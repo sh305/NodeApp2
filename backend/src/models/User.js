@@ -1,0 +1,141 @@
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    phoneNumber: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+    email: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+    },
+    facebookId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    avatar: {
+      type: String,
+      default: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+    },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other'],
+      default: 'male',
+    },
+    coins: {
+      type: Number,
+      default: 1000, // Initial welcome coins
+      min: 0,
+    },
+    diamonds: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // User Wealth & Charm EXP and Levels
+    wealthExp: {
+      type: Number,
+      default: 0,
+    },
+    wealthLevel: {
+      type: Number,
+      default: 1,
+    },
+    charmExp: {
+      type: Number,
+      default: 0,
+    },
+    charmLevel: {
+      type: Number,
+      default: 1,
+    },
+    // Active Avatar Frame
+    activeFrame: {
+      id: { type: String, default: 'frame_lv1' },
+      name: { type: String, default: 'Starter Frame' },
+      frameUrl: { type: String, default: 'https://assets.example.com/frames/frame_lv1.png' },
+    },
+    // User Ban System (Reporting Penalty)
+    isBanned: {
+      type: Boolean,
+      default: false,
+    },
+    banType: {
+      type: String,
+      enum: [null, '3days', '7days', 'permanent'],
+      default: null,
+    },
+    bannedAt: {
+      type: Date,
+      default: null,
+    },
+    banExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    banReason: {
+      type: String,
+      default: '',
+    },
+    // Block System (User A blocks User B)
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Helper method to verify if user account is currently banned
+userSchema.methods.checkActiveBan = function () {
+  if (!this.isBanned) return { banned: false };
+
+  if (this.banType === 'permanent') {
+    return {
+      banned: true,
+      type: 'permanent',
+      message: 'Aapka account permanent ban kar diya gaya hai. Aap dubara login nahi kar sakte.',
+    };
+  }
+
+  if (this.banExpiresAt && new Date() < this.banExpiresAt) {
+    const daysLeft = Math.ceil((this.banExpiresAt - new Date()) / (1000 * 60 * 60 * 24));
+    return {
+      banned: true,
+      type: this.banType,
+      expiresAt: this.banExpiresAt,
+      message: `Aapka account ${daysLeft} din ke liye suspend hai report ki wajah se.`,
+    };
+  }
+
+  // Ban expired, reset status
+  this.isBanned = false;
+  this.banType = null;
+  this.banExpiresAt = null;
+  this.bannedAt = null;
+  this.save();
+  return { banned: false };
+};
+
+module.exports = mongoose.model('User', userSchema);
