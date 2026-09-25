@@ -6,12 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Platform,
+  Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { auth } from '../config/firebase';
 import api from '../api/client';
 
 export default function AuthScreen({ navigation, onLoginSuccess }) {
@@ -22,32 +20,43 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [otpSentMessage, setOtpSentMessage] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState(null);
 
-  const recaptchaVerifierRef = useRef(null);
+  // Beautiful Toast Notification State & Animation (React Hot Toast Style)
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+  const toastAnim = useRef(new Animated.Value(-100)).current;
+  const toastTimerRef = useRef(null);
 
-  useEffect(() => {
-    // Ensure recaptcha-container DOM element exists for Web
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      try {
-        let container = document.getElementById('recaptcha-container');
-        if (!container) {
-          container = document.createElement('div');
-          container.id = 'recaptcha-container';
-          document.body.appendChild(container);
-        }
-      } catch (e) {
-        console.log('DOM container init note:', e.message);
-      }
-    }
-  }, []);
+  const showToast = (message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+
+    setToast({ visible: true, message, type });
+
+    Animated.spring(toastAnim, {
+      toValue: 20,
+      friction: 6,
+      tension: 50,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+
+    toastTimerRef.current = setTimeout(() => {
+      hideToast();
+    }, 3500);
+  };
+
+  const hideToast = () => {
+    Animated.timing(toastAnim, {
+      toValue: -100,
+      duration: 300,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start(() => {
+      setToast({ visible: false, message: '', type: 'success' });
+    });
+  };
 
   const handleSendOtp = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!cleanPhone || cleanPhone.length !== 10) {
-      const msg = 'Please enter a valid 10-digit Indian mobile number';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Required', msg);
+      showToast('Please enter a valid 10-digit mobile number', 'error');
       return;
     }
 
@@ -55,57 +64,40 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     setOtpSentMessage('');
 
     try {
-      // Send Real SMS OTP to User's Mobile via Fast2SMS
+      // Send Real SMS OTP to User's Mobile via Twilio / Fast2SMS
       const res = await api.post('/auth/send-whatsapp-otp', {
         phoneNumber: cleanPhone,
       });
 
       if (res.data.success) {
-        setOtpSentMessage(`📲 Real SMS sent to +91 ${cleanPhone}!`);
-        const alertMsg = res.data.message || `Real SMS OTP has been sent to +91 ${cleanPhone}!\nPlease check your phone messages.`;
-
-        if (Platform.OS === 'web') {
-          window.alert(alertMsg);
-        } else {
-          Alert.alert('SMS Sent 📲', alertMsg);
-        }
+        setOtpSentMessage(`📲 OTP Sent to +91 ${cleanPhone}`);
+        // Clean toast message requested by user
+        showToast('Message Sent Successfully', 'success');
       } else {
-        const errorMsg = res.data.message || 'Failed to send SMS';
-        if (Platform.OS === 'web') window.alert(errorMsg);
-        else Alert.alert('Error', errorMsg);
+        showToast(res.data.message || 'Failed to send OTP', 'error');
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to send SMS OTP';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      showToast(msg, 'error');
     } finally {
       setSendingOtp(false);
     }
   };
 
   const handlePhoneLogin = async () => {
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
-    if (!cleanPhone) {
-      Alert.alert('Required', 'Please enter your phone number');
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      showToast('Please enter your 10-digit mobile number', 'error');
       return;
     }
     if (!otp.trim()) {
-      Alert.alert('Required', 'Please enter the 6-digit OTP code');
+      showToast('Please enter the 6-digit OTP code', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      // If Firebase confirmation is active, verify with Firebase
-      if (confirmationResult) {
-        try {
-          await confirmationResult.confirm(otp.trim());
-        } catch (fbConfirmErr) {
-          console.log('Firebase confirm note:', fbConfirmErr.message);
-        }
-      }
-
-      // Login/Register in Backend
+      // Verify OTP in Backend
       const res = await api.post('/auth/phone-login', {
         phoneNumber: cleanPhone,
         otp: otp.trim(),
@@ -113,15 +105,18 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       });
 
       if (res.data.success) {
+        showToast('Login Successful! Welcome 🎉', 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
         await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
         if (onLoginSuccess) onLoginSuccess(res.data.user);
       }
     } catch (err) {
       if (err.response?.data?.banned) {
-        Alert.alert('Account Banned 🚫', err.response.data.message);
+        showToast(`Account Banned: ${err.response.data.message}`, 'error');
       } else {
-        Alert.alert('Login Failed', err.response?.data?.message || 'Invalid OTP code. Please try again.');
+        // Exact custom wrong OTP error requested by user
+        const errMsg = err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP';
+        showToast(errMsg, 'error');
       }
     } finally {
       setLoading(false);
@@ -147,15 +142,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
       const res = await api.post(`/auth/${provider}-login`, payload);
       if (res.data.success) {
+        showToast('Login Successful!', 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
         await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
         if (onLoginSuccess) onLoginSuccess(res.data.user);
       }
     } catch (err) {
       if (err.response?.data?.banned) {
-        Alert.alert('Account Banned 🚫', err.response.data.message);
+        showToast(err.response.data.message, 'error');
       } else {
-        Alert.alert('Login Error', err.response?.data?.message || 'Login failed');
+        showToast('Social login failed. Please try again.', 'error');
       }
     } finally {
       setLoading(false);
@@ -164,8 +160,29 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   return (
     <View style={styles.container}>
-      {/* Invisible Recaptcha container for Web */}
-      {Platform.OS === 'web' && <div id="recaptcha-container" />}
+      {/* Sleek Modern Hot-Toast Floating Notification Banner */}
+      {toast.visible && (
+        <Animated.View
+          style={[
+            styles.toastContainer,
+            toast.type === 'success' && styles.toastSuccess,
+            toast.type === 'error' && styles.toastError,
+            toast.type === 'info' && styles.toastInfo,
+            { top: toastAnim },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.toastInner}
+            activeOpacity={0.9}
+            onPress={hideToast}
+          >
+            <Text style={styles.toastIcon}>
+              {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
+            </Text>
+            <Text style={styles.toastText}>{toast.message}</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* App Logo & Title */}
       <View style={styles.logoSection}>
@@ -308,7 +325,57 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F0F1A',
     paddingHorizontal: 24,
     justifyContent: 'center',
+    position: 'relative',
   },
+  // Sleek React-Hot-Toast style Banner
+  toastContainer: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    zIndex: 9999,
+    alignItems: 'center',
+  },
+  toastInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: 'rgba(30, 30, 46, 0.95)',
+    borderWidth: 1.5,
+    borderColor: '#374151',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+    maxWidth: 440,
+    width: '100%',
+    gap: 10,
+  },
+  toastSuccess: {
+    borderColor: '#10B981',
+    shadowColor: '#10B981',
+  },
+  toastError: {
+    borderColor: '#EF4444',
+    shadowColor: '#EF4444',
+  },
+  toastInfo: {
+    borderColor: '#6366F1',
+    shadowColor: '#6366F1',
+  },
+  toastIcon: {
+    fontSize: 16,
+  },
+  toastText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    letterSpacing: 0.2,
+  },
+
   logoSection: {
     alignItems: 'center',
     marginBottom: 24,

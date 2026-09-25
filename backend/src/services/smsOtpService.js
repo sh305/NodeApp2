@@ -98,7 +98,7 @@ class SmsOtpService {
         } else {
           return {
             valid: false,
-            message: 'Invalid or expired OTP code. Please check your SMS and try again.',
+            message: 'Wrong OTP! Please enter correct 6 digit OTP',
           };
         }
       } catch (err) {
@@ -115,7 +115,7 @@ class SmsOtpService {
 
     return {
       valid: false,
-      message: 'Invalid OTP code. Please check the SMS on your mobile and try again.',
+      message: 'Wrong OTP! Please enter correct 6 digit OTP',
     };
   }
 }
