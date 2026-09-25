@@ -17,23 +17,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../api/client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import RoomLockModal from '../components/RoomLockModal';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function HomeScreen({ navigation, currentUser, onLogout }) {
   const insets = useSafeAreaInsets();
+  const { t, openLanguageModal } = useLanguage();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleLogoutPress = () => {
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Kya aap account se logout karna chahte hain?');
+      const confirmed = window.confirm(t('logoutConfirm', 'Do you want to logout from your account?'));
       if (confirmed && onLogout) {
         onLogout();
       }
     } else {
-      Alert.alert('Logout 🚪', 'Kya aap account se logout karna chahte hain?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: onLogout },
+      Alert.alert(t('logout', 'Logout') + ' 🚪', t('logoutConfirm', 'Do you want to logout from your account?'), [
+        { text: t('cancel', 'Cancel'), style: 'cancel' },
+        { text: t('logout', 'Logout'), style: 'destructive', onPress: onLogout },
       ]);
     }
   };
@@ -87,11 +89,11 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
 
   const handleCreateRoom = async () => {
     if (!newRoomTitle.trim()) {
-      Alert.alert('Required', 'Please enter a room title');
+      Alert.alert(t('roomTitleRequired', 'Please enter a room title'));
       return;
     }
     if (isLockedNewRoom && !newRoomPassword.trim()) {
-      Alert.alert('Required', 'Please enter a password for your locked room');
+      Alert.alert(t('roomPasswordRequired', 'Please enter a password for your locked room'));
       return;
     }
 
@@ -128,12 +130,21 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
       {/* Header Bar */}
       <View style={[styles.header, { paddingTop: Math.max(16, insets.top) }]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.appTitle}>YoYo Rooms</Text>
-          <Text style={styles.onlineBadge}>🟢 Live Voice Chat</Text>
+          <Text style={styles.appTitle}>{t('roomsTitle', 'YoYo Rooms')}</Text>
+          <Text style={styles.onlineBadge}>{t('liveVoiceChat', '🟢 Live Voice Chat')}</Text>
         </View>
 
         {currentUser && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            {/* Language Switch Button */}
+            <TouchableOpacity
+              style={styles.logoutHeaderBtn}
+              onPress={openLanguageModal}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 16 }}>🌐</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.profileBtn}
               onPress={() => navigation.navigate('UserProfile', { userId: currentUser._id })}

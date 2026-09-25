@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import api from '../api/client';
 import ScreenContainer from '../components/ScreenContainer';
+import { useLanguage } from '../context/LanguageContext';
 
 // Official Multi-Color Gmail 'M' Vector Icon (matching user reference screenshot)
 const GmailOfficialIcon = ({ size = 26 }) => (
@@ -55,6 +56,8 @@ const PhoneHandsetIcon = ({ size = 22, color = '#0284C7' }) => (
 );
 
 export default function AuthScreen({ navigation, onLoginSuccess }) {
+  const { t, openLanguageModal, activeLanguagePillText } = useLanguage();
+
   // 'phone' | 'email' | null
   const [activeModal, setActiveModal] = useState(null);
 
@@ -221,7 +224,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleSendPhoneOtp = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!cleanPhone || cleanPhone.length !== 10) {
-      showToast('Please enter a valid 10-digit mobile number', 'error');
+      showToast(t('msgValidPhone', 'Please enter a valid 10-digit mobile number'), 'error');
       return;
     }
 
@@ -232,12 +235,12 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         setPhoneOtpSent(true);
         setIsPhoneOtpVerified(false);
         setPhoneOtp('');
-        showToast('Message Sent Successfully', 'success');
+        showToast(t('msgOtpSent', 'Message Sent Successfully'), 'success');
       } else {
-        showToast(res.data.message || 'Failed to send OTP', 'error');
+        showToast(res.data.message || t('msgOtpFailed', 'Failed to send OTP'), 'error');
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to send SMS OTP', 'error');
+      showToast(err.response?.data?.message || t('msgOtpFailed', 'Failed to send SMS OTP'), 'error');
     } finally {
       setPhoneSending(false);
     }
@@ -246,7 +249,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleVerifyPhoneOtp = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!phoneOtp.trim() || phoneOtp.trim().length < 6) {
-      showToast('Please enter the 6-digit OTP code', 'error');
+      showToast(t('msgEnter6DigitOtp', 'Please enter the 6-digit OTP code'), 'error');
       return;
     }
 
@@ -258,14 +261,14 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       });
       if (res.data.success) {
         setIsPhoneOtpVerified(true);
-        showToast('OTP Verified Successfully! ✅', 'success');
+        showToast(t('msgOtpVerified', 'OTP Verified Successfully! ✅'), 'success');
       } else {
         setIsPhoneOtpVerified(false);
-        showToast(res.data.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
+        showToast(res.data.message || t('msgWrongOtp', 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
       }
     } catch (err) {
       setIsPhoneOtpVerified(false);
-      showToast(err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
+      showToast(err.response?.data?.message || t('msgWrongOtp', 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
     } finally {
       setPhoneVerifying(false);
     }
@@ -274,11 +277,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handlePhoneLoginSubmit = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!isPhoneOtpVerified) {
-      showToast('Please verify your OTP first', 'error');
+      showToast(t('msgVerifyOtpFirst', 'Please verify your OTP first'), 'error');
       return;
     }
     if (!phoneUserName.trim()) {
-      showToast('Please enter your full name', 'error');
+      showToast(t('msgEnterFullName', 'Please enter your full name'), 'error');
       return;
     }
 
@@ -290,13 +293,13 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         name: phoneUserName.trim(),
       });
       if (res.data.success) {
-        showToast('Login Successful! Welcome 🎉', 'success');
+        showToast(t('msgLoginSuccess', 'Login Successful! Welcome 🎉'), 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
         await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
         if (onLoginSuccess) onLoginSuccess(res.data.user);
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Login failed', 'error');
+      showToast(err.response?.data?.message || t('msgLoginFailed', 'Login failed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -306,7 +309,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleSendEmailOtp = async () => {
     const cleanEmail = email.toLowerCase().trim();
     if (!cleanEmail || !cleanEmail.includes('@')) {
-      showToast('Please enter a valid Gmail / Email address', 'error');
+      showToast(t('msgValidEmail', 'Please enter a valid Gmail / Email address'), 'error');
       return;
     }
 
@@ -317,12 +320,12 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         setEmailOtpSent(true);
         setIsEmailOtpVerified(false);
         setEmailOtp('');
-        showToast('Message Sent Successfully', 'success');
+        showToast(t('msgOtpSent', 'Message Sent Successfully'), 'success');
       } else {
-        showToast(res.data.message || 'Failed to send OTP to email', 'error');
+        showToast(res.data.message || t('msgOtpFailed', 'Failed to send OTP to email'), 'error');
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to send Email OTP', 'error');
+      showToast(err.response?.data?.message || t('msgOtpFailed', 'Failed to send Email OTP'), 'error');
     } finally {
       setEmailSending(false);
     }
@@ -331,7 +334,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleVerifyEmailOtp = async () => {
     const cleanEmail = email.toLowerCase().trim();
     if (!emailOtp.trim() || emailOtp.trim().length < 6) {
-      showToast('Please enter the 6-digit OTP code', 'error');
+      showToast(t('msgEnter6DigitOtp', 'Please enter the 6-digit OTP code'), 'error');
       return;
     }
 
@@ -343,14 +346,14 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       });
       if (res.data.success) {
         setIsEmailOtpVerified(true);
-        showToast('OTP Verified Successfully! ✅', 'success');
+        showToast(t('msgOtpVerified', 'OTP Verified Successfully! ✅'), 'success');
       } else {
         setIsEmailOtpVerified(false);
-        showToast(res.data.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
+        showToast(res.data.message || t('msgWrongOtp', 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
       }
     } catch (err) {
       setIsEmailOtpVerified(false);
-      showToast(err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
+      showToast(err.response?.data?.message || t('msgWrongOtp', 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
     } finally {
       setEmailVerifying(false);
     }
@@ -359,11 +362,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleEmailLoginSubmit = async () => {
     const cleanEmail = email.toLowerCase().trim();
     if (!isEmailOtpVerified) {
-      showToast('Please verify your OTP first', 'error');
+      showToast(t('msgVerifyOtpFirst', 'Please verify your OTP first'), 'error');
       return;
     }
     if (!emailUserName.trim()) {
-      showToast('Please enter your full name', 'error');
+      showToast(t('msgEnterFullName', 'Please enter your full name'), 'error');
       return;
     }
 
@@ -375,13 +378,13 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         name: emailUserName.trim(),
       });
       if (res.data.success) {
-        showToast('Login Successful! Welcome 🎉', 'success');
+        showToast(t('msgLoginSuccess', 'Login Successful! Welcome 🎉'), 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
         await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
         if (onLoginSuccess) onLoginSuccess(res.data.user);
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Login failed', 'error');
+      showToast(err.response?.data?.message || t('msgLoginFailed', 'Login failed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -457,8 +460,8 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           <Text style={styles.yoExclamation}>!</Text>
         </View>
 
-        <Text style={styles.hindiTagline}>वॉइस चैट, प्ले गेम्स, दोस्त बनाएं</Text>
-        <Text style={styles.englishTagline}>Voice Chat, Play Games, Make Friends</Text>
+        <Text style={styles.hindiTagline}>{t('Voice Chat, Play Games, Make Friends')}</Text>
+        <Text style={styles.englishTagline}>{t('Connect with millions around the world')}</Text>
       </View>
 
         {/* MAIN BUTTONS or ACTIVE AUTH MODAL FORM */}
@@ -479,8 +482,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 <GmailOfficialIcon size={24} />
               </View>
               <View style={styles.btnTextCol}>
-                <Text style={styles.premiumButtonTitle}>गूगल / Gmail के साथ साइन इन करें</Text>
-                <Text style={styles.premiumButtonSub}>Instant 6-Digit Email OTP</Text>
+                <Text style={styles.premiumButtonTitle}>{t('Sign in with Google / Gmail')}</Text>
               </View>
             </TouchableOpacity>
 
@@ -500,8 +502,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 <PhoneHandsetIcon size={22} color="#0284C7" />
               </View>
               <View style={styles.btnTextCol}>
-                <Text style={styles.premiumButtonTitle}>मोबाइल नंबर के साथ साइन इन करें</Text>
-                <Text style={styles.premiumButtonSub}>Fast SMS Verification Code</Text>
+                <Text style={styles.premiumButtonTitle}>{t('Sign in with Phone Number')}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -511,7 +512,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderTitleWrap}>
                 <PhoneHandsetIcon size={20} color="#0284C7" />
-                <Text style={styles.cardTitle}>Mobile Phone Login</Text>
+                <Text style={styles.cardTitle}>{t('Mobile Phone Login')}</Text>
               </View>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeBtn} activeOpacity={0.7}>
                 <Text style={styles.closeBtnText}>✕</Text>
@@ -519,7 +520,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             </View>
 
             {/* Mobile Number Row */}
-            <Text style={styles.inputLabel}>Mobile Number</Text>
+            <Text style={styles.inputLabel}>{t('Mobile Number')}</Text>
             <View style={styles.inputRow}>
               <View style={styles.phoneInputCombined}>
                 <View style={styles.countryCodeBadge}>
@@ -527,7 +528,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 </View>
                 <TextInput
                   style={styles.phoneTextInputInside}
-                  placeholder="Enter 10-digit number"
+                  placeholder={t('Enter 10-digit number')}
                   placeholderTextColor="#9CA3AF"
                   keyboardType="phone-pad"
                   maxLength={10}
@@ -550,7 +551,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 {phoneSending ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.muiBtnText}>{phoneOtpSent ? 'Resend' : 'Get OTP'}</Text>
+                  <Text style={styles.muiBtnText}>{phoneOtpSent ? t('Resend') : t('Get OTP')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -559,13 +560,13 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             {phoneOtpSent && (
               <View style={styles.fieldSpacing}>
                 <View style={styles.labelFlexRow}>
-                  <Text style={styles.inputLabel}>Enter 6-Digit SMS OTP</Text>
-                  {isPhoneOtpVerified && <Text style={styles.verifiedText}>Verified ✅</Text>}
+                  <Text style={styles.inputLabel}>{t('Enter 6-Digit SMS OTP')}</Text>
+                  {isPhoneOtpVerified && <Text style={styles.verifiedText}>{t('Verified ✅')}</Text>}
                 </View>
                 <View style={styles.inputRow}>
                   <TextInput
                     style={[styles.input, styles.flexInput, isPhoneOtpVerified && styles.inputVerified]}
-                    placeholder="Enter 6-digit OTP"
+                    placeholder={t('Enter 6-digit OTP')}
                     placeholderTextColor="#9CA3AF"
                     keyboardType="number-pad"
                     maxLength={6}
@@ -586,7 +587,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <Text style={styles.muiVerifyBtnText}>
-                        {isPhoneOtpVerified ? 'Verified ✅' : 'Verify OTP'}
+                        {isPhoneOtpVerified ? t('Verified ✅') : t('Verify OTP')}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -596,11 +597,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
             {/* Mandatory Name */}
             <Text style={styles.inputLabel}>
-              Your Full Name <Text style={styles.star}>*</Text>
+              {t('Your Full Name')} <Text style={styles.star}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Rahul Sharma"
+              placeholder={t('e.g. Rahul Sharma')}
               placeholderTextColor="#9CA3AF"
               value={phoneUserName}
               onFocus={() => {
@@ -620,7 +621,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 <ActivityIndicator color="#000" />
               ) : (
                 <Text style={[styles.primarySubmitBtnText, !isPhoneOtpVerified && styles.primaryBtnTextLocked]}>
-                  {isPhoneOtpVerified ? 'Verify & Login' : 'Verify OTP First to Login 🔒'}
+                  {isPhoneOtpVerified ? t('Verify & Login') : t('Verify OTP First to Login 🔒')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -631,7 +632,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderTitleWrap}>
                 <GmailOfficialIcon size={22} />
-                <Text style={styles.cardTitle}>Gmail / Email Login</Text>
+                <Text style={styles.cardTitle}>{t('Gmail / Email Login')}</Text>
               </View>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeBtn} activeOpacity={0.7}>
                 <Text style={styles.closeBtnText}>✕</Text>
@@ -639,11 +640,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             </View>
 
             {/* Email Address Row */}
-            <Text style={styles.inputLabel}>Gmail / Email Address</Text>
+            <Text style={styles.inputLabel}>{t('Gmail / Email Address')}</Text>
             <View style={styles.inputRow}>
               <TextInput
                 style={[styles.input, styles.flexInput]}
-                placeholder="youremail@gmail.com"
+                placeholder={t('Enter your email')}
                 placeholderTextColor="#9CA3AF"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -665,7 +666,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 {emailSending ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.muiBtnText}>{emailOtpSent ? 'Resend' : 'Get OTP'}</Text>
+                  <Text style={styles.muiBtnText}>{emailOtpSent ? t('Resend') : t('Get OTP')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -674,13 +675,13 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             {emailOtpSent && (
               <View style={styles.fieldSpacing}>
                 <View style={styles.labelFlexRow}>
-                  <Text style={styles.inputLabel}>Enter 6-Digit Email OTP</Text>
-                  {isEmailOtpVerified && <Text style={styles.verifiedText}>Verified ✅</Text>}
+                  <Text style={styles.inputLabel}>{t('Enter 6-Digit Email OTP')}</Text>
+                  {isEmailOtpVerified && <Text style={styles.verifiedText}>{t('Verified ✅')}</Text>}
                 </View>
                 <View style={styles.inputRow}>
                   <TextInput
                     style={[styles.input, styles.flexInput, isEmailOtpVerified && styles.inputVerified]}
-                    placeholder="Enter 6-digit code"
+                    placeholder={t('Enter 6-digit OTP')}
                     placeholderTextColor="#9CA3AF"
                     keyboardType="number-pad"
                     maxLength={6}
@@ -701,22 +702,22 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <Text style={styles.muiVerifyBtnText}>
-                        {isEmailOtpVerified ? 'Verified ✅' : 'Verify OTP'}
+                        {isEmailOtpVerified ? t('Verified ✅') : t('Verify OTP')}
                       </Text>
                     )}
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.spamHelperText}>💡 Check your Gmail Inbox & Spam folder</Text>
+                <Text style={styles.spamHelperText}>💡 {t('Check your Gmail Inbox & Spam folder')}</Text>
               </View>
             )}
 
             {/* Mandatory Name */}
             <Text style={styles.inputLabel}>
-              Your Full Name <Text style={styles.star}>*</Text>
+              {t('Your Full Name')} <Text style={styles.star}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Rahul Sharma"
+              placeholder={t('e.g. Rahul Sharma')}
               placeholderTextColor="#9CA3AF"
               value={emailUserName}
               onFocus={() => {
@@ -736,22 +737,27 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 <ActivityIndicator color="#000" />
               ) : (
                 <Text style={[styles.primarySubmitBtnText, !isEmailOtpVerified && styles.primaryBtnTextLocked]}>
-                  {isEmailOtpVerified ? 'Verify & Login' : 'Verify OTP First to Login 🔒'}
+                  {isEmailOtpVerified ? t('Verify & Login') : t('Verify OTP First to Login 🔒')}
                 </Text>
               )}
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Bottom Language Selector & Terms matching screenshot */}
+        {/* Bottom Language Selector & Terms matching user requirement */}
         <View style={styles.footerSection}>
-          <TouchableOpacity style={styles.langPill} activeOpacity={0.8}>
-            <Text style={styles.langPillText}>🌐 हिन्दी (Hindi)  ›</Text>
+          <TouchableOpacity
+            style={styles.langPill}
+            activeOpacity={0.8}
+            onPress={openLanguageModal}
+          >
+            <Text style={styles.langPillText}>{activeLanguagePillText}  ›</Text>
           </TouchableOpacity>
 
           <Text style={styles.termsText}>
-            जारी रखकर आप <Text style={styles.termsLink}>&lt;&lt;सेवा की शर्तें&gt;&gt;</Text> और{' '}
-            <Text style={styles.termsLink}>&lt;&lt;गोपनीयता नीति&gt;&gt;</Text> से सहमत होते हैं
+            {t('By continuing, you agree to our')}{' '}
+            <Text style={styles.termsLink}>&lt;&lt;{t('Terms of Service')}&gt;&gt;</Text> {t('and')}{' '}
+            <Text style={styles.termsLink}>&lt;&lt;{t('Privacy Policy')}&gt;&gt;</Text>
           </Text>
         </View>
     </ScreenContainer>
@@ -997,7 +1003,7 @@ const styles = StyleSheet.create({
   },
   premiumButtonTitle: {
     color: '#0F172A',
-    fontSize: 14.5,
+    fontSize: 15.5,
     fontWeight: '800',
     letterSpacing: 0.2,
   },

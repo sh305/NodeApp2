@@ -12,6 +12,7 @@ const roomRoutes = require('./routes/roomRoutes');
 const userRoutes = require('./routes/userRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const giftRoutes = require('./routes/giftRoutes');
+const translationRoutes = require('./routes/translationRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +36,7 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/gifts', giftRoutes);
+app.use('/api/translations', translationRoutes);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {
