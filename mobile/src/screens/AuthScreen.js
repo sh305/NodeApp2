@@ -37,12 +37,10 @@ const GoogleGIcon = ({ size = 26 }) => (
   </Svg>
 );
 
-// High-Tech Cyber Smartphone Vector Icon
-const CyberPhoneIcon = ({ size = 24 }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Rect x="5" y="2" width="14" height="20" rx="3.5" stroke="#00F0FF" strokeWidth="2" fill="#0A2540" />
-    <Circle cx="12" cy="18" r="1.3" fill="#00F0FF" />
-    <Path d="M10 5H14" stroke="#00F0FF" strokeWidth="1.5" strokeLinecap="round" />
+// Classic Blue Telephone Handset Vector Icon
+const PhoneHandsetIcon = ({ size = 22, color = '#0284C7' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.047 15.047 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1.01A11.36 11.36 0 0 1 8.57 3.9c0-.55-.45-1-1-1H3.97c-.55 0-1 .45-1 1C2.97 13.56 10.44 21.03 19.97 21.03c.55 0 1-.45 1-1v-3.65c0-.55-.45-1-.96-1z" />
   </Svg>
 );
 
@@ -466,7 +464,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               onMouseLeave={() => setHoveredBtn(null)}
             >
               <View style={[styles.phoneIconBadge, hoveredBtn === 'phone' && styles.phoneBadgeHovered]}>
-                <CyberPhoneIcon size={24} />
+                <PhoneHandsetIcon size={22} color="#0284C7" />
               </View>
               <View style={styles.btnTextCol}>
                 <Text style={styles.premiumButtonTitle}>मोबाइल नंबर के साथ साइन इन करें</Text>
@@ -479,7 +477,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           <View style={styles.authCard}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderTitleWrap}>
-                <CyberPhoneIcon size={20} />
+                <PhoneHandsetIcon size={20} color="#0284C7" />
                 <Text style={styles.cardTitle}>Mobile Phone Login</Text>
               </View>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeBtn} activeOpacity={0.7}>
@@ -923,19 +921,22 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
-    shadowColor: '#00F0FF',
-    shadowOpacity: 0.35,
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.15,
     shadowRadius: 6,
-    elevation: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     transition: Platform.OS === 'web' ? 'transform 0.28s ease' : undefined,
   },
   phoneBadgeHovered: {
     transform: [{ scale: 1.12 }],
-    shadowOpacity: 0.6,
+    borderColor: '#0284C7',
+    shadowOpacity: 0.35,
   },
   btnTextCol: {
     flex: 1,
