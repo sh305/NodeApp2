@@ -68,8 +68,18 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
   const iconRotateAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
+  // Immediately cancel ongoing animations so mouse enter / exit never gets stuck
+  const stopAllAnims = () => {
+    scaleAnim.stopAnimation();
+    translateYAnim.stopAnimation();
+    iconScaleAnim.stopAnimation();
+    iconRotateAnim.stopAnimation();
+    glowAnim.stopAnimation();
+  };
+
   const triggerHoverIn = () => {
     setIsHovered(true);
+    stopAllAnims();
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1.035,
@@ -78,26 +88,27 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(translateYAnim, {
-        toValue: -3.5,
+        toValue: -4,
         friction: 5,
         tension: 90,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(iconScaleAnim, {
-        toValue: 1.16,
+        toValue: 1.2,
         friction: 4,
-        tension: 100,
+        tension: 110,
         useNativeDriver: Platform.OS !== 'web',
       }),
-      Animated.timing(iconRotateAnim, {
+      // Visible 24-degree dynamic rotation
+      Animated.spring(iconRotateAnim, {
         toValue: isGoogle ? -1 : 1,
-        duration: 220,
-        easing: Easing.out(Easing.back(1.5)),
+        friction: 4,
+        tension: 110,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(glowAnim, {
         toValue: 1,
-        duration: 220,
+        duration: 200,
         useNativeDriver: false,
       }),
     ]).start();
@@ -105,56 +116,67 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
 
   const triggerHoverOut = () => {
     setIsHovered(false);
+    stopAllAnims();
+    // Return all values back to normal promptly and cleanly
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
-        friction: 6,
-        tension: 80,
+        friction: 7,
+        tension: 120,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(translateYAnim, {
         toValue: 0,
-        friction: 6,
-        tension: 80,
+        friction: 7,
+        tension: 120,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(iconScaleAnim, {
         toValue: 1,
-        friction: 6,
-        tension: 80,
+        friction: 7,
+        tension: 120,
         useNativeDriver: Platform.OS !== 'web',
       }),
-      Animated.timing(iconRotateAnim, {
+      // Reset rotation back to 0 immediately
+      Animated.spring(iconRotateAnim, {
         toValue: 0,
-        duration: 180,
+        friction: 6,
+        tension: 120,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(glowAnim, {
         toValue: 0,
-        duration: 220,
+        duration: 160,
         useNativeDriver: false,
       }),
     ]).start();
   };
 
   const triggerPressIn = () => {
+    stopAllAnims();
     Animated.parallel([
       Animated.spring(scaleAnim, {
-        toValue: 0.96,
+        toValue: 0.95,
         friction: 5,
-        tension: 140,
+        tension: 150,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(translateYAnim, {
         toValue: 1.5,
         friction: 5,
-        tension: 140,
+        tension: 150,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(iconScaleAnim, {
         toValue: 0.94,
         friction: 5,
-        tension: 140,
+        tension: 150,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(iconRotateAnim, {
+        toValue: 0,
+        friction: 6,
+        tension: 150,
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
@@ -168,9 +190,10 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
     }
   };
 
+  // Distinct visible rotation: 24 degrees
   const iconRotation = iconRotateAnim.interpolate({
     inputRange: [-1, 0, 1],
-    outputRange: ['-10deg', '0deg', '10deg'],
+    outputRange: ['-24deg', '0deg', '24deg'],
   });
 
   const animatedBorderColor = glowAnim.interpolate({
@@ -204,13 +227,15 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
           ],
         },
       ]}
+      onMouseEnter={triggerHoverIn}
+      onMouseLeave={triggerHoverOut}
     >
       <Pressable
         onPress={onPress}
         onPressIn={triggerPressIn}
         onPressOut={triggerPressOut}
-        onMouseEnter={triggerHoverIn}
-        onMouseLeave={triggerHoverOut}
+        onHoverIn={triggerHoverIn}
+        onHoverOut={triggerHoverOut}
         style={styles.pressableFull}
       >
         <Animated.View
@@ -225,7 +250,9 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
             },
           ]}
         >
+          {/* Animated Rotated + Scaled Icon with pointerEvents none */}
           <Animated.View
+            pointerEvents="none"
             style={[
               styles.iconBadgeAnimWrap,
               {
@@ -239,12 +266,13 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
             {icon}
           </Animated.View>
 
-          <View style={styles.btnTextCol}>
+          <View pointerEvents="none" style={styles.btnTextCol}>
             <Text style={styles.premiumButtonTitle}>{title}</Text>
           </View>
 
           {/* Micro arrow icon that glides forward when hovered/touched */}
           <Animated.View
+            pointerEvents="none"
             style={[
               styles.arrowBadgeWrap,
               {
@@ -256,7 +284,7 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
                   {
                     translateX: glowAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0, 4],
+                      outputRange: [0, 5],
                     }),
                   },
                 ],
@@ -457,8 +485,13 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       if (res.data.success) {
         setPhoneOtpSent(true);
         setIsPhoneOtpVerified(false);
-        setPhoneOtp('');
-        showToast(t('msgOtpSent', 'Message Sent Successfully'), 'success');
+        if (res.data.devOtp) {
+          setPhoneOtp(res.data.devOtp);
+          showToast(`OTP: ${res.data.devOtp}`, 'success');
+        } else {
+          setPhoneOtp('');
+          showToast(t('msgOtpSent', 'Message Sent Successfully'), 'success');
+        }
       } else {
         showToast(res.data.message || t('msgOtpFailed', 'Failed to send OTP'), 'error');
       }
@@ -542,8 +575,13 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       if (res.data.success) {
         setEmailOtpSent(true);
         setIsEmailOtpVerified(false);
-        setEmailOtp('');
-        showToast(t('msgOtpSent', 'Message Sent Successfully'), 'success');
+        if (res.data.devOtp && !res.data.isRealMailSent) {
+          setEmailOtp(res.data.devOtp);
+          showToast(`OTP: ${res.data.devOtp}`, 'success');
+        } else {
+          setEmailOtp('');
+          showToast(t('msgOtpSent', 'OTP code sent to your Gmail inbox!'), 'success');
+        }
       } else {
         showToast(res.data.message || t('msgOtpFailed', 'Failed to send OTP to email'), 'error');
       }

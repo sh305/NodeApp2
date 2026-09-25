@@ -78,8 +78,9 @@ class EmailOtpService {
 
       return {
         success: true,
-        message: 'Message Sent Successfully',
-        devOtp: process.env.NODE_ENV === 'production' && transporter ? undefined : otp,
+        message: mailer ? 'OTP code sent to your Gmail inbox!' : `OTP sent: ${otp} (Valid for 5 mins)`,
+        devOtp: otp,
+        isRealMailSent: !!mailer,
       };
     } catch (error) {
       console.error('EmailOtpService Error:', error.message);
