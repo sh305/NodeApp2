@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ActivityIndicator,
   Platform,
@@ -55,6 +56,229 @@ const PhoneHandsetIcon = ({ size = 22, color = '#0284C7' }) => (
   </Svg>
 );
 
+// Interactive Animated Pill Button with Rich Hover (Web) & Press (Phone) Spring Physics
+const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => {
+  const isGoogle = variant === 'google';
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Animated values for silky spring scaling, lift, rotation, and luminous glow
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const translateYAnim = useRef(new Animated.Value(0)).current;
+  const iconScaleAnim = useRef(new Animated.Value(1)).current;
+  const iconRotateAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  const triggerHoverIn = () => {
+    setIsHovered(true);
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1.035,
+        friction: 5,
+        tension: 90,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(translateYAnim, {
+        toValue: -3.5,
+        friction: 5,
+        tension: 90,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(iconScaleAnim, {
+        toValue: 1.16,
+        friction: 4,
+        tension: 100,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(iconRotateAnim, {
+        toValue: isGoogle ? -1 : 1,
+        duration: 220,
+        easing: Easing.out(Easing.back(1.5)),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(glowAnim, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  const triggerHoverOut = () => {
+    setIsHovered(false);
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(translateYAnim, {
+        toValue: 0,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(iconScaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(iconRotateAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(glowAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  const triggerPressIn = () => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 0.96,
+        friction: 5,
+        tension: 140,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(translateYAnim, {
+        toValue: 1.5,
+        friction: 5,
+        tension: 140,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(iconScaleAnim, {
+        toValue: 0.94,
+        friction: 5,
+        tension: 140,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  };
+
+  const triggerPressOut = () => {
+    if (isHovered) {
+      triggerHoverIn();
+    } else {
+      triggerHoverOut();
+    }
+  };
+
+  const iconRotation = iconRotateAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-10deg', '0deg', '10deg'],
+  });
+
+  const animatedBorderColor = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 255, 255, 0.9)', isGoogle ? '#10B981' : '#0284C7'],
+  });
+
+  const animatedBgColor = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#FFFFFF', isGoogle ? '#F0FDF4' : '#F0F9FF'],
+  });
+
+  const animatedShadowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.16, 0.42],
+  });
+
+  const animatedShadowRadius = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 22],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.animatedPillOuter,
+        {
+          transform: [
+            { scale: scaleAnim },
+            { translateY: translateYAnim },
+          ],
+        },
+      ]}
+    >
+      <Pressable
+        onPress={onPress}
+        onPressIn={triggerPressIn}
+        onPressOut={triggerPressOut}
+        onMouseEnter={triggerHoverIn}
+        onMouseLeave={triggerHoverOut}
+        style={styles.pressableFull}
+      >
+        <Animated.View
+          style={[
+            styles.premiumPillButton,
+            {
+              backgroundColor: animatedBgColor,
+              borderColor: animatedBorderColor,
+              shadowColor: isGoogle ? '#10B981' : '#0284C7',
+              shadowOpacity: animatedShadowOpacity,
+              shadowRadius: animatedShadowRadius,
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.iconBadgeAnimWrap,
+              {
+                transform: [
+                  { scale: iconScaleAnim },
+                  { rotate: iconRotation },
+                ],
+              },
+            ]}
+          >
+            {icon}
+          </Animated.View>
+
+          <View style={styles.btnTextCol}>
+            <Text style={styles.premiumButtonTitle}>{title}</Text>
+          </View>
+
+          {/* Micro arrow icon that glides forward when hovered/touched */}
+          <Animated.View
+            style={[
+              styles.arrowBadgeWrap,
+              {
+                opacity: glowAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.35, 1],
+                }),
+                transform: [
+                  {
+                    translateX: glowAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 4],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M9 5l7 7-7 7"
+                stroke={isGoogle ? '#10B981' : '#0284C7'}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+          </Animated.View>
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+};
+
 export default function AuthScreen({ navigation, onLoginSuccess }) {
   const { t, openLanguageModal, activeLanguagePillText } = useLanguage();
 
@@ -78,7 +302,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [isEmailOtpVerified, setIsEmailOtpVerified] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailVerifying, setEmailVerifying] = useState(false);
-  const [hoveredBtn, setHoveredBtn] = useState(null); // 'email' | 'phone' | null
   const [loading, setLoading] = useState(false);
 
   // Scroll View Ref for automatic keyboard focus scrolling
@@ -468,43 +691,20 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         {!activeModal ? (
           <View style={styles.actionButtonsContainer}>
             {/* 1. Google / Gmail Sign In Premium Pill */}
-            <TouchableOpacity
-              style={[
-                styles.premiumPillButton,
-                hoveredBtn === 'email' && styles.premiumPillButtonHoveredGoogle,
-              ]}
-              activeOpacity={0.88}
+            <InteractivePillButton
+              variant="google"
               onPress={() => handleOpenModal('email')}
-              onMouseEnter={() => setHoveredBtn('email')}
-              onMouseLeave={() => setHoveredBtn(null)}
-            >
-              <View style={[styles.googleIconBadge, hoveredBtn === 'email' && styles.iconBadgeHovered]}>
-                <GmailOfficialIcon size={24} />
-              </View>
-              <View style={styles.btnTextCol}>
-                <Text style={styles.premiumButtonTitle}>{t('Sign in with Google / Gmail')}</Text>
-              </View>
-            </TouchableOpacity>
+              icon={<GmailOfficialIcon size={38} />}
+              title={t('Sign in with Google / Gmail')}
+            />
 
             {/* 2. Mobile Phone Sign In Premium Pill */}
-            <TouchableOpacity
-              style={[
-                styles.premiumPillButton,
-                styles.phonePillGlow,
-                hoveredBtn === 'phone' && styles.premiumPillButtonHoveredPhone,
-              ]}
-              activeOpacity={0.88}
+            <InteractivePillButton
+              variant="phone"
               onPress={() => handleOpenModal('phone')}
-              onMouseEnter={() => setHoveredBtn('phone')}
-              onMouseLeave={() => setHoveredBtn(null)}
-            >
-              <View style={[styles.phoneIconBadge, hoveredBtn === 'phone' && styles.phoneBadgeHovered]}>
-                <PhoneHandsetIcon size={22} color="#0284C7" />
-              </View>
-              <View style={styles.btnTextCol}>
-                <Text style={styles.premiumButtonTitle}>{t('Sign in with Phone Number')}</Text>
-              </View>
-            </TouchableOpacity>
+              icon={<PhoneHandsetIcon size={28} color="#0284C7" />}
+              title={t('Sign in with Phone Number')}
+            />
           </View>
         ) : activeModal === 'phone' ? (
           /* Phone OTP Modal Card */
@@ -920,82 +1120,36 @@ const styles = StyleSheet.create({
     gap: 16,
     marginVertical: 18,
   },
+  animatedPillOuter: {
+    width: '100%',
+  },
+  pressableFull: {
+    width: '100%',
+  },
   premiumPillButton: {
-    backgroundColor: '#FFFFFF',
+    width: '100%',
     borderRadius: 34,
     paddingVertical: 13,
     paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.85)',
     cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    transition: Platform.OS === 'web' ? 'all 0.28s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
-  premiumPillButtonHoveredGoogle: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOpacity: 0.38,
-    shadowRadius: 18,
-    transform: [{ scale: 1.025 }, { translateY: -2 }],
-  },
-  premiumPillButtonHoveredPhone: {
-    backgroundColor: '#F0F9FF',
-    borderColor: '#0284C7',
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.38,
-    shadowRadius: 18,
-    transform: [{ scale: 1.025 }, { translateY: -2 }],
-  },
-  phonePillGlow: {
-    borderColor: 'rgba(255, 255, 255, 0.9)',
-  },
-  googleIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F8FAFC',
+  iconBadgeAnimWrap: {
+    width: 42,
+    height: 42,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    transition: Platform.OS === 'web' ? 'transform 0.28s ease' : undefined,
   },
-  iconBadgeHovered: {
-    transform: [{ scale: 1.12 }],
-    borderColor: '#10B981',
-  },
-  phoneIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+  arrowBadgeWrap: {
+    marginLeft: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    transition: Platform.OS === 'web' ? 'transform 0.28s ease' : undefined,
-  },
-  phoneBadgeHovered: {
-    transform: [{ scale: 1.12 }],
-    borderColor: '#0284C7',
-    shadowOpacity: 0.35,
   },
   btnTextCol: {
     flex: 1,
