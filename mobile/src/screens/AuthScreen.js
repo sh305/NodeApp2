@@ -43,9 +43,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   }, []);
 
   const handleSendOtp = async () => {
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
-    if (!cleanPhone || cleanPhone.length < 10) {
-      const msg = 'Please enter a valid 10-digit mobile number';
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      const msg = 'Please enter a valid 10-digit Indian mobile number';
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Required', msg);
       return;
@@ -54,74 +54,28 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     setSendingOtp(true);
     setOtpSentMessage('');
 
-    // Format phone with country code (+91 for India)
-    const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length > 10
-      ? `+${cleanPhone}`
-      : cleanPhone.startsWith('+')
-      ? cleanPhone
-      : `+91${cleanPhone.slice(-10)}`;
-
     try {
-      // 1. Try Firebase Real SMS OTP on Web
-      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-        let container = document.getElementById('recaptcha-container');
-        if (!container) {
-          container = document.createElement('div');
-          container.id = 'recaptcha-container';
-          document.body.appendChild(container);
-        }
-
-        try {
-          if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-              size: 'invisible',
-              callback: () => {},
-            });
-          }
-
-          const confirmation = await signInWithPhoneNumber(
-            auth,
-            formattedPhone,
-            window.recaptchaVerifier
-          );
-          setConfirmationResult(confirmation);
-          setOtpSentMessage(`📲 Real SMS OTP sent to ${formattedPhone}!`);
-          window.alert(`✅ Real SMS OTP has been sent by Firebase to: ${formattedPhone}\nPlease check your phone messages.`);
-          setSendingOtp(false);
-          return;
-        } catch (firebaseErr) {
-          console.warn('Firebase SMS warning:', firebaseErr.code, firebaseErr.message);
-          if (window.recaptchaVerifier) {
-            try {
-              window.recaptchaVerifier.clear();
-              window.recaptchaVerifier = null;
-            } catch (clearErr) {}
-          }
-        }
-      }
-
-      // 2. Fast WhatsApp / Cloud OTP Endpoint (Backend)
+      // Send Real SMS OTP to User's Mobile via Fast2SMS
       const res = await api.post('/auth/send-whatsapp-otp', {
         phoneNumber: cleanPhone,
       });
 
       if (res.data.success) {
-        setOtpSentMessage('✅ OTP sent successfully!');
-        if (res.data.devOtp) {
-          setOtp(res.data.devOtp);
-        }
-        const alertMsg = res.data.devOtp
-          ? `[Dev Mode] Your OTP Code is: ${res.data.devOtp}`
-          : `OTP sent to ${formattedPhone}!`;
+        setOtpSentMessage(`📲 Real SMS sent to +91 ${cleanPhone}!`);
+        const alertMsg = res.data.message || `Real SMS OTP has been sent to +91 ${cleanPhone}!\nPlease check your phone messages.`;
 
         if (Platform.OS === 'web') {
           window.alert(alertMsg);
         } else {
-          Alert.alert('OTP Sent 📲', alertMsg);
+          Alert.alert('SMS Sent 📲', alertMsg);
         }
+      } else {
+        const errorMsg = res.data.message || 'Failed to send SMS';
+        if (Platform.OS === 'web') window.alert(errorMsg);
+        else Alert.alert('Error', errorMsg);
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to send OTP';
+      const msg = err.response?.data?.message || err.message || 'Failed to send SMS OTP';
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Error', msg);
     } finally {

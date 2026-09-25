@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const SmsOtpService = require('../services/smsOtpService');
 const WhatsAppOtpService = require('../services/whatsappOtpService');
 
 const generateToken = (id) => {
@@ -8,8 +9,8 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Send OTP to User's WhatsApp (Meta Cloud API)
-// @route   POST /api/auth/send-whatsapp-otp
+// @desc    Send Real SMS OTP to User's Mobile (Fast2SMS Gateway)
+// @route   POST /api/auth/send-whatsapp-otp & /api/auth/send-sms-otp
 exports.sendWhatsAppOtp = async (req, res) => {
   try {
     const { phoneNumber } = req.body;
@@ -17,10 +18,11 @@ exports.sendWhatsAppOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
 
-    const result = await WhatsAppOtpService.sendOtp(phoneNumber);
+    // Direct Fast2SMS Real SMS Delivery to User's Phone
+    const result = await SmsOtpService.sendOtp(phoneNumber);
     return res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
-    console.error('sendWhatsAppOtp error:', error);
+    console.error('sendSmsOtp error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -39,8 +41,8 @@ exports.phoneLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'OTP is required' });
     }
 
-    // Verify OTP using WhatsApp Service (or dev fallback 123456)
-    const verifyResult = await WhatsAppOtpService.verifyOtp(phoneNumber, otp);
+    // Verify OTP using Fast2SMS / Redis Cache
+    const verifyResult = await SmsOtpService.verifyOtp(phoneNumber, otp);
     if (!verifyResult.valid) {
       return res.status(400).json({ success: false, message: verifyResult.message || 'Invalid OTP code' });
     }
