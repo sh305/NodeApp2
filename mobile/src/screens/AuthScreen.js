@@ -11,6 +11,7 @@ import {
   ScrollView,
   Easing,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import api from '../api/client';
@@ -140,7 +141,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   // Floating Hot-Toast Notification State
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
-  const toastAnim = useRef(new Animated.Value(-100)).current;
+  const toastAnim = useRef(new Animated.Value(-120)).current;
   const toastTimerRef = useRef(null);
 
   const showToast = (message, type = 'success') => {
@@ -148,10 +149,10 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     setToast({ visible: true, message, type });
 
     Animated.spring(toastAnim, {
-      toValue: 24,
-      friction: 6,
+      toValue: 0,
+      friction: 7,
       tension: 50,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: true,
     }).start();
 
     toastTimerRef.current = setTimeout(() => {
@@ -161,9 +162,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   const hideToast = () => {
     Animated.timing(toastAnim, {
-      toValue: -100,
-      duration: 300,
-      useNativeDriver: Platform.OS !== 'web',
+      toValue: -120,
+      duration: 260,
+      useNativeDriver: true,
     }).start(() => {
       setToast({ visible: false, message: '', type: 'success' });
     });
@@ -368,7 +369,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Floating Hot-Toast */}
       {toast.visible && (
         <Animated.View
@@ -376,7 +377,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             styles.toastContainer,
             toast.type === 'success' && styles.toastSuccess,
             toast.type === 'error' && styles.toastError,
-            { top: toastAnim },
+            { transform: [{ translateY: toastAnim }] },
           ]}
         >
           <TouchableOpacity style={styles.toastInner} activeOpacity={0.9} onPress={hideToast}>
@@ -498,21 +499,23 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             {/* Mobile Number Row */}
             <Text style={styles.inputLabel}>Mobile Number</Text>
             <View style={styles.inputRow}>
-              <View style={styles.countryBadge}>
-                <Text style={styles.countryBadgeText}>+91</Text>
+              <View style={styles.phoneInputCombined}>
+                <View style={styles.countryCodeBadge}>
+                  <Text style={styles.countryBadgeText}>+91</Text>
+                </View>
+                <TextInput
+                  style={styles.phoneTextInputInside}
+                  placeholder="Enter 10-digit number"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={phoneNumber}
+                  onChangeText={(val) => {
+                    setPhoneNumber(val);
+                    setIsPhoneOtpVerified(false);
+                  }}
+                />
               </View>
-              <TextInput
-                style={[styles.input, styles.flexInput]}
-                placeholder="Enter 10-digit number"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={phoneNumber}
-                onChangeText={(val) => {
-                  setPhoneNumber(val);
-                  setIsPhoneOtpVerified(false);
-                }}
-              />
               <TouchableOpacity
                 style={[styles.muiBtn, phoneOtpSent && styles.muiBtnResend]}
                 onPress={handleSendPhoneOtp}
@@ -712,7 +715,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -724,10 +727,10 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'web' ? 36 : 56,
-    paddingBottom: 24,
+    paddingTop: Platform.OS === 'web' ? 24 : 12,
+    paddingBottom: Platform.OS === 'android' ? 36 : 24,
     alignItems: 'center',
   },
 
@@ -757,6 +760,7 @@ const styles = StyleSheet.create({
   // Toast
   toastContainer: {
     position: 'absolute',
+    top: Platform.OS === 'web' ? 24 : 44,
     left: 20,
     right: 20,
     zIndex: 99999,
@@ -1051,26 +1055,46 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
     marginBottom: 8,
+    width: '100%',
   },
-  countryBadge: {
+  phoneInputCombined: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: '#CBD5E1',
+    overflow: 'hidden',
+  },
+  countryCodeBadge: {
+    backgroundColor: '#EEF2F6',
+    paddingHorizontal: 10,
+    paddingVertical: 11,
+    borderRightWidth: 1,
+    borderRightColor: '#CBD5E1',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   countryBadgeText: {
     color: '#0F172A',
     fontWeight: '800',
     fontSize: 13,
   },
+  phoneTextInputInside: {
+    flex: 1,
+    color: '#0F172A',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   input: {
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     color: '#0F172A',
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 10,
     fontSize: 13.5,
     borderWidth: 1.2,
     borderColor: '#CBD5E1',
@@ -1086,12 +1110,12 @@ const styles = StyleSheet.create({
   // Material UI Buttons
   muiBtn: {
     backgroundColor: '#4F46E5',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 11,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 88,
+    minWidth: 78,
   },
   muiBtnResend: {
     backgroundColor: '#64748B',
@@ -1104,12 +1128,12 @@ const styles = StyleSheet.create({
 
   muiVerifyBtn: {
     backgroundColor: '#059669',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 11,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 94,
+    minWidth: 88,
   },
   muiVerifyBtnSuccess: {
     backgroundColor: '#10B981',
@@ -1126,7 +1150,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 13,
     alignItems: 'center',
-    marginTop: 18,
+    marginTop: 16,
     shadowColor: '#10B981',
     shadowOpacity: 0.4,
     shadowRadius: 8,
@@ -1149,8 +1173,9 @@ const styles = StyleSheet.create({
   // Footer
   footerSection: {
     alignItems: 'center',
-    marginTop: 20,
-    gap: 12,
+    marginTop: 18,
+    paddingBottom: Platform.OS === 'android' ? 24 : 12,
+    gap: 10,
   },
   langPill: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
@@ -1168,6 +1193,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 16,
+    paddingHorizontal: 12,
   },
   termsLink: {
     color: '#FFFFFF',
