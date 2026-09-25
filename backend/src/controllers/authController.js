@@ -7,7 +7,7 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Phone Number Login / Registrations Datas
+// @desc    Phone Number Login / Registrations
 // @route   POST /api/auth/phone-login
 exports.phoneLogin = async (req, res) => {
   try {
