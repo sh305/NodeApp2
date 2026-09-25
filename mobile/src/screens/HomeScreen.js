@@ -17,7 +17,7 @@ import api from '../api/client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import RoomLockModal from '../components/RoomLockModal';
 
-export default function HomeScreen({ navigation, currentUser }) {
+export default function HomeScreen({ navigation, currentUser, onLogout }) {
   const insets = useSafeAreaInsets();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -118,17 +118,31 @@ export default function HomeScreen({ navigation, currentUser }) {
         </View>
 
         {currentUser && (
-          <TouchableOpacity
-            style={styles.profileBtn}
-            onPress={() => navigation.navigate('UserProfile', { userId: currentUser._id })}
-          >
-            <AvatarWithFrame
-              avatarUri={currentUser.avatar}
-              level={currentUser.wealthLevel || 1}
-              size={36}
-              showLevelBadge={false}
-            />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TouchableOpacity
+              style={styles.profileBtn}
+              onPress={() => navigation.navigate('UserProfile', { userId: currentUser._id })}
+            >
+              <AvatarWithFrame
+                avatarUri={currentUser.avatar}
+                level={currentUser.wealthLevel || 1}
+                size={36}
+                showLevelBadge={false}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.logoutHeaderBtn}
+              onPress={() => {
+                Alert.alert('Logout 🚪', 'Kya aap account se logout karna chahte hain?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Logout', style: 'destructive', onPress: onLogout },
+                ]);
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>🚪</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -499,5 +513,14 @@ const styles = StyleSheet.create({
   submitBtnText: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  logoutHeaderBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    padding: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

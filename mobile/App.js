@@ -34,6 +34,16 @@ export default function App() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('@auth_token');
+      await AsyncStorage.removeItem('@user_info');
+      setCurrentUser(null);
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+  };
+
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0F0F1A', justifyContent: 'center', alignItems: 'center' }}>
@@ -59,13 +69,30 @@ export default function App() {
           ) : (
             <>
               <Stack.Screen name="Home">
-                {(props) => <HomeScreen {...props} currentUser={currentUser} />}
+                {(props) => (
+                  <HomeScreen
+                    {...props}
+                    currentUser={currentUser}
+                    onLogout={handleLogout}
+                  />
+                )}
               </Stack.Screen>
               <Stack.Screen name="VoiceRoom">
-                {(props) => <VoiceRoomScreen {...props} currentUser={currentUser} />}
+                {(props) => (
+                  <VoiceRoomScreen
+                    {...props}
+                    currentUser={currentUser}
+                  />
+                )}
               </Stack.Screen>
               <Stack.Screen name="UserProfile">
-                {(props) => <UserProfileScreen {...props} currentUser={currentUser} />}
+                {(props) => (
+                  <UserProfileScreen
+                    {...props}
+                    currentUser={currentUser}
+                    onLogout={handleLogout}
+                  />
+                )}
               </Stack.Screen>
             </>
           )}

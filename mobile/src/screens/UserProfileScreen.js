@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../api/client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import ReportModal from '../components/ReportModal';
 
-export default function UserProfileScreen({ route, navigation }) {
+export default function UserProfileScreen({ route, navigation, currentUser, onLogout }) {
   const insets = useSafeAreaInsets();
-  const { userId } = route.params;
+  const userId = route.params?.userId || currentUser?._id;
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
+
+  const isSelf = currentUser && (userId === currentUser._id || profile?._id === currentUser._id);
 
   const fetchProfile = async () => {
     try {
@@ -60,6 +62,23 @@ export default function UserProfileScreen({ route, navigation }) {
     }
   };
 
+  const handleConfirmLogout = () => {
+    Alert.alert(
+      'Logout 🚪',
+      'Kya aap account se logout karna chahte hain?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: () => {
+            if (onLogout) onLogout();
+          },
+        },
+      ]
+    );
+  };
+
   const handleSubmitReport = async ({ requestedBanDuration, reason, description }) => {
     await api.post('/reports', {
       reportedUserId: userId,
@@ -86,55 +105,83 @@ export default function UserProfileScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>User Profile</Text>
+        <Text style={styles.headerTitle}>{isSelf ? 'My Profile' : 'User Profile'}</Text>
         <View style={{ width: 30 }} />
       </View>
 
-      {/* Profile Card */}
-      <View style={styles.card}>
-        <AvatarWithFrame
-          avatarUri={profile.avatar}
-          level={profile.wealthLevel || 1}
-          size={90}
-        />
-        <Text style={styles.name}>{profile.name}</Text>
-        <Text style={styles.idText}>ID: {profile._id.slice(-8)}</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Profile Card */}
+        <View style={styles.card}>
+          <AvatarWithFrame
+            avatarUri={profile.avatar}
+            level={profile.wealthLevel || 1}
+            size={90}
+          />
+          <Text style={styles.name}>{profile.name}</Text>
+          <Text style={styles.idText}>ID: {profile._id ? profile._id.slice(-8) : '10001'}</Text>
 
-        {/* Level & Frame Badges */}
-        <View style={styles.badgesRow}>
-          <View style={styles.wealthBadge}>
-            <Text style={styles.badgeText}>💰 Wealth Lv.{profile.wealthLevel || 1}</Text>
+          {/* Wallet stats for Self */}
+          {isSelf && (
+            <View style={styles.walletRow}>
+              <View style={styles.walletPill}>
+                <Text style={styles.walletIcon}>🪙</Text>
+                <Text style={styles.walletValue}>{profile.coins || 1000}</Text>
+                <Text style={styles.walletLabel}>Coins</Text>
+              </View>
+              <View style={styles.walletPill}>
+                <Text style={styles.walletIcon}>💎</Text>
+                <Text style={styles.walletValue}>{profile.diamonds || 0}</Text>
+                <Text style={styles.walletLabel}>Diamonds</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Level & Frame Badges */}
+          <View style={styles.badgesRow}>
+            <View style={styles.wealthBadge}>
+              <Text style={styles.badgeText}>💰 Wealth Lv.{profile.wealthLevel || 1}</Text>
+            </View>
+            <View style={styles.charmBadge}>
+              <Text style={styles.badgeText}>💖 Charm Lv.{profile.charmLevel || 1}</Text>
+            </View>
           </View>
-          <View style={styles.charmBadge}>
-            <Text style={styles.badgeText}>💖 Charm Lv.{profile.charmLevel || 1}</Text>
-          </View>
-        </View>
 
-        <View style={styles.frameBadge}>
-          <Text style={styles.frameBadgeText}>
-            🎖️ Active Frame: {profile.activeFrame?.name || 'Novice Glow'}
-          </Text>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.blockBtn, isBlocked && styles.unblockBtn]}
-            onPress={handleToggleBlock}
-          >
-            <Text style={styles.blockBtnText}>
-              {isBlocked ? '🔓 Unblock User' : '🚷 Block User'}
+          <View style={styles.frameBadge}>
+            <Text style={styles.frameBadgeText}>
+              🎖️ Active Frame: {profile.activeFrame?.name || 'Novice Glow'}
             </Text>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={styles.reportBtn}
-            onPress={() => setReportModalVisible(true)}
-          >
-            <Text style={styles.reportBtnText}>🚩 Report Profile (3d/7d/Perm)</Text>
-          </TouchableOpacity>
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            {isSelf ? (
+              /* MY PROFILE LOGOUT BUTTON */
+              <TouchableOpacity style={styles.logoutBtn} onPress={handleConfirmLogout}>
+                <Text style={styles.logoutBtnText}>🚪 Logout Account</Text>
+              </TouchableOpacity>
+            ) : (
+              /* OTHER USER ACTIONS */
+              <>
+                <TouchableOpacity
+                  style={[styles.blockBtn, isBlocked && styles.unblockBtn]}
+                  onPress={handleToggleBlock}
+                >
+                  <Text style={styles.blockBtnText}>
+                    {isBlocked ? '🔓 Unblock User' : '🚷 Block User'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.reportBtn}
+                  onPress={() => setReportModalVisible(true)}
+                >
+                  <Text style={styles.reportBtnText}>🚩 Report Profile (3d/7d/Perm)</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Report Modal */}
       <ReportModal
@@ -162,7 +209,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 45,
     paddingHorizontal: 20,
     paddingBottom: 16,
     backgroundColor: '#1E1E2E',
@@ -180,8 +226,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  scrollContent: {
+    padding: 16,
+  },
   card: {
-    margin: 20,
     backgroundColor: '#1E1E2E',
     borderRadius: 20,
     padding: 24,
@@ -199,6 +247,36 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 12,
     marginTop: 2,
+  },
+  walletRow: {
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 16,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  walletPill: {
+    flex: 1,
+    backgroundColor: '#141422',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  walletIcon: {
+    fontSize: 18,
+  },
+  walletValue: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  walletLabel: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    marginTop: 1,
   },
   badgesRow: {
     flexDirection: 'row',
@@ -240,8 +318,23 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     width: '100%',
-    marginTop: 30,
+    marginTop: 26,
     gap: 12,
+  },
+  logoutBtn: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  logoutBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
   blockBtn: {
     backgroundColor: '#374151',
@@ -258,15 +351,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   reportBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1,
-    borderColor: '#EF4444',
+    backgroundColor: '#DC2626',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
   },
   reportBtnText: {
-    color: '#EF4444',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
   },

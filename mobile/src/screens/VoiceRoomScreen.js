@@ -328,7 +328,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       <ScrollView style={styles.seatsScrollArea}>
         <RoomSeatGrid
           seats={room?.seats || []}
+          owner={room?.owner}
           onSeatPress={handleSeatPress}
+          onHostPress={(hostUser) => {
+            if (hostUser) {
+              setSelectedSeatUser(hostUser);
+            }
+          }}
           currentUserId={currentUser?._id}
           isOwner={isOwner}
         />
