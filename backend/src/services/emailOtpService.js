@@ -42,19 +42,28 @@ class EmailOtpService {
         const mailOptions = {
           from: `"YoYo Live Voice" <${process.env.EMAIL_USER}>`,
           to: cleanEmail,
-          subject: `🔐 Your YoYo Live Login OTP: ${otp}`,
+          replyTo: process.env.EMAIL_USER,
+          subject: `${otp} is your YoYo Live verification code`,
+          text: `Your YoYo Live verification code is: ${otp}\n\nThis code is valid for 5 minutes. Please do not share it with anyone.`,
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #0F0F1A; color: #FFFFFF; padding: 24px; border-radius: 16px; border: 1px solid #2A2A3E;">
-              <h2 style="color: #F59E0B; text-align: center; margin-bottom: 8px;">🎙️ YoYo Live Voice</h2>
-              <p style="color: #9CA3AF; text-align: center; font-size: 14px;">Voice Chat Rooms & Community</p>
-              <div style="background: #1E1E2E; padding: 20px; border-radius: 12px; text-align: center; margin: 24px 0;">
-                <p style="color: #D1D5DB; margin-bottom: 10px; font-size: 14px;">Your 6-Digit Verification Code is:</p>
-                <h1 style="color: #10B981; font-size: 36px; letter-spacing: 6px; margin: 0;">${otp}</h1>
-                <p style="color: #9CA3AF; font-size: 12px; margin-top: 10px;">This code is valid for 5 minutes.</p>
+            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #ffffff; color: #1f2937; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #10b981; margin: 0; font-size: 24px;">🎙️ YoYo Live Voice</h2>
+                <p style="color: #6b7280; font-size: 13px; margin-top: 4px;">Voice Chat Rooms & Community</p>
               </div>
-              <p style="color: #6B7280; font-size: 12px; text-align: center;">If you did not request this OTP, you can safely ignore this email.</p>
+              <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;">
+                <p style="color: #4b5563; font-size: 13px; margin-bottom: 8px;">Your 6-Digit Login Verification Code:</p>
+                <div style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #111827; font-family: monospace;">${otp}</div>
+                <p style="color: #9ca3af; font-size: 11px; margin-top: 8px;">Valid for 5 minutes only</p>
+              </div>
+              <p style="color: #9ca3af; font-size: 11px; text-align: center; margin-top: 20px;">If you didn't request this code, you can safely ignore this email.</p>
             </div>
           `,
+          headers: {
+            'X-Priority': '1',
+            'X-MSMail-Priority': 'High',
+            Importance: 'high',
+          },
         };
 
         await mailer.sendMail(mailOptions);
