@@ -64,10 +64,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [emailOtp, setEmailOtp] = useState('');
   const [emailUserName, setEmailUserName] = useState('');
   const [emailOtpSent, setEmailOtpSent] = useState(false);
-  const [isEmailOtpVerified, setIsEmailOtpVerified] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailVerifying, setEmailVerifying] = useState(false);
-
+  const [hoveredBtn, setHoveredBtn] = useState(null); // 'email' | 'phone' | null
   const [loading, setLoading] = useState(false);
 
   // Continuous Dynamic Floating Background Animations
@@ -436,11 +435,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           <View style={styles.actionButtonsContainer}>
             {/* 1. Google / Gmail Sign In Premium Pill */}
             <TouchableOpacity
-              style={styles.premiumPillButton}
+              style={[
+                styles.premiumPillButton,
+                hoveredBtn === 'email' && styles.premiumPillButtonHoveredGoogle,
+              ]}
               activeOpacity={0.88}
               onPress={() => handleOpenModal('email')}
+              onMouseEnter={() => setHoveredBtn('email')}
+              onMouseLeave={() => setHoveredBtn(null)}
             >
-              <View style={styles.googleIconBadge}>
+              <View style={[styles.googleIconBadge, hoveredBtn === 'email' && styles.iconBadgeHovered]}>
                 <GoogleGIcon size={24} />
               </View>
               <View style={styles.btnTextCol}>
@@ -451,11 +455,17 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
             {/* 2. Mobile Phone Sign In Premium Pill */}
             <TouchableOpacity
-              style={[styles.premiumPillButton, styles.phonePillGlow]}
+              style={[
+                styles.premiumPillButton,
+                styles.phonePillGlow,
+                hoveredBtn === 'phone' && styles.premiumPillButtonHoveredPhone,
+              ]}
               activeOpacity={0.88}
               onPress={() => handleOpenModal('phone')}
+              onMouseEnter={() => setHoveredBtn('phone')}
+              onMouseLeave={() => setHoveredBtn(null)}
             >
-              <View style={styles.phoneIconBadge}>
+              <View style={[styles.phoneIconBadge, hoveredBtn === 'phone' && styles.phoneBadgeHovered]}>
                 <CyberPhoneIcon size={24} />
               </View>
               <View style={styles.btnTextCol}>
@@ -856,17 +866,35 @@ const styles = StyleSheet.create({
   premiumPillButton: {
     backgroundColor: '#FFFFFF',
     borderRadius: 34,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.16,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    transition: Platform.OS === 'web' ? 'all 0.28s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
+  },
+  premiumPillButtonHoveredGoogle: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOpacity: 0.38,
+    shadowRadius: 18,
+    transform: [{ scale: 1.025 }, { translateY: -2 }],
+  },
+  premiumPillButtonHoveredPhone: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#0284C7',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.38,
+    shadowRadius: 18,
+    transform: [{ scale: 1.025 }, { translateY: -2 }],
   },
   phonePillGlow: {
     borderColor: 'rgba(255, 255, 255, 0.9)',
@@ -878,13 +906,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    transition: Platform.OS === 'web' ? 'transform 0.28s ease' : undefined,
+  },
+  iconBadgeHovered: {
+    transform: [{ scale: 1.12 }],
+    borderColor: '#10B981',
   },
   phoneIconBadge: {
     width: 44,
@@ -893,11 +926,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
     shadowColor: '#00F0FF',
     shadowOpacity: 0.35,
     shadowRadius: 6,
     elevation: 3,
+    transition: Platform.OS === 'web' ? 'transform 0.28s ease' : undefined,
+  },
+  phoneBadgeHovered: {
+    transform: [{ scale: 1.12 }],
+    shadowOpacity: 0.6,
   },
   btnTextCol: {
     flex: 1,
