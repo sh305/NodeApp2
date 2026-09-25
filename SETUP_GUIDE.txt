@@ -1,0 +1,76 @@
+================================================================================
+                    NODEAPP - NEW SYSTEM SETUP GUIDE / INSTRUCTIONS
+================================================================================
+
+Repository URL: https://github.com/sh305/NodeApp2.git
+
+--------------------------------------------------------------------------------
+1. PREREQUISITES (Naye System par ye install hona chahiye):
+--------------------------------------------------------------------------------
+- Node.js (v18 ya v20+) -> https://nodejs.org/
+- Git -> https://git-scm.com/
+- MongoDB (Local MongoDB Community Server ya MongoDB Atlas Cloud URL)
+- Redis (Local Redis Server / Memurai ya Upstash Cloud Redis)
+- Expo Go App (Apne Android / iPhone mobile me install karein)
+
+--------------------------------------------------------------------------------
+2. PROJECT CLONE KARNA:
+--------------------------------------------------------------------------------
+Terminal / PowerShell open karein aur run karein:
+
+git clone https://github.com/sh305/NodeApp2.git
+cd NodeApp2
+
+
+--------------------------------------------------------------------------------
+3. BACKEND SETUP (Server chalu karna):
+--------------------------------------------------------------------------------
+Step A: Backend directory me jayein
+cd backend
+
+Step B: Sare backend packages install karein
+npm install
+
+Step C: .env file create karein
+backend folder ke andar ek file banayein jiska naam ".env" rakhein aur ye values daalein:
+
+PORT=5000
+MONGO_URI=mongodb://localhost:27017/nodeapp
+JWT_SECRET=my_super_secret_jwt_key_12345
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+Step D: Backend server start karein
+npm run dev
+
+(Output aayega: Server running on port 5000, MongoDB Connected, Redis Connected)
+
+
+--------------------------------------------------------------------------------
+4. MOBILE APP SETUP (React Native / Expo App chalu karna):
+--------------------------------------------------------------------------------
+Step A: Naya terminal open karein aur mobile folder me jayein
+cd mobile
+
+Step B: Sare mobile packages install karein
+npm install
+
+Step C: Backend API URL check/update karein
+File open karein: mobile/src/api/client.js
+Wahan BASE_URL me apne computer ka local IP address daalein (e.g. http://192.168.1.XX:5000)
+
+Step D: Expo app start karein
+npx expo start
+
+Step E: App run karein
+- Mobile phone me "Expo Go" app khol kar QR code scan karein
+- Ya terminal me 'a' dabayein (Android Emulator ke liye)
+
+
+--------------------------------------------------------------------------------
+5. QUICK TROUBLESHOOTING TIPS:
+--------------------------------------------------------------------------------
+- Agar Redis local me nahi chal raha: Upstash (free cloud redis) ka URI use kar sakte hain.
+- Agar Mobile app connect nahi ho rahi: Computer aur Mobile dono SAME Wi-Fi network par hone chahiye.
+- Agar Windows Firewall block kare: Port 5000 allow karein ya Private Network select karein.
+================================================================================
