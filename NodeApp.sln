@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A98846C7-82BF-4C17-9149-61F80824E31C}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Backend", "Backend", "{760CA85E-5DDC-4731-BC20-21398223847F}"
+	ProjectSection(SolutionItems) = preProject
+		backend\package.json = backend\package.json
+		backend\.env.example = backend\.env.example
+		backend\src\server.js = backend\src\server.js
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Mobile", "Mobile", "{A47BF7F9-53DC-43B6-9533-3176B8BEF843}"
+	ProjectSection(SolutionItems) = preProject
+		mobile\package.json = mobile\package.json
+		mobile\app.json = mobile\app.json
+		mobile\App.js = mobile\App.js
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+	EndGlobalSection
+EndGlobal
