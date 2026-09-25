@@ -9,6 +9,7 @@ import {
   Platform,
   Animated,
   ScrollView,
+  KeyboardAvoidingView,
   Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -424,7 +425,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         </Animated.View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, width: '100%' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
         {/* Top Header & Big "Yo!" Logo matching screenshot */}
         <View style={styles.brandHeader}>
           <View style={styles.yoLogoContainer}>
@@ -714,7 +724,8 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <Text style={styles.termsLink}>&lt;&lt;गोपनीयता नीति&gt;&gt;</Text> से सहमत होते हैं
           </Text>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

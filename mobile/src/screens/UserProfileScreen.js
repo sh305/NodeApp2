@@ -116,7 +116,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
         <View style={{ width: 30 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Profile Card */}
         <View style={styles.card}>
           <AvatarWithFrame
