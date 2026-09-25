@@ -1,23 +1,20 @@
 const nodemailer = require('nodemailer');
 const { cacheService } = require('../config/redis');
 
-let transporter = null;
-const emailUser = process.env.EMAIL_USER;
-const emailPass = process.env.EMAIL_PASS;
-
-if (emailUser && emailPass) {
-  try {
-    transporter = nodemailer.createTransport({
+const getTransporter = () => {
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
+  if (emailUser && emailPass) {
+    return nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: emailUser,
         pass: emailPass,
       },
     });
-  } catch (err) {
-    console.error('Nodemailer init error:', err.message);
   }
-}
+  return null;
+};
 
 /**
  * Real Gmail / Email 6-Digit OTP Service
@@ -40,9 +37,10 @@ class EmailOtpService {
       // Store in high-speed cache for 5 minutes (300 seconds)
       await cacheService.set(`email_otp:${cleanEmail}`, otp, 300);
 
-      if (transporter) {
+      const mailer = getTransporter();
+      if (mailer) {
         const mailOptions = {
-          from: `"YoYo Live Voice" <${emailUser}>`,
+          from: `"YoYo Live Voice" <${process.env.EMAIL_USER}>`,
           to: cleanEmail,
           subject: `🔐 Your YoYo Live Login OTP: ${otp}`,
           html: `
@@ -59,7 +57,7 @@ class EmailOtpService {
           `,
         };
 
-        await transporter.sendMail(mailOptions);
+        await mailer.sendMail(mailOptions);
         console.log(`✅ Real Gmail OTP sent to ${cleanEmail}`);
       } else {
         console.log(`\n======================================================`);
