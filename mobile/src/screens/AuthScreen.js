@@ -10,6 +10,7 @@ import {
   Animated,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
   Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -78,6 +79,25 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [emailVerifying, setEmailVerifying] = useState(false);
   const [hoveredBtn, setHoveredBtn] = useState(null); // 'email' | 'phone' | null
   const [loading, setLoading] = useState(false);
+
+  // Scroll View Ref for automatic keyboard focus scrolling
+  const scrollViewRef = useRef(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        if (activeModal) {
+          setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, 60);
+        }
+      }
+    );
+    return () => {
+      showSub.remove();
+    };
+  }, [activeModal]);
 
   // Continuous Dynamic Floating Background Animations
   const floatAnim1 = useRef(new Animated.Value(0)).current;
@@ -430,10 +450,12 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={true}
         >
         {/* Top Header & Big "Yo!" Logo matching screenshot */}
         <View style={styles.brandHeader}>
@@ -520,6 +542,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   keyboardType="phone-pad"
                   maxLength={10}
                   value={phoneNumber}
+                  onFocus={() => {
+                    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                  }}
                   onChangeText={(val) => {
                     setPhoneNumber(val);
                     setIsPhoneOtpVerified(false);
@@ -556,6 +581,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                     maxLength={6}
                     editable={!isPhoneOtpVerified}
                     value={phoneOtp}
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                    }}
                     onChangeText={setPhoneOtp}
                   />
                   <TouchableOpacity
@@ -585,6 +613,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               placeholder="e.g. Rahul Sharma"
               placeholderTextColor="#9CA3AF"
               value={phoneUserName}
+              onFocus={() => {
+                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+              }}
               onChangeText={setPhoneUserName}
             />
 
@@ -627,6 +658,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
+                onFocus={() => {
+                  setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                }}
                 onChangeText={(val) => {
                   setEmail(val);
                   setIsEmailOtpVerified(false);
@@ -662,6 +696,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                     maxLength={6}
                     editable={!isEmailOtpVerified}
                     value={emailOtp}
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                    }}
                     onChangeText={setEmailOtp}
                   />
                   <TouchableOpacity
@@ -692,6 +729,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               placeholder="e.g. Rahul Sharma"
               placeholderTextColor="#9CA3AF"
               value={emailUserName}
+              onFocus={() => {
+                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+              }}
               onChangeText={setEmailUserName}
             />
 

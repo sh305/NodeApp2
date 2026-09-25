@@ -17,7 +17,8 @@
       "adaptiveIcon": {
         "backgroundColor": "#0F0F1A"
       },
-      "package": "com.yoyo.voice"
+      "package": "com.yoyo.voice",
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
