@@ -98,6 +98,22 @@ function initRoomSockets(io) {
       }
     });
 
+    // Leave Host Seat (Step down from Hosting)
+    socket.on('leave_host', ({ roomId, userId }) => {
+      io.to(roomId).emit('host_status_updated', {
+        isHostActive: false,
+        userId,
+      });
+    });
+
+    // Take Host Seat
+    socket.on('take_host', ({ roomId, userId }) => {
+      io.to(roomId).emit('host_status_updated', {
+        isHostActive: true,
+        userId,
+      });
+    });
+
     // Toggle Mic Mute
     socket.on('toggle_mic_mute', async ({ roomId, seatIndex, isMuted }) => {
       try {

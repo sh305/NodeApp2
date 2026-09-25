@@ -33,6 +33,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   // Modals state
   const [selectedSeatUser, setSelectedSeatUser] = useState(null);
+  const [isHostActive, setIsHostActive] = useState(true);
   const [giftModalVisible, setGiftModalVisible] = useState(false);
   const [kickModalVisible, setKickModalVisible] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -86,6 +87,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setRoom((prev) => (prev ? { ...prev, seats } : prev));
       const mySeat = seats.findIndex((s) => s.user && s.user._id === currentUser?._id);
       setMySeatIndex(mySeat !== -1 ? mySeat : null);
+    });
+
+    // Realtime Host Status update
+    socket.on('host_status_updated', ({ isHostActive: hActive }) => {
+      setIsHostActive(hActive);
     });
 
     // Seat mute status
@@ -176,6 +182,40 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       });
       setMySeatIndex(null);
     }
+  };
+
+  const handleLeaveHosting = () => {
+    setIsHostActive(false);
+    socketRef.current.emit('leave_host', {
+      roomId,
+      userId: currentUser?._id,
+    });
+    Alert.alert('Leave Hosting 👑', 'Aap host seat se step down ho gaye hain.');
+    setSelectedSeatUser(null);
+  };
+
+  const handleTakeHost = () => {
+    if (!isOwner) {
+      Alert.alert('Host Only', 'Sirf Room Owner hi Host ban sakte hain.');
+      return;
+    }
+    setIsHostActive(true);
+    socketRef.current.emit('take_host', {
+      roomId,
+      userId: currentUser?._id,
+    });
+    Alert.alert('Host Active 👑', 'Aap Host seat par baith gaye hain.');
+    setSelectedSeatUser(null);
+  };
+
+  const handleRemoveUserFromSeat = () => {
+    if (!selectedSeatUser) return;
+    socketRef.current.emit('leave_seat', {
+      roomId,
+      userId: selectedSeatUser._id,
+    });
+    Alert.alert('Seat Removed 🪑', `${selectedSeatUser.name} ko seat se hata diya gaya.`);
+    setSelectedSeatUser(null);
   };
 
   const handleToggleMic = () => {
@@ -282,7 +322,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     setSelectedSeatUser(null);
   };
 
-  const isOwner = room && currentUser && room.owner?._id === currentUser._id;
+  const roomOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
+  const currentUserIdStr = currentUser?._id ? currentUser._id.toString() : '';
+  const isOwner = Boolean(roomOwnerId && currentUserIdStr && roomOwnerId === currentUserIdStr);
+  const selectedUserIdStr = selectedSeatUser?._id ? selectedSeatUser._id.toString() : '';
+  const isSelf = Boolean(selectedUserIdStr && currentUserIdStr && selectedUserIdStr === currentUserIdStr);
 
   return (
     <View style={styles.container}>
@@ -329,6 +373,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         <RoomSeatGrid
           seats={room?.seats || []}
           owner={room?.owner}
+          isHostActive={isHostActive}
           onSeatPress={handleSeatPress}
           onHostPress={(hostUser) => {
             if (hostUser) {
@@ -454,8 +499,55 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Report ID</Text>
                 </TouchableOpacity>
 
+                {/* 👑 1. LEAVE HOSTING (For Host on Host Seat) */}
+                {Boolean((selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) && isHostActive && isOwner) && (
+                  <TouchableOpacity
+                    style={[styles.actionBox, { borderColor: '#F59E0B', borderWidth: 1, backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}
+                    onPress={handleLeaveHosting}
+                  >
+                    <Text style={styles.actionEmoji}>👑</Text>
+                    <Text style={[styles.actionLabel, { color: '#F59E0B' }]}>Leave Hosting</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* 👑 1B. TAKE HOST (When host seat is vacant and user is owner) */}
+                {Boolean((selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) && !isHostActive && isOwner) && (
+                  <TouchableOpacity
+                    style={[styles.actionBox, { borderColor: '#10B981', borderWidth: 1, backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}
+                    onPress={handleTakeHost}
+                  >
+                    <Text style={styles.actionEmoji}>👑</Text>
+                    <Text style={[styles.actionLabel, { color: '#10B981' }]}>Take Host</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* 🚪 2. LEAVE SEAT (For sitting user leaving their own sofa seat) */}
+                {Boolean(!selectedSeatUser?.isHostSeat && isSelf && mySeatIndex !== null) && (
+                  <TouchableOpacity
+                    style={[styles.actionBox, { borderColor: '#EF4444', borderWidth: 1, backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}
+                    onPress={() => {
+                      handleLeaveSeat();
+                      setSelectedSeatUser(null);
+                    }}
+                  >
+                    <Text style={styles.actionEmoji}>🚪</Text>
+                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Leave Seat</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* 🪑 3. REMOVE FROM SEAT (Host removes someone from sofa seat) */}
+                {Boolean(!selectedSeatUser?.isHostSeat && isOwner && !isSelf) && (
+                  <TouchableOpacity
+                    style={[styles.actionBox, { borderColor: '#F43F5E', borderWidth: 1, backgroundColor: 'rgba(244, 63, 94, 0.15)' }]}
+                    onPress={handleRemoveUserFromSeat}
+                  >
+                    <Text style={styles.actionEmoji}>🪑</Text>
+                    <Text style={[styles.actionLabel, { color: '#F43F5E' }]}>Remove Seat</Text>
+                  </TouchableOpacity>
+                )}
+
                 {/* Kick Option for Room Owner */}
-                {isOwner && selectedSeatUser._id !== currentUser?._id && (
+                {Boolean(isOwner && !isSelf) && (
                   <TouchableOpacity
                     style={[styles.actionBox, styles.kickActionBox]}
                     onPress={() => setKickModalVisible(true)}

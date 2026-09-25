@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../api/client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
@@ -63,20 +63,27 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   };
 
   const handleConfirmLogout = () => {
-    Alert.alert(
-      'Logout 🚪',
-      'Kya aap account se logout karna chahte hain?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            if (onLogout) onLogout();
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Kya aap account se logout karna chahte hain?');
+      if (confirmed && onLogout) {
+        onLogout();
+      }
+    } else {
+      Alert.alert(
+        'Logout 🚪',
+        'Kya aap account se logout karna chahte hain?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: () => {
+              if (onLogout) onLogout();
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleSubmitReport = async ({ requestedBanDuration, reason, description }) => {

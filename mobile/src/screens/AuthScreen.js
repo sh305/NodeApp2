@@ -1,26 +1,161 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Platform,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '../config/firebase';
 import api from '../api/client';
 
 export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [authMethod, setAuthMethod] = useState('phone'); // 'phone' | 'google' | 'facebook'
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('123456');
+  const [otp, setOtp] = useState('');
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpSentMessage, setOtpSentMessage] = useState('');
+  const [confirmationResult, setConfirmationResult] = useState(null);
+
+  const recaptchaVerifierRef = useRef(null);
+
+  useEffect(() => {
+    // Ensure recaptcha-container DOM element exists for Web
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      try {
+        let container = document.getElementById('recaptcha-container');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'recaptcha-container';
+          document.body.appendChild(container);
+        }
+      } catch (e) {
+        console.log('DOM container init note:', e.message);
+      }
+    }
+  }, []);
+
+  const handleSendOtp = async () => {
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      const msg = 'Please enter a valid 10-digit mobile number';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Required', msg);
+      return;
+    }
+
+    setSendingOtp(true);
+    setOtpSentMessage('');
+
+    // Format phone with country code (+91 for India)
+    const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length > 10
+      ? `+${cleanPhone}`
+      : cleanPhone.startsWith('+')
+      ? cleanPhone
+      : `+91${cleanPhone.slice(-10)}`;
+
+    try {
+      // 1. Try Firebase Real SMS OTP on Web
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        let container = document.getElementById('recaptcha-container');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'recaptcha-container';
+          document.body.appendChild(container);
+        }
+
+        try {
+          if (!window.recaptchaVerifier) {
+            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+              size: 'invisible',
+              callback: () => {},
+            });
+          }
+
+          const confirmation = await signInWithPhoneNumber(
+            auth,
+            formattedPhone,
+            window.recaptchaVerifier
+          );
+          setConfirmationResult(confirmation);
+          setOtpSentMessage(`📲 Real SMS OTP sent to ${formattedPhone}!`);
+          window.alert(`✅ Real SMS OTP has been sent by Firebase to: ${formattedPhone}\nPlease check your phone messages.`);
+          setSendingOtp(false);
+          return;
+        } catch (firebaseErr) {
+          console.warn('Firebase SMS warning:', firebaseErr.code, firebaseErr.message);
+          if (window.recaptchaVerifier) {
+            try {
+              window.recaptchaVerifier.clear();
+              window.recaptchaVerifier = null;
+            } catch (clearErr) {}
+          }
+        }
+      }
+
+      // 2. Fast WhatsApp / Cloud OTP Endpoint (Backend)
+      const res = await api.post('/auth/send-whatsapp-otp', {
+        phoneNumber: cleanPhone,
+      });
+
+      if (res.data.success) {
+        setOtpSentMessage('✅ OTP sent successfully!');
+        if (res.data.devOtp) {
+          setOtp(res.data.devOtp);
+        }
+        const alertMsg = res.data.devOtp
+          ? `[Dev Mode] Your OTP Code is: ${res.data.devOtp}`
+          : `OTP sent to ${formattedPhone}!`;
+
+        if (Platform.OS === 'web') {
+          window.alert(alertMsg);
+        } else {
+          Alert.alert('OTP Sent 📲', alertMsg);
+        }
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to send OTP';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setSendingOtp(false);
+    }
+  };
 
   const handlePhoneLogin = async () => {
-    if (!phoneNumber) {
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    if (!cleanPhone) {
       Alert.alert('Required', 'Please enter your phone number');
       return;
     }
+    if (!otp.trim()) {
+      Alert.alert('Required', 'Please enter the 6-digit OTP code');
+      return;
+    }
+
     setLoading(true);
     try {
+      // If Firebase confirmation is active, verify with Firebase
+      if (confirmationResult) {
+        try {
+          await confirmationResult.confirm(otp.trim());
+        } catch (fbConfirmErr) {
+          console.log('Firebase confirm note:', fbConfirmErr.message);
+        }
+      }
+
+      // Login/Register in Backend
       const res = await api.post('/auth/phone-login', {
-        phoneNumber,
-        otp,
-        name: userName || undefined,
+        phoneNumber: cleanPhone,
+        otp: otp.trim(),
+        name: userName.trim() || undefined,
       });
 
       if (res.data.success) {
@@ -32,7 +167,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       if (err.response?.data?.banned) {
         Alert.alert('Account Banned 🚫', err.response.data.message);
       } else {
-        Alert.alert('Login Failed', err.response?.data?.message || 'Check connection');
+        Alert.alert('Login Failed', err.response?.data?.message || 'Invalid OTP code. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -75,6 +210,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   return (
     <View style={styles.container}>
+      {/* Invisible Recaptcha container for Web */}
+      {Platform.OS === 'web' && <div id="recaptcha-container" />}
+
       {/* App Logo & Title */}
       <View style={styles.logoSection}>
         <View style={styles.iconCircle}>
@@ -91,7 +229,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           onPress={() => setAuthMethod('phone')}
         >
           <Text style={[styles.tabText, authMethod === 'phone' && styles.tabTextActive]}>
-            📱 Phone
+            📱 Mobile OTP
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -116,15 +254,32 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       <View style={styles.formCard}>
         {authMethod === 'phone' ? (
           <>
-            <Text style={styles.inputLabel}>Mobile Number</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="+91 9876543210"
-              placeholderTextColor="#6B7280"
-              keyboardType="phone-pad"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-            />
+            <Text style={styles.inputLabel}>Mobile Number (10 Digits)</Text>
+            <View style={styles.phoneInputRow}>
+              <TextInput
+                style={[styles.input, styles.phoneInputFlex]}
+                placeholder="9876543210"
+                placeholderTextColor="#6B7280"
+                keyboardType="phone-pad"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+              />
+              <TouchableOpacity
+                style={styles.sendOtpBtn}
+                onPress={handleSendOtp}
+                disabled={sendingOtp}
+              >
+                {sendingOtp ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.sendOtpBtnText}>📲 Get OTP</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {otpSentMessage ? (
+              <Text style={styles.otpSentStatusText}>{otpSentMessage}</Text>
+            ) : null}
 
             <Text style={styles.inputLabel}>Your Name (Optional)</Text>
             <TextInput
@@ -135,10 +290,10 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               onChangeText={setUserName}
             />
 
-            <Text style={styles.inputLabel}>OTP Code (Test: 123456)</Text>
+            <Text style={styles.inputLabel}>6-Digit OTP Code</Text>
             <TextInput
               style={styles.input}
-              placeholder="123456"
+              placeholder="Enter 6-digit OTP"
               placeholderTextColor="#6B7280"
               keyboardType="number-pad"
               value={otp}
@@ -149,7 +304,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               {loading ? (
                 <ActivityIndicator color="#000" />
               ) : (
-                <Text style={styles.primaryBtnText}>Login with Mobile</Text>
+                <Text style={styles.primaryBtnText}>Verify & Login</Text>
               )}
             </TouchableOpacity>
           </>
@@ -202,33 +357,33 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: '#6366F1',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
     shadowColor: '#6366F1',
     shadowOpacity: 0.5,
     shadowRadius: 10,
     elevation: 8,
   },
   logoEmoji: {
-    fontSize: 34,
+    fontSize: 32,
   },
   appName: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   tagline: {
     color: '#9CA3AF',
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 4,
   },
   tabBar: {
@@ -236,11 +391,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E1E2E',
     borderRadius: 12,
     padding: 4,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 9,
     alignItems: 'center',
     borderRadius: 8,
   },
@@ -249,8 +404,8 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: '#9CA3AF',
-    fontSize: 12,
     fontWeight: '600',
+    fontSize: 11,
   },
   tabTextActive: {
     color: '#FFFFFF',
@@ -258,8 +413,8 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: '#1E1E2E',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 22,
     borderWidth: 1,
     borderColor: '#2A2A3E',
   },
@@ -268,53 +423,84 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 6,
-    marginTop: 10,
+    marginTop: 8,
   },
   input: {
     backgroundColor: '#2A2A3E',
+    borderRadius: 10,
     color: '#FFFFFF',
-    borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 11,
     fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#374151',
   },
-  primaryBtn: {
-    backgroundColor: '#6366F1',
-    paddingVertical: 14,
-    borderRadius: 10,
+  phoneInputRow: {
+    flexDirection: 'row',
+    gap: 8,
     alignItems: 'center',
-    marginTop: 20,
   },
-  primaryBtnText: {
+  phoneInputFlex: {
+    flex: 1,
+  },
+  sendOtpBtn: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendOtpBtnText: {
     color: '#FFFFFF',
     fontWeight: '700',
+    fontSize: 12,
+  },
+  otpSentStatusText: {
+    color: '#34D399',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  primaryBtn: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 20,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  primaryBtnText: {
+    color: '#000000',
     fontSize: 15,
+    fontWeight: '800',
   },
   socialBox: {
+    paddingVertical: 12,
     alignItems: 'center',
-    paddingVertical: 16,
   },
   socialDesc: {
     color: '#9CA3AF',
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: 20,
+    marginBottom: 18,
+    lineHeight: 18,
   },
   googleBtn: {
     backgroundColor: '#EA4335',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 10,
     width: '100%',
+    paddingVertical: 13,
+    borderRadius: 10,
     alignItems: 'center',
   },
   facebookBtn: {
     backgroundColor: '#1877F2',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 10,
     width: '100%',
+    paddingVertical: 13,
+    borderRadius: 10,
     alignItems: 'center',
   },
   socialBtnText: {

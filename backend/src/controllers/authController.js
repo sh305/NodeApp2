@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const WhatsAppOtpService = require('../services/whatsappOtpService');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'yoyo_super_secret_jwt_key_2026_!@#$%^', {
@@ -7,7 +8,24 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Phone Number Login / Registrations
+// @desc    Send OTP to User's WhatsApp (Meta Cloud API)
+// @route   POST /api/auth/send-whatsapp-otp
+exports.sendWhatsAppOtp = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
+    const result = await WhatsAppOtpService.sendOtp(phoneNumber);
+    return res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    console.error('sendWhatsAppOtp error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Phone Number Login / Registrations with OTP verification
 // @route   POST /api/auth/phone-login
 exports.phoneLogin = async (req, res) => {
   try {
@@ -17,10 +35,14 @@ exports.phoneLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
 
-    // In production, verify OTP via SMS Gateway (Twilio / Firebase Auth)
-    // Here we accept standard 6-digit OTP (e.g. 123456)
-    if (otp !== '123456' && otp !== '000000') {
-      return res.status(400).json({ success: false, message: 'Invalid OTP code' });
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'OTP is required' });
+    }
+
+    // Verify OTP using WhatsApp Service (or dev fallback 123456)
+    const verifyResult = await WhatsAppOtpService.verifyOtp(phoneNumber, otp);
+    if (!verifyResult.valid) {
+      return res.status(400).json({ success: false, message: verifyResult.message || 'Invalid OTP code' });
     }
 
     let user = await User.findOne({ phoneNumber });

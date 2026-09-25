@@ -11,6 +11,7 @@ import {
   TextInput,
   Switch,
   Alert,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../api/client';
@@ -22,6 +23,20 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const handleLogoutPress = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Kya aap account se logout karna chahte hain?');
+      if (confirmed && onLogout) {
+        onLogout();
+      }
+    } else {
+      Alert.alert('Logout 🚪', 'Kya aap account se logout karna chahte hain?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', style: 'destructive', onPress: onLogout },
+      ]);
+    }
+  };
 
   // Locked Room Modal state
   const [lockedRoomTarget, setLockedRoomTarget] = useState(null);
@@ -133,12 +148,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
 
             <TouchableOpacity
               style={styles.logoutHeaderBtn}
-              onPress={() => {
-                Alert.alert('Logout 🚪', 'Kya aap account se logout karna chahte hain?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Logout', style: 'destructive', onPress: onLogout },
-                ]);
-              }}
+              onPress={handleLogoutPress}
             >
               <Text style={{ fontSize: 16 }}>🚪</Text>
             </TouchableOpacity>

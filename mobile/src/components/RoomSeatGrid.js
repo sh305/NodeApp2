@@ -10,12 +10,14 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import AvatarWithFrame from './AvatarWithFrame';
 import StylishSofaIcon from './StylishSofaIcon';
+import RoyalHostSofaIcon from './RoyalHostSofaIcon';
 
 const { width } = Dimensions.get('window');
 
 export default function RoomSeatGrid({
   seats = [],
   owner = null,
+  isHostActive = true,
   onSeatPress,
   onHostPress,
   currentUserId,
@@ -26,41 +28,58 @@ export default function RoomSeatGrid({
 
   return (
     <View style={styles.container}>
-      {/* 👑 TOP HOST SEAT (Screenshot matching) */}
+      {/* 👑 TOP HOST SEAT (With Stylish Royal Sofa) */}
       <View style={styles.hostSection}>
         <TouchableOpacity
           style={styles.hostSeatWrapper}
           activeOpacity={0.8}
-          onPress={() => onHostPress && onHostPress(owner)}
+          onPress={() => onHostPress && onHostPress({ ...owner, isHostSeat: true })}
         >
-          {/* Host Circular Glowing Avatar */}
+          {/* Host Circular Pod */}
           <View style={styles.hostGlowRing}>
             <LinearGradient
-              colors={['#818CF8', '#A855F7', '#EC4899']}
+              colors={
+                isHostActive
+                  ? ['#818CF8', '#A855F7', '#EC4899']
+                  : ['rgba(139, 92, 246, 0.4)', 'rgba(99, 102, 241, 0.3)']
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.hostGradientBorder}
             >
               <View style={styles.hostInnerCircle}>
-                {owner?.avatar ? (
-                  <Image source={{ uri: owner.avatar }} style={styles.hostAvatar} />
+                {isHostActive ? (
+                  owner?.avatar ? (
+                    <Image source={{ uri: owner.avatar }} style={styles.hostAvatar} />
+                  ) : (
+                    <Image
+                      source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' }}
+                      style={styles.hostAvatar}
+                    />
+                  )
                 ) : (
-                  <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' }}
-                    style={styles.hostAvatar}
-                  />
+                  /* Vacant Host Seat: Royal VIP Sofa */
+                  <View style={styles.vacantHostSofaBox}>
+                    <RoyalHostSofaIcon width={44} height={44} />
+                  </View>
                 )}
               </View>
             </LinearGradient>
 
             {/* Speaking Wave Pulse */}
-            <View style={styles.hostSpeakingPulse} />
+            {isHostActive && <View style={styles.hostSpeakingPulse} />}
           </View>
 
-          {/* Host Name with Fancy Wings */}
+          {/* Host Name / Label */}
           <View style={styles.hostInfoBox}>
             <Text style={styles.hostName} numberOfLines={1}>
-              {owner?.name ? `༺𓊈𒆜 ${owner.name} 😎 𒆜𓊉༻` : '༺𓊈𒆜 Raftar 😎😎 𒆜𓊉༻'}
+              {isHostActive
+                ? owner?.name
+                  ? `༺𓊈𒆜 ${owner.name} 😎 𒆜𓊉༻`
+                  : '༺𓊈𒆜 Raftar 😎😎 𒆜𓊉༻'
+                : isOwner
+                ? '🛋️ Tap to Take Host'
+                : '🛋️ Host Seat (Vacant)'}
             </Text>
           </View>
         </TouchableOpacity>
@@ -139,7 +158,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-    marginTop: 6,
+    marginTop: 10,
   },
   hostSeatWrapper: {
     alignItems: 'center',
@@ -150,9 +169,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hostGradientBorder: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     padding: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -163,21 +182,30 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   hostInnerCircle: {
-    width: 61,
-    height: 61,
-    borderRadius: 30.5,
+    width: 67,
+    height: 67,
+    borderRadius: 33.5,
     overflow: 'hidden',
     backgroundColor: '#1E1B4B',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hostAvatar: {
     width: '100%',
     height: '100%',
   },
+  vacantHostSofaBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(99, 102, 241, 0.25)',
+  },
   hostSpeakingPulse: {
     position: 'absolute',
-    width: 74,
-    height: 74,
-    borderRadius: 37,
+    width: 82,
+    height: 82,
+    borderRadius: 41,
     borderWidth: 1.5,
     borderColor: 'rgba(168, 85, 247, 0.5)',
   },
