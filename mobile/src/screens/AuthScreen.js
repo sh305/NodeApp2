@@ -15,24 +15,33 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import api from '../api/client';
 
-// Clean Crisp Vector Google "G" Icon
-const GoogleGIcon = ({ size = 26 }) => (
-  <Svg width={size} height={size} viewBox="0 0 48 48">
+// Official Multi-Color Gmail 'M' Vector Icon (matching user reference screenshot)
+const GmailOfficialIcon = ({ size = 26 }) => (
+  <Svg width={size} height={(size * 38) / 48} viewBox="0 0 48 38" fill="none">
+    {/* Left Blue Pillar with bottom-left rounded corner */}
     <Path
-      fill="#EA4335"
-      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-    />
-    <Path
+      d="M4 14.5L14 21V38H8a4 4 0 0 1-4-4V14.5z"
       fill="#4285F4"
-      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
     />
+    {/* Right Green Pillar with bottom-right rounded corner */}
     <Path
-      fill="#FBBC05"
-      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-    />
-    <Path
+      d="M44 14.5L34 21V38h6a4 4 0 0 0 4-4V14.5z"
       fill="#34A853"
-      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+    />
+    {/* Top Right Amber/Yellow Fold */}
+    <Path
+      d="M34 21V7.8a3.2 3.2 0 0 1 5.1-2.5L44 9.5v5z"
+      fill="#FBBC04"
+    />
+    {/* Top Left Dark Red Corner Shadow */}
+    <Path
+      d="M4 14.5v-5l4.9-4.2a3.2 3.2 0 0 1 5.1 2.5V21z"
+      fill="#C5221F"
+    />
+    {/* Center Vibrant Red Envelope V Flap */}
+    <Path
+      d="M14 21L24 28.5 34 21V7.8a3.2 3.2 0 0 0-5.1-2.5L24 9.2l-4.9-3.9A3.2 3.2 0 0 0 14 7.8V21z"
+      fill="#EA4335"
     />
   </Svg>
 );
@@ -62,6 +71,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [emailOtp, setEmailOtp] = useState('');
   const [emailUserName, setEmailUserName] = useState('');
   const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [isEmailOtpVerified, setIsEmailOtpVerified] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailVerifying, setEmailVerifying] = useState(false);
   const [hoveredBtn, setHoveredBtn] = useState(null); // 'email' | 'phone' | null
@@ -443,7 +453,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               onMouseLeave={() => setHoveredBtn(null)}
             >
               <View style={[styles.googleIconBadge, hoveredBtn === 'email' && styles.iconBadgeHovered]}>
-                <GoogleGIcon size={24} />
+                <GmailOfficialIcon size={24} />
               </View>
               <View style={styles.btnTextCol}>
                 <Text style={styles.premiumButtonTitle}>गूगल / Gmail के साथ साइन इन करें</Text>
@@ -586,7 +596,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           <View style={styles.authCard}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderTitleWrap}>
-                <GoogleGIcon size={20} />
+                <GmailOfficialIcon size={22} />
                 <Text style={styles.cardTitle}>Gmail / Email Login</Text>
               </View>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeBtn} activeOpacity={0.7}>
