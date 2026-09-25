@@ -9,6 +9,7 @@ import {
   Platform,
   Animated,
   Easing,
+  Keyboard,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
