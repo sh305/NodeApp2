@@ -27,6 +27,36 @@ exports.sendWhatsAppOtp = async (req, res) => {
   }
 };
 
+// @desc    Verify OTP Code Only
+// @route   POST /api/auth/verify-otp
+exports.verifyOtpOnly = async (req, res) => {
+  try {
+    const { phoneNumber, otp } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'OTP code is required' });
+    }
+
+    const verifyResult = await SmsOtpService.verifyOtp(phoneNumber, otp);
+    if (!verifyResult.valid) {
+      return res.status(400).json({
+        success: false,
+        message: verifyResult.message || 'Wrong OTP! Please enter correct 6 digit OTP',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'OTP Verified Successfully! ✅',
+    });
+  } catch (error) {
+    console.error('verifyOtpOnly error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Phone Number Login / Registrations with OTP verification
 // @route   POST /api/auth/phone-login
 exports.phoneLogin = async (req, res) => {
@@ -37,24 +67,21 @@ exports.phoneLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
 
-    if (!otp) {
-      return res.status(400).json({ success: false, message: 'OTP is required' });
-    }
-
-    // Verify OTP using Fast2SMS / Redis Cache
-    const verifyResult = await SmsOtpService.verifyOtp(phoneNumber, otp);
-    if (!verifyResult.valid) {
-      return res.status(400).json({ success: false, message: verifyResult.message || 'Invalid OTP code' });
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Your name is required to complete registration' });
     }
 
     let user = await User.findOne({ phoneNumber });
 
     if (!user) {
       user = await User.create({
-        name: name || `User_${phoneNumber.slice(-4)}`,
+        name: name.trim(),
         phoneNumber,
         avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${phoneNumber}`,
       });
+    } else if (name.trim()) {
+      user.name = name.trim();
+      await user.save();
     }
 
     // Ban check

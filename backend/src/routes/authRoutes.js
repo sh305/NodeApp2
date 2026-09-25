@@ -5,11 +5,14 @@ const {
   googleLogin,
   facebookLogin,
   sendWhatsAppOtp,
+  verifyOtpOnly,
   getMe,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
 router.post('/send-whatsapp-otp', sendWhatsAppOtp);
+router.post('/send-sms-otp', sendWhatsAppOtp);
+router.post('/verify-otp', verifyOtpOnly);
 router.post('/phone-login', phoneLogin);
 router.post('/google-login', googleLogin);
 router.post('/facebook-login', facebookLogin);
