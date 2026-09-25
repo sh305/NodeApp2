@@ -1,95 +1,70 @@
-const axios = require('axios');
+const twilio = require('twilio');
 const { cacheService } = require('../config/redis');
 
+let twilioClient = null;
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID || 'VA7c9dc753c2da55e6efaa1f5153a98141';
+
+if (accountSid && authToken) {
+  try {
+    twilioClient = twilio(accountSid, authToken);
+  } catch (err) {
+    console.error('Twilio init error:', err.message);
+  }
+}
+
 /**
- * Fast2SMS Real Mobile Text SMS OTP Service
- * Direct Indian Mobile SMS Gateway
+ * Real SMS OTP Service powered by Twilio Verify API
+ * Delivers Real SMS OTP to Indian & Global Mobile Numbers
  */
 class SmsOtpService {
   /**
-   * Send 6-Digit Real SMS OTP to Indian Mobile Number
+   * Send 6-Digit Real SMS OTP to Mobile Number
    * @param {string} rawPhoneNumber - 10 digit Indian number (e.g. 7982720270)
    */
   static async sendOtp(rawPhoneNumber) {
     try {
-      const cleanPhone = rawPhoneNumber.replace(/\D/g, '').slice(-10);
-      if (!cleanPhone || cleanPhone.length !== 10) {
+      const cleanDigits = rawPhoneNumber.replace(/\D/g, '').slice(-10);
+      if (!cleanDigits || cleanDigits.length !== 10) {
         return { success: false, message: 'Please enter a valid 10-digit Indian mobile number' };
       }
 
-      // Generate secure 6-digit OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const formattedPhone = `+91${cleanDigits}`;
 
-      // Store in high-speed cache for 5 minutes (300 seconds)
-      await cacheService.set(`otp:${cleanPhone}`, otp, 300);
+      if (twilioClient && verifyServiceSid) {
+        console.log(`📡 Sending Real SMS OTP via Twilio Verify to ${formattedPhone}...`);
 
-      const apiKey = process.env.FAST2SMS_API_KEY;
-
-      if (apiKey) {
-        console.log(`📡 Sending Real SMS OTP via Fast2SMS to +91${cleanPhone}...`);
-        
-        try {
-          // Fast2SMS Quick OTP API Call
-          const response = await axios.post(
-            'https://www.fast2sms.com/dev/bulkV2',
-            {
-              variables_values: otp,
-              route: 'otp',
-              numbers: cleanPhone,
-            },
-            {
-              headers: {
-                authorization: apiKey,
-                'Content-Type': 'application/json',
-              },
-              timeout: 10000,
-            }
-          );
-
-          console.log('✅ Fast2SMS Response:', response.data);
-
-          if (response.data?.return || response.data?.status_code === 200) {
-            return {
-              success: true,
-              message: `Real SMS OTP sent to +91 ${cleanPhone}! Check your phone messages.`,
-            };
-          }
-        } catch (apiError) {
-          console.error('Fast2SMS POST Error, trying GET fallback:', apiError.response?.data || apiError.message);
-          
-          // Try GET fallback if POST is restricted
-          const getRes = await axios.get('https://www.fast2sms.com/dev/bulkV2', {
-            params: {
-              authorization: apiKey,
-              variables_values: otp,
-              route: 'otp',
-              numbers: cleanPhone,
-            },
-            timeout: 10000,
+        const verification = await twilioClient.verify.v2
+          .services(verifyServiceSid)
+          .verifications.create({
+            to: formattedPhone,
+            channel: 'sms',
           });
 
-          console.log('✅ Fast2SMS GET Response:', getRes.data);
-          if (getRes.data?.return || getRes.data?.status_code === 200) {
-            return {
-              success: true,
-              message: `Real SMS OTP sent to +91 ${cleanPhone}! Check your phone messages.`,
-            };
-          }
-        }
+        console.log('✅ Twilio SMS Dispatched successfully! Status:', verification.status);
+
+        return {
+          success: true,
+          message: `Real SMS OTP has been sent to ${formattedPhone}!\nPlease check your mobile messages.`,
+        };
       }
 
-      // If no API key or simulation
-      console.log(`📱 [Local OTP Fallback] Number: +91${cleanPhone} | OTP: ${otp}`);
+      // Fallback local OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      await cacheService.set(`otp:${cleanDigits}`, otp, 300);
+      console.log(`📱 [Local OTP Fallback] Number: ${formattedPhone} | OTP: ${otp}`);
+
       return {
         success: true,
-        message: `OTP sent to +91 ${cleanPhone}`,
+        message: `OTP sent to ${formattedPhone}`,
         devOtp: process.env.NODE_ENV === 'production' ? undefined : otp,
       };
     } catch (error) {
-      console.error('SmsOtpService Error:', error.response?.data || error.message);
+      console.error('Twilio SMS Error:', error.message);
       return {
         success: false,
-        message: error.response?.data?.message || error.message || 'Failed to deliver SMS OTP',
+        message: error.message || 'Failed to deliver SMS OTP',
       };
     }
   }
@@ -98,27 +73,50 @@ class SmsOtpService {
    * Verify User's Entered 6-Digit OTP
    */
   static async verifyOtp(rawPhoneNumber, enteredOtp) {
-    const cleanPhone = rawPhoneNumber.replace(/\D/g, '').slice(-10);
+    const cleanDigits = rawPhoneNumber.replace(/\D/g, '').slice(-10);
+    const formattedPhone = `+91${cleanDigits}`;
 
     // Master test code
     if (enteredOtp === '123456' || enteredOtp === '000000') {
       return { valid: true };
     }
 
-    const storedOtp = await cacheService.get(`otp:${cleanPhone}`);
+    if (twilioClient && verifyServiceSid) {
+      try {
+        console.log(`🔍 Verifying Twilio OTP code for ${formattedPhone}...`);
+        const verificationCheck = await twilioClient.verify.v2
+          .services(verifyServiceSid)
+          .verificationChecks.create({
+            to: formattedPhone,
+            code: enteredOtp.toString().trim(),
+          });
 
-    if (!storedOtp) {
-      return { valid: false, message: 'OTP expired or not requested. Please tap "Get OTP" again.' };
+        console.log('✅ Twilio Verification Result:', verificationCheck.status);
+
+        if (verificationCheck.status === 'approved') {
+          return { valid: true };
+        } else {
+          return {
+            valid: false,
+            message: 'Invalid or expired OTP code. Please check your SMS and try again.',
+          };
+        }
+      } catch (err) {
+        console.error('Twilio verify error:', err.message);
+      }
     }
 
-    if (storedOtp.toString().trim() !== enteredOtp.toString().trim()) {
-      return { valid: false, message: 'Incorrect OTP code. Please check your SMS and enter the 6-digit code.' };
+    // Fallback Redis/Memory cache verification
+    const storedOtp = await cacheService.get(`otp:${cleanDigits}`);
+    if (storedOtp && storedOtp.toString().trim() === enteredOtp.toString().trim()) {
+      await cacheService.del(`otp:${cleanDigits}`);
+      return { valid: true };
     }
 
-    // Delete OTP after successful verification (Single-use security)
-    await cacheService.del(`otp:${cleanPhone}`);
-
-    return { valid: true };
+    return {
+      valid: false,
+      message: 'Invalid OTP code. Please check the SMS on your mobile and try again.',
+    };
   }
 }
 
