@@ -8,20 +8,24 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Backend", "Backend", "{760CA85E-5DDC-4731-BC20-21398223847F}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "backend", "backend", "{760CA85E-5DDC-4731-BC20-21398223847F}"
 	ProjectSection(SolutionItems) = preProject
 		backend\package.json = backend\package.json
 		backend\.env.example = backend\.env.example
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{B1000000-0000-0000-0000-000000000000}"
+	ProjectSection(SolutionItems) = preProject
 		backend\src\server.js = backend\src\server.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Config", "Config", "{B1000001-0000-0000-0000-000000000001}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "config", "config", "{B1000001-0000-0000-0000-000000000001}"
 	ProjectSection(SolutionItems) = preProject
 		backend\src\config\db.js = backend\src\config\db.js
 		backend\src\config\redis.js = backend\src\config\redis.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Controllers", "Controllers", "{B1000002-0000-0000-0000-000000000002}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "controllers", "controllers", "{B1000002-0000-0000-0000-000000000002}"
 	ProjectSection(SolutionItems) = preProject
 		backend\src\controllers\authController.js = backend\src\controllers\authController.js
 		backend\src\controllers\giftController.js = backend\src\controllers\giftController.js
@@ -30,12 +34,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Controllers", "Controllers"
 		backend\src\controllers\userController.js = backend\src\controllers\userController.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Middlewares", "Middlewares", "{B1000003-0000-0000-0000-000000000003}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "middlewares", "middlewares", "{B1000003-0000-0000-0000-000000000003}"
 	ProjectSection(SolutionItems) = preProject
 		backend\src\middlewares\authMiddleware.js = backend\src\middlewares\authMiddleware.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Models", "Models", "{B1000004-0000-0000-0000-000000000004}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "models", "models", "{B1000004-0000-0000-0000-000000000004}"
 	ProjectSection(SolutionItems) = preProject
 		backend\src\models\Gift.js = backend\src\models\Gift.js
 		backend\src\models\Report.js = backend\src\models\Report.js
@@ -44,7 +48,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Models", "Models", "{B10000
 		backend\src\models\User.js = backend\src\models\User.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Routes", "Routes", "{B1000005-0000-0000-0000-000000000005}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "routes", "routes", "{B1000005-0000-0000-0000-000000000005}"
 	ProjectSection(SolutionItems) = preProject
 		backend\src\routes\authRoutes.js = backend\src\routes\authRoutes.js
 		backend\src\routes\giftRoutes.js = backend\src\routes\giftRoutes.js
@@ -53,17 +57,17 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Routes", "Routes", "{B10000
 		backend\src\routes\userRoutes.js = backend\src\routes\userRoutes.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Services", "Services", "{B1000006-0000-0000-0000-000000000006}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "services", "services", "{B1000006-0000-0000-0000-000000000006}"
 	ProjectSection(SolutionItems) = preProject
 		backend\src\services\levelService.js = backend\src\services\levelService.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sockets", "Sockets", "{B1000007-0000-0000-0000-000000000007}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sockets", "sockets", "{B1000007-0000-0000-0000-000000000007}"
 	ProjectSection(SolutionItems) = preProject
 		backend\src\sockets\roomSocket.js = backend\src\sockets\roomSocket.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Mobile", "Mobile", "{A47BF7F9-53DC-43B6-9533-3176B8BEF843}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "mobile", "mobile", "{A47BF7F9-53DC-43B6-9533-3176B8BEF843}"
 	ProjectSection(SolutionItems) = preProject
 		mobile\package.json = mobile\package.json
 		mobile\app.json = mobile\app.json
@@ -71,12 +75,14 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Mobile", "Mobile", "{A47BF7
 		mobile\App.js = mobile\App.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Api", "Api", "{C1000001-0000-0000-0000-000000000001}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{C1000000-0000-0000-0000-000000000000}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "api", "api", "{C1000001-0000-0000-0000-000000000001}"
 	ProjectSection(SolutionItems) = preProject
 		mobile\src\api\client.js = mobile\src\api\client.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Components", "Components", "{C1000002-0000-0000-0000-000000000002}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "components", "components", "{C1000002-0000-0000-0000-000000000002}"
 	ProjectSection(SolutionItems) = preProject
 		mobile\src\components\AvatarWithFrame.js = mobile\src\components\AvatarWithFrame.js
 		mobile\src\components\GiftBottomSheet.js = mobile\src\components\GiftBottomSheet.js
@@ -86,7 +92,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Components", "Components", 
 		mobile\src\components\RoomSeatGrid.js = mobile\src\components\RoomSeatGrid.js
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Screens", "Screens", "{C1000003-0000-0000-0000-000000000003}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "screens", "screens", "{C1000003-0000-0000-0000-000000000003}"
 	ProjectSection(SolutionItems) = preProject
 		mobile\src\screens\AuthScreen.js = mobile\src\screens\AuthScreen.js
 		mobile\src\screens\HomeScreen.js = mobile\src\screens\HomeScreen.js
@@ -100,15 +106,17 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{B1000001-0000-0000-0000-000000000001} = {760CA85E-5DDC-4731-BC20-21398223847F}
-		{B1000002-0000-0000-0000-000000000002} = {760CA85E-5DDC-4731-BC20-21398223847F}
-		{B1000003-0000-0000-0000-000000000003} = {760CA85E-5DDC-4731-BC20-21398223847F}
-		{B1000004-0000-0000-0000-000000000004} = {760CA85E-5DDC-4731-BC20-21398223847F}
-		{B1000005-0000-0000-0000-000000000005} = {760CA85E-5DDC-4731-BC20-21398223847F}
-		{B1000006-0000-0000-0000-000000000006} = {760CA85E-5DDC-4731-BC20-21398223847F}
-		{B1000007-0000-0000-0000-000000000007} = {760CA85E-5DDC-4731-BC20-21398223847F}
-		{C1000001-0000-0000-0000-000000000001} = {A47BF7F9-53DC-43B6-9533-3176B8BEF843}
-		{C1000002-0000-0000-0000-000000000002} = {A47BF7F9-53DC-43B6-9533-3176B8BEF843}
-		{C1000003-0000-0000-0000-000000000003} = {A47BF7F9-53DC-43B6-9533-3176B8BEF843}
+		{B1000000-0000-0000-0000-000000000000} = {760CA85E-5DDC-4731-BC20-21398223847F}
+		{B1000001-0000-0000-0000-000000000001} = {B1000000-0000-0000-0000-000000000000}
+		{B1000002-0000-0000-0000-000000000002} = {B1000000-0000-0000-0000-000000000000}
+		{B1000003-0000-0000-0000-000000000003} = {B1000000-0000-0000-0000-000000000000}
+		{B1000004-0000-0000-0000-000000000004} = {B1000000-0000-0000-0000-000000000000}
+		{B1000005-0000-0000-0000-000000000005} = {B1000000-0000-0000-0000-000000000000}
+		{B1000006-0000-0000-0000-000000000006} = {B1000000-0000-0000-0000-000000000000}
+		{B1000007-0000-0000-0000-000000000007} = {B1000000-0000-0000-0000-000000000000}
+		{C1000000-0000-0000-0000-000000000000} = {A47BF7F9-53DC-43B6-9533-3176B8BEF843}
+		{C1000001-0000-0000-0000-000000000001} = {C1000000-0000-0000-0000-000000000000}
+		{C1000002-0000-0000-0000-000000000002} = {C1000000-0000-0000-0000-000000000000}
+		{C1000003-0000-0000-0000-000000000003} = {C1000000-0000-0000-0000-000000000000}
 	EndGlobalSection
 EndGlobal
