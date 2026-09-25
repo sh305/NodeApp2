@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../api/client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import ReportModal from '../components/ReportModal';
+import ScreenContainer from '../components/ScreenContainer';
 
 export default function UserProfileScreen({ route, navigation, currentUser, onLogout }) {
   const insets = useSafeAreaInsets();
@@ -106,7 +107,11 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   if (!profile) return null;
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer
+      backgroundColor="#0F0F1A"
+      contentContainerStyle={styles.scrollContent}
+      edges={['bottom']}
+    >
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(16, insets.top) }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -116,9 +121,8 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
         <View style={{ width: 30 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* Profile Card */}
-        <View style={styles.card}>
+      {/* Profile Card */}
+      <View style={styles.card}>
           <AvatarWithFrame
             avatarUri={profile.avatar}
             level={profile.wealthLevel || 1}
@@ -188,7 +192,6 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
             )}
           </View>
         </View>
-      </ScrollView>
 
       {/* Report Modal */}
       <ReportModal
@@ -197,7 +200,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
         onSubmitReport={handleSubmitReport}
         targetUserName={profile.name}
       />
-    </View>
+    </ScreenContainer>
   );
 }
 

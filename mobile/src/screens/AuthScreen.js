@@ -8,15 +8,12 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
-  ScrollView,
-  KeyboardAvoidingView,
-  Keyboard,
   Easing,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import api from '../api/client';
+import ScreenContainer from '../components/ScreenContainer';
 
 // Official Multi-Color Gmail 'M' Vector Icon (matching user reference screenshot)
 const GmailOfficialIcon = ({ size = 26 }) => (
@@ -390,7 +387,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <ScreenContainer
+      backgroundColor="#12C85A"
+      contentContainerStyle={styles.scrollContent}
+      scrollRef={scrollViewRef}
+    >
       {/* Floating Hot-Toast */}
       {toast.visible && (
         <Animated.View
@@ -445,31 +446,19 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         </Animated.View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1, width: '100%' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          automaticallyAdjustKeyboardInsets={true}
-        >
-        {/* Top Header & Big "Yo!" Logo matching screenshot */}
-        <View style={styles.brandHeader}>
-          <View style={styles.yoLogoContainer}>
-            <Text style={styles.yoTextY}>Y</Text>
-            <View style={styles.yoBubbleContainer}>
-              <View style={styles.speechDot} />
-            </View>
-            <Text style={styles.yoExclamation}>!</Text>
+      {/* Top Header & Big "Yo!" Logo matching screenshot */}
+      <View style={styles.brandHeader}>
+        <View style={styles.yoLogoContainer}>
+          <Text style={styles.yoTextY}>Y</Text>
+          <View style={styles.yoBubbleContainer}>
+            <View style={styles.speechDot} />
           </View>
-
-          <Text style={styles.hindiTagline}>वॉइस चैट, प्ले गेम्स, दोस्त बनाएं</Text>
-          <Text style={styles.englishTagline}>Voice Chat, Play Games, Make Friends</Text>
+          <Text style={styles.yoExclamation}>!</Text>
         </View>
+
+        <Text style={styles.hindiTagline}>वॉइस चैट, प्ले गेम्स, दोस्त बनाएं</Text>
+        <Text style={styles.englishTagline}>Voice Chat, Play Games, Make Friends</Text>
+      </View>
 
         {/* MAIN BUTTONS or ACTIVE AUTH MODAL FORM */}
         {!activeModal ? (
@@ -764,9 +753,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <Text style={styles.termsLink}>&lt;&lt;गोपनीयता नीति&gt;&gt;</Text> से सहमत होते हैं
           </Text>
         </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
