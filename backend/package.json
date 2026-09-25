@@ -17,6 +17,7 @@
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.1",
+    "nodemailer": "^10.0.10",
     "socket.io": "^4.7.5",
     "twilio": "^6.1.1"
   },

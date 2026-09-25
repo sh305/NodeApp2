@@ -8,33 +8,46 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/client';
 
 export default function AuthScreen({ navigation, onLoginSuccess }) {
-  const [authMethod, setAuthMethod] = useState('phone'); // 'phone' | 'google' | 'facebook'
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [userName, setUserName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [isOtpVerified, setIsOtpVerified] = useState(false);
+  // 'landing' | 'phone' | 'email'
+  const [activeModal, setActiveModal] = useState(null);
 
-  // Modern Hot-Toast Floating Alert State & Animation
+  // Phone Form State
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneUserName, setPhoneUserName] = useState('');
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [isPhoneOtpVerified, setIsPhoneOtpVerified] = useState(false);
+  const [phoneSending, setPhoneSending] = useState(false);
+  const [phoneVerifying, setPhoneVerifying] = useState(false);
+
+  // Gmail / Email Form State
+  const [email, setEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [emailUserName, setEmailUserName] = useState('');
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [isEmailOtpVerified, setIsEmailOtpVerified] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailVerifying, setEmailVerifying] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+
+  // Modern Hot-Toast Floating Notification State
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const toastAnim = useRef(new Animated.Value(-100)).current;
   const toastTimerRef = useRef(null);
 
   const showToast = (message, type = 'success') => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-
     setToast({ visible: true, message, type });
 
     Animated.spring(toastAnim, {
-      toValue: 20,
+      toValue: 24,
       friction: 6,
       tension: 50,
       useNativeDriver: Platform.OS !== 'web',
@@ -55,88 +68,67 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     });
   };
 
-  // 1. Send OTP to User's Mobile
-  const handleSendOtp = async () => {
+  // ---------------- PHONE AUTH HANDLERS ----------------
+  const handleSendPhoneOtp = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!cleanPhone || cleanPhone.length !== 10) {
       showToast('Please enter a valid 10-digit mobile number', 'error');
       return;
     }
 
-    setSendingOtp(true);
-
+    setPhoneSending(true);
     try {
-      const res = await api.post('/auth/send-whatsapp-otp', {
-        phoneNumber: cleanPhone,
-      });
-
+      const res = await api.post('/auth/send-sms-otp', { phoneNumber: cleanPhone });
       if (res.data.success) {
-        setOtpSent(true);
-        setIsOtpVerified(false);
-        setOtp('');
+        setPhoneOtpSent(true);
+        setIsPhoneOtpVerified(false);
+        setPhoneOtp('');
         showToast('Message Sent Successfully', 'success');
       } else {
         showToast(res.data.message || 'Failed to send OTP', 'error');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to send SMS OTP';
-      showToast(msg, 'error');
+      showToast(err.response?.data?.message || 'Failed to send SMS OTP', 'error');
     } finally {
-      setSendingOtp(false);
+      setPhoneSending(false);
     }
   };
 
-  // 2. Verify OTP Button Handler
-  const handleVerifyOtp = async () => {
+  const handleVerifyPhoneOtp = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      showToast('Please enter your 10-digit mobile number', 'error');
-      return;
-    }
-
-    if (!otp.trim() || otp.trim().length < 6) {
+    if (!phoneOtp.trim() || phoneOtp.trim().length < 6) {
       showToast('Please enter the 6-digit OTP code', 'error');
       return;
     }
 
-    setVerifyingOtp(true);
-
+    setPhoneVerifying(true);
     try {
       const res = await api.post('/auth/verify-otp', {
         phoneNumber: cleanPhone,
-        otp: otp.trim(),
+        otp: phoneOtp.trim(),
       });
-
       if (res.data.success) {
-        setIsOtpVerified(true);
+        setIsPhoneOtpVerified(true);
         showToast('OTP Verified Successfully! ✅', 'success');
       } else {
-        setIsOtpVerified(false);
+        setIsPhoneOtpVerified(false);
         showToast(res.data.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
       }
     } catch (err) {
-      setIsOtpVerified(false);
-      const msg = err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP';
-      showToast(msg, 'error');
+      setIsPhoneOtpVerified(false);
+      showToast(err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
     } finally {
-      setVerifyingOtp(false);
+      setPhoneVerifying(false);
     }
   };
 
-  // 3. Complete Registration & Login
-  const handlePhoneLogin = async () => {
+  const handlePhoneLoginSubmit = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      showToast('Please enter your 10-digit mobile number', 'error');
-      return;
-    }
-
-    if (!isOtpVerified) {
+    if (!isPhoneOtpVerified) {
       showToast('Please verify your OTP first', 'error');
       return;
     }
-
-    if (!userName.trim()) {
+    if (!phoneUserName.trim()) {
       showToast('Please enter your full name', 'error');
       return;
     }
@@ -145,10 +137,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     try {
       const res = await api.post('/auth/phone-login', {
         phoneNumber: cleanPhone,
-        otp: otp.trim(),
-        name: userName.trim(),
+        otp: phoneOtp.trim(),
+        name: phoneUserName.trim(),
       });
-
       if (res.data.success) {
         showToast('Login Successful! Welcome 🎉', 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
@@ -156,47 +147,92 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         if (onLoginSuccess) onLoginSuccess(res.data.user);
       }
     } catch (err) {
-      if (err.response?.data?.banned) {
-        showToast(`Account Banned: ${err.response.data.message}`, 'error');
-      } else {
-        showToast(err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
-      }
+      showToast(err.response?.data?.message || 'Login failed', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // 4. Social Login
-  const handleSocialLogin = async (provider) => {
+  // ---------------- GMAIL / EMAIL AUTH HANDLERS ----------------
+  const handleSendEmailOtp = async () => {
+    const cleanEmail = email.toLowerCase().trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      showToast('Please enter a valid Gmail / Email address', 'error');
+      return;
+    }
+
+    setEmailSending(true);
+    try {
+      const res = await api.post('/auth/send-email-otp', { email: cleanEmail });
+      if (res.data.success) {
+        setEmailOtpSent(true);
+        setIsEmailOtpVerified(false);
+        setEmailOtp('');
+        showToast('Message Sent Successfully', 'success');
+      } else {
+        showToast(res.data.message || 'Failed to send OTP to email', 'error');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to send Email OTP', 'error');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    const cleanEmail = email.toLowerCase().trim();
+    if (!emailOtp.trim() || emailOtp.trim().length < 6) {
+      showToast('Please enter the 6-digit OTP code', 'error');
+      return;
+    }
+
+    setEmailVerifying(true);
+    try {
+      const res = await api.post('/auth/verify-email-otp', {
+        email: cleanEmail,
+        otp: emailOtp.trim(),
+      });
+      if (res.data.success) {
+        setIsEmailOtpVerified(true);
+        showToast('OTP Verified Successfully! ✅', 'success');
+      } else {
+        setIsEmailOtpVerified(false);
+        showToast(res.data.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
+      }
+    } catch (err) {
+      setIsEmailOtpVerified(false);
+      showToast(err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP', 'error');
+    } finally {
+      setEmailVerifying(false);
+    }
+  };
+
+  const handleEmailLoginSubmit = async () => {
+    const cleanEmail = email.toLowerCase().trim();
+    if (!isEmailOtpVerified) {
+      showToast('Please verify your OTP first', 'error');
+      return;
+    }
+    if (!emailUserName.trim()) {
+      showToast('Please enter your full name', 'error');
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload =
-        provider === 'google'
-          ? {
-              googleId: `google_${Date.now()}`,
-              email: `user_${Date.now()}@gmail.com`,
-              name: 'Google Live User',
-              avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-            }
-          : {
-              facebookId: `fb_${Date.now()}`,
-              name: 'Facebook Live User',
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-            };
-
-      const res = await api.post(`/auth/${provider}-login`, payload);
+      const res = await api.post('/auth/email-login', {
+        email: cleanEmail,
+        otp: emailOtp.trim(),
+        name: emailUserName.trim(),
+      });
       if (res.data.success) {
-        showToast('Login Successful!', 'success');
+        showToast('Login Successful! Welcome 🎉', 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
         await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
         if (onLoginSuccess) onLoginSuccess(res.data.user);
       }
     } catch (err) {
-      if (err.response?.data?.banned) {
-        showToast(err.response.data.message, 'error');
-      } else {
-        showToast('Social login failed. Please try again.', 'error');
-      }
+      showToast(err.response?.data?.message || 'Login failed', 'error');
     } finally {
       setLoading(false);
     }
@@ -204,146 +240,147 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   return (
     <View style={styles.container}>
-      {/* Sleek Material Hot-Toast Floating Notification Banner */}
+      {/* Floating Hot-Toast */}
       {toast.visible && (
         <Animated.View
           style={[
             styles.toastContainer,
             toast.type === 'success' && styles.toastSuccess,
             toast.type === 'error' && styles.toastError,
-            toast.type === 'info' && styles.toastInfo,
             { top: toastAnim },
           ]}
         >
-          <TouchableOpacity
-            style={styles.toastInner}
-            activeOpacity={0.9}
-            onPress={hideToast}
-          >
-            <Text style={styles.toastIcon}>
-              {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
-            </Text>
+          <TouchableOpacity style={styles.toastInner} activeOpacity={0.9} onPress={hideToast}>
+            <Text style={styles.toastIcon}>{toast.type === 'success' ? '✅' : '❌'}</Text>
             <Text style={styles.toastText}>{toast.message}</Text>
           </TouchableOpacity>
         </Animated.View>
       )}
 
-      {/* App Logo & Title */}
-      <View style={styles.logoSection}>
-        <View style={styles.iconCircle}>
-          <Text style={styles.logoEmoji}>🎙️</Text>
+      {/* Decorative 3D Gaming & Music Background Icons */}
+      <View style={styles.bgDecorations} pointerEvents="none">
+        <Text style={[styles.floatingIcon, { top: '10%', left: '8%', fontSize: 38, opacity: 0.25 }]}>🎙️</Text>
+        <Text style={[styles.floatingIcon, { top: '15%', right: '10%', fontSize: 34, opacity: 0.28 }]}>🎵</Text>
+        <Text style={[styles.floatingIcon, { top: '22%', right: '15%', fontSize: 42, opacity: 0.2 }]}>🎲</Text>
+        <Text style={[styles.floatingIcon, { top: '35%', left: '12%', fontSize: 44, opacity: 0.22 }]}>🎮</Text>
+        <Text style={[styles.floatingIcon, { bottom: '28%', right: '8%', fontSize: 36, opacity: 0.3 }]}>⭐</Text>
+        <Text style={[styles.floatingIcon, { bottom: '18%', left: '14%', fontSize: 48, opacity: 0.25 }]}>🎲</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Top Header & Big "Yo!" Logo matching screenshot */}
+        <View style={styles.brandHeader}>
+          <View style={styles.yoLogoContainer}>
+            <Text style={styles.yoTextY}>Y</Text>
+            <View style={styles.yoBubbleContainer}>
+              <Text style={styles.yoTextO}>o</Text>
+              <View style={styles.speechDot} />
+            </View>
+            <Text style={styles.yoExclamation}>!</Text>
+          </View>
+
+          <Text style={styles.hindiTagline}>वॉइस चैट, प्ले गेम्स, दोस्त बनाएं</Text>
+          <Text style={styles.englishTagline}>Voice Chat, Play Games, Make Friends</Text>
         </View>
-        <Text style={styles.appName}>YoYo Live Voice</Text>
-        <Text style={styles.tagline}>Voice Chat Rooms, Gifting & Community</Text>
-      </View>
 
-      {/* Auth Method Selector */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tab, authMethod === 'phone' && styles.tabActive]}
-          onPress={() => setAuthMethod('phone')}
-        >
-          <Text style={[styles.tabText, authMethod === 'phone' && styles.tabTextActive]}>
-            Mobile OTP
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, authMethod === 'google' && styles.tabActive]}
-          onPress={() => setAuthMethod('google')}
-        >
-          <Text style={[styles.tabText, authMethod === 'google' && styles.tabTextActive]}>
-            Google
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, authMethod === 'facebook' && styles.tabActive]}
-          onPress={() => setAuthMethod('facebook')}
-        >
-          <Text style={[styles.tabText, authMethod === 'facebook' && styles.tabTextActive]}>
-            Facebook
-          </Text>
-        </TouchableOpacity>
-      </View>
+        {/* MAIN BUTTONS or ACTIVE AUTH FORM */}
+        {!activeModal ? (
+          <View style={styles.actionButtonsContainer}>
+            {/* 1. Google / Gmail Sign In Pill Button */}
+            <TouchableOpacity
+              style={styles.pillButton}
+              activeOpacity={0.85}
+              onPress={() => setActiveModal('email')}
+            >
+              <View style={styles.googleIconBadge}>
+                <Text style={styles.googleIconLetter}>G</Text>
+              </View>
+              <Text style={styles.pillButtonText}>गूगल / Gmail के साथ साइन इन करें</Text>
+            </TouchableOpacity>
 
-      {/* Form Content */}
-      <View style={styles.formCard}>
-        {authMethod === 'phone' ? (
-          <>
-            {/* 1. Mobile Number Row with Material UI Get OTP Button */}
+            {/* 2. Phone SMS Sign In Pill Button */}
+            <TouchableOpacity
+              style={[styles.pillButton, styles.phonePillButton]}
+              activeOpacity={0.85}
+              onPress={() => setActiveModal('phone')}
+            >
+              <View style={styles.phoneIconBadge}>
+                <Text style={styles.phoneIconText}>📱</Text>
+              </View>
+              <Text style={styles.pillButtonText}>मोबाइल नंबर के साथ साइन इन करें</Text>
+            </TouchableOpacity>
+          </View>
+        ) : activeModal === 'phone' ? (
+          /* Phone OTP Modal Card */
+          <View style={styles.authCard}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>📱 Mobile Phone Login</Text>
+              <TouchableOpacity onPress={() => setActiveModal(null)} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Mobile Number Row */}
             <Text style={styles.inputLabel}>Mobile Number</Text>
             <View style={styles.inputRow}>
-              <View style={styles.countryCodeBadge}>
-                <Text style={styles.countryCodeText}>+91</Text>
+              <View style={styles.countryBadge}>
+                <Text style={styles.countryBadgeText}>+91</Text>
               </View>
               <TextInput
                 style={[styles.input, styles.flexInput]}
                 placeholder="Enter 10-digit number"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor="#9CA3AF"
                 keyboardType="phone-pad"
                 maxLength={10}
                 value={phoneNumber}
                 onChangeText={(val) => {
                   setPhoneNumber(val);
-                  setIsOtpVerified(false);
+                  setIsPhoneOtpVerified(false);
                 }}
               />
               <TouchableOpacity
-                style={[
-                  styles.muiGetOtpBtn,
-                  otpSent && styles.muiResendOtpBtn,
-                ]}
-                onPress={handleSendOtp}
-                disabled={sendingOtp}
+                style={[styles.muiBtn, phoneOtpSent && styles.muiBtnResend]}
+                onPress={handleSendPhoneOtp}
+                disabled={phoneSending}
                 activeOpacity={0.8}
               >
-                {sendingOtp ? (
+                {phoneSending ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.muiGetOtpText}>
-                    {otpSent ? 'Resend OTP' : 'Get OTP'}
-                  </Text>
+                  <Text style={styles.muiBtnText}>{phoneOtpSent ? 'Resend' : 'Get OTP'}</Text>
                 )}
               </TouchableOpacity>
             </View>
 
-            {/* 2. OTP Input Field + Verify OTP Button (Shown after Get OTP) */}
-            {otpSent && (
-              <View style={styles.sectionSpacing}>
-                <View style={styles.labelRow}>
+            {/* OTP Field + Verify OTP Button */}
+            {phoneOtpSent && (
+              <View style={styles.fieldSpacing}>
+                <View style={styles.labelFlexRow}>
                   <Text style={styles.inputLabel}>Enter 6-Digit OTP</Text>
-                  {isOtpVerified && (
-                    <Text style={styles.verifiedBadgeText}>Verified ✅</Text>
-                  )}
+                  {isPhoneOtpVerified && <Text style={styles.verifiedText}>Verified ✅</Text>}
                 </View>
                 <View style={styles.inputRow}>
                   <TextInput
-                    style={[
-                      styles.input,
-                      styles.flexInput,
-                      isOtpVerified && styles.inputVerifiedBorder,
-                    ]}
-                    placeholder="Enter 6-digit OTP code"
-                    placeholderTextColor="#6B7280"
+                    style={[styles.input, styles.flexInput, isPhoneOtpVerified && styles.inputVerified]}
+                    placeholder="Enter 6-digit OTP"
+                    placeholderTextColor="#9CA3AF"
                     keyboardType="number-pad"
                     maxLength={6}
-                    editable={!isOtpVerified}
-                    value={otp}
-                    onChangeText={setOtp}
+                    editable={!isPhoneOtpVerified}
+                    value={phoneOtp}
+                    onChangeText={setPhoneOtp}
                   />
                   <TouchableOpacity
-                    style={[
-                      styles.muiVerifyOtpBtn,
-                      isOtpVerified && styles.muiVerifyOtpBtnSuccess,
-                    ]}
-                    onPress={handleVerifyOtp}
-                    disabled={verifyingOtp || isOtpVerified}
+                    style={[styles.muiVerifyBtn, isPhoneOtpVerified && styles.muiVerifyBtnSuccess]}
+                    onPress={handleVerifyPhoneOtp}
+                    disabled={phoneVerifying || isPhoneOtpVerified}
                     activeOpacity={0.8}
                   >
-                    {verifyingOtp ? (
+                    {phoneVerifying ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.muiVerifyOtpText}>
-                        {isOtpVerified ? 'Verified ✅' : 'Verify OTP'}
+                      <Text style={styles.muiVerifyBtnText}>
+                        {isPhoneOtpVerified ? 'Verified ✅' : 'Verify OTP'}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -351,80 +388,151 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               </View>
             )}
 
-            {/* 3. Compulsory Full Name Field */}
+            {/* Mandatory Name */}
             <Text style={styles.inputLabel}>
-              Your Full Name <Text style={styles.requiredStar}>*</Text>
+              Your Full Name <Text style={styles.star}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. Rahul Sharma"
-              placeholderTextColor="#6B7280"
-              value={userName}
-              onChangeText={setUserName}
+              placeholderTextColor="#9CA3AF"
+              value={phoneUserName}
+              onChangeText={setPhoneUserName}
             />
 
-            {/* 4. Main Login Button (Enabled only after OTP is Verified) */}
+            {/* Login Button */}
             <TouchableOpacity
-              style={[
-                styles.primaryBtn,
-                !isOtpVerified && styles.primaryBtnDisabled,
-              ]}
-              onPress={handlePhoneLogin}
-              disabled={loading || !isOtpVerified}
+              style={[styles.primarySubmitBtn, !isPhoneOtpVerified && styles.primaryBtnLocked]}
+              onPress={handlePhoneLoginSubmit}
+              disabled={loading || !isPhoneOtpVerified}
               activeOpacity={0.85}
             >
               {loading ? (
                 <ActivityIndicator color="#000" />
               ) : (
-                <Text
-                  style={[
-                    styles.primaryBtnText,
-                    !isOtpVerified && styles.primaryBtnTextDisabled,
-                  ]}
-                >
-                  {isOtpVerified ? 'Verify & Login' : 'Verify OTP First to Login 🔒'}
+                <Text style={[styles.primarySubmitBtnText, !isPhoneOtpVerified && styles.primaryBtnTextLocked]}>
+                  {isPhoneOtpVerified ? 'Verify & Login' : 'Verify OTP First 🔒'}
                 </Text>
-              )}
-            </TouchableOpacity>
-          </>
-        ) : authMethod === 'google' ? (
-          <View style={styles.socialBox}>
-            <Text style={styles.socialDesc}>
-              Sign in with your Google Account to access voice rooms and custom profile frames.
-            </Text>
-            <TouchableOpacity
-              style={styles.googleBtn}
-              onPress={() => handleSocialLogin('google')}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.socialBtnText}>Continue with Google ID</Text>
               )}
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.socialBox}>
-            <Text style={styles.socialDesc}>
-              Sign in with your Facebook Profile to connect with voice room friends.
+          /* Gmail / Email OTP Modal Card */
+          <View style={styles.authCard}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>✉️ Gmail / Email Login</Text>
+              <TouchableOpacity onPress={() => setActiveModal(null)} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Email Address Row */}
+            <Text style={styles.inputLabel}>Gmail / Email Address</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.input, styles.flexInput]}
+                placeholder="youremail@gmail.com"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  setIsEmailOtpVerified(false);
+                }}
+              />
+              <TouchableOpacity
+                style={[styles.muiBtn, emailOtpSent && styles.muiBtnResend]}
+                onPress={handleSendEmailOtp}
+                disabled={emailSending}
+                activeOpacity={0.8}
+              >
+                {emailSending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.muiBtnText}>{emailOtpSent ? 'Resend' : 'Get OTP'}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Email OTP Field + Verify OTP Button */}
+            {emailOtpSent && (
+              <View style={styles.fieldSpacing}>
+                <View style={styles.labelFlexRow}>
+                  <Text style={styles.inputLabel}>Enter 6-Digit Email OTP</Text>
+                  {isEmailOtpVerified && <Text style={styles.verifiedText}>Verified ✅</Text>}
+                </View>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={[styles.input, styles.flexInput, isEmailOtpVerified && styles.inputVerified]}
+                    placeholder="Enter 6-digit code"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    editable={!isEmailOtpVerified}
+                    value={emailOtp}
+                    onChangeText={setEmailOtp}
+                  />
+                  <TouchableOpacity
+                    style={[styles.muiVerifyBtn, isEmailOtpVerified && styles.muiVerifyBtnSuccess]}
+                    onPress={handleVerifyEmailOtp}
+                    disabled={emailVerifying || isEmailOtpVerified}
+                    activeOpacity={0.8}
+                  >
+                    {emailVerifying ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.muiVerifyBtnText}>
+                        {isEmailOtpVerified ? 'Verified ✅' : 'Verify OTP'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Mandatory Name */}
+            <Text style={styles.inputLabel}>
+              Your Full Name <Text style={styles.star}>*</Text>
             </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Rahul Sharma"
+              placeholderTextColor="#9CA3AF"
+              value={emailUserName}
+              onChangeText={setEmailUserName}
+            />
+
+            {/* Login Button */}
             <TouchableOpacity
-              style={styles.facebookBtn}
-              onPress={() => handleSocialLogin('facebook')}
-              disabled={loading}
+              style={[styles.primarySubmitBtn, !isEmailOtpVerified && styles.primaryBtnLocked]}
+              onPress={handleEmailLoginSubmit}
+              disabled={loading || !isEmailOtpVerified}
               activeOpacity={0.85}
             >
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color="#000" />
               ) : (
-                <Text style={styles.socialBtnText}>Continue with Facebook ID</Text>
+                <Text style={[styles.primarySubmitBtnText, !isEmailOtpVerified && styles.primaryBtnTextLocked]}>
+                  {isEmailOtpVerified ? 'Verify & Login' : 'Verify OTP First 🔒'}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
         )}
-      </View>
+
+        {/* Bottom Language Selector & Terms matching screenshot */}
+        <View style={styles.footerSection}>
+          <TouchableOpacity style={styles.langPill} activeOpacity={0.8}>
+            <Text style={styles.langPillText}>🌐 हिन्दी (Hindi)  ›</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.termsText}>
+            जारी रखकर आप <Text style={styles.termsLink}>&lt;&lt;सेवा की शर्तें&gt;&gt;</Text> और{' '}
+            <Text style={styles.termsLink}>&lt;&lt;गोपनीयता नीति&gt;&gt;</Text> से सहमत होते हैं
+          </Text>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -432,33 +540,48 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B0B14',
-    paddingHorizontal: 24,
-    justifyContent: 'center',
+    backgroundColor: '#1FD866', // Vibrant energetic gaming green
     position: 'relative',
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'web' ? 40 : 60,
+    paddingBottom: 24,
+    alignItems: 'center',
+  },
 
-  // React-Hot-Toast Style Floating Banner
+  // Floating background icons
+  bgDecorations: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  floatingIcon: {
+    position: 'absolute',
+    color: '#0D8F40',
+  },
+
+  // Toast
   toastContainer: {
     position: 'absolute',
     left: 20,
     right: 20,
-    zIndex: 9999,
+    zIndex: 99999,
     alignItems: 'center',
   },
   toastInner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 13,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     borderRadius: 16,
-    backgroundColor: 'rgba(26, 26, 42, 0.96)',
+    backgroundColor: 'rgba(20, 24, 33, 0.96)',
     borderWidth: 1.5,
     borderColor: '#374151',
     shadowColor: '#000',
     shadowOpacity: 0.45,
     shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
     elevation: 12,
     maxWidth: 440,
     width: '100%',
@@ -472,10 +595,6 @@ const styles = StyleSheet.create({
     borderColor: '#EF4444',
     shadowColor: '#EF4444',
   },
-  toastInfo: {
-    borderColor: '#6366F1',
-    shadowColor: '#6366F1',
-  },
   toastIcon: {
     fontSize: 16,
   },
@@ -484,255 +603,329 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '700',
     flex: 1,
-    letterSpacing: 0.2,
   },
 
-  // Header Logo
-  logoSection: {
+  // Brand Header
+  brandHeader: {
     alignItems: 'center',
-    marginBottom: 22,
+    marginTop: 20,
+    marginBottom: 30,
   },
-  iconCircle: {
+  yoLogoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  yoTextY: {
+    fontSize: 76,
+    fontWeight: '900',
+    color: '#F4EB3B', // Vibrant cartoon yellow
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 6,
+    fontFamily: Platform.OS === 'web' ? 'Impact, sans-serif' : undefined,
+  },
+  yoBubbleContainer: {
     width: 66,
     height: 66,
     borderRadius: 33,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
+    backgroundColor: '#F4EB3B',
     justifyContent: 'center',
-    marginBottom: 10,
-    shadowColor: '#6366F1',
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  logoEmoji: {
-    fontSize: 30,
-  },
-  appName: {
-    color: '#FFFFFF',
-    fontSize: 23,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  tagline: {
-    color: '#9CA3AF',
-    fontSize: 12,
-    marginTop: 4,
-  },
-
-  // Tab Bar
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#171726',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 9,
     alignItems: 'center',
-    borderRadius: 8,
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  tabActive: {
-    backgroundColor: '#6366F1',
+  yoTextO: {
+    display: 'none',
   },
-  tabText: {
-    color: '#9CA3AF',
-    fontWeight: '600',
-    fontSize: 12,
+  speechDot: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1E232A',
+    borderBottomRightRadius: 4,
   },
-  tabTextActive: {
+  yoExclamation: {
+    fontSize: 76,
+    fontWeight: '900',
+    color: '#F4EB3B',
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 6,
+    fontFamily: Platform.OS === 'web' ? 'Impact, sans-serif' : undefined,
+  },
+  hindiTagline: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  englishTagline: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+    textAlign: 'center',
   },
 
-  // Form Card
-  formCard: {
-    backgroundColor: '#171726',
-    borderRadius: 22,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#26263B',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 6,
+  // Action Buttons
+  actionButtonsContainer: {
+    width: '100%',
+    maxWidth: 380,
+    gap: 16,
+    marginVertical: 20,
   },
+  pillButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  phonePillButton: {
+    backgroundColor: '#FFFFFF',
+  },
+  googleIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  googleIconLetter: {
+    color: '#EA4335',
+    fontWeight: '900',
+    fontSize: 20,
+  },
+  phoneIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  phoneIconText: {
+    fontSize: 18,
+  },
+  pillButtonText: {
+    color: '#1F2937',
+    fontSize: 15,
+    fontWeight: '800',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 36,
+  },
+
+  // Auth Form Card Modal
+  authCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 22,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+    marginVertical: 10,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingBottom: 10,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  closeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeBtnText: {
+    color: '#6B7280',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+
   inputLabel: {
-    color: '#D1D5DB',
-    fontSize: 12,
+    color: '#374151',
+    fontSize: 12.5,
     fontWeight: '700',
     marginBottom: 6,
     marginTop: 6,
   },
-  labelRow: {
+  labelFlexRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  requiredStar: {
+  star: {
     color: '#EF4444',
-    fontWeight: '800',
   },
-  verifiedBadgeText: {
+  verifiedText: {
     color: '#10B981',
-    fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
+    fontSize: 11.5,
   },
-  sectionSpacing: {
-    marginTop: 6,
+  fieldSpacing: {
+    marginTop: 4,
     marginBottom: 4,
   },
 
-  // Inputs
   inputRow: {
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
     marginBottom: 8,
   },
-  countryCodeBadge: {
-    backgroundColor: '#222236',
+  countryBadge: {
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderWidth: 1,
-    borderColor: '#374151',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: '#E5E7EB',
   },
-  countryCodeText: {
-    color: '#D1D5DB',
-    fontWeight: '700',
+  countryBadgeText: {
+    color: '#1F2937',
+    fontWeight: '800',
     fontSize: 13,
   },
   input: {
-    backgroundColor: '#222236',
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    color: '#FFFFFF',
+    color: '#111827',
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 13.5,
-    borderWidth: 1,
-    borderColor: '#374151',
+    borderWidth: 1.2,
+    borderColor: '#E5E7EB',
   },
   flexInput: {
     flex: 1,
   },
-  inputVerifiedBorder: {
+  inputVerified: {
     borderColor: '#10B981',
-    backgroundColor: '#132822',
+    backgroundColor: '#F0FDF4',
   },
 
-  // Material UI Style Elevated Buttons
-  muiGetOtpBtn: {
+  // Material UI Buttons
+  muiBtn: {
     backgroundColor: '#4F46E5',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#4F46E5',
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    elevation: 4,
-    minWidth: 92,
-  },
-  muiResendOtpBtn: {
-    backgroundColor: '#374151',
-    shadowColor: '#374151',
-  },
-  muiGetOtpText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 12.5,
-    letterSpacing: 0.3,
-  },
-
-  muiVerifyOtpBtn: {
-    backgroundColor: '#059669',
     paddingHorizontal: 15,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#059669',
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    elevation: 4,
-    minWidth: 95,
+    minWidth: 88,
   },
-  muiVerifyOtpBtnSuccess: {
-    backgroundColor: '#10B981',
-    shadowColor: '#10B981',
+  muiBtnResend: {
+    backgroundColor: '#6B7280',
   },
-  muiVerifyOtpText: {
+  muiBtnText: {
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 12,
-    letterSpacing: 0.3,
   },
 
-  // Primary Login Button
-  primaryBtn: {
-    backgroundColor: '#F59E0B',
+  muiVerifyBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderRadius: 12,
-    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 92,
+  },
+  muiVerifyBtnSuccess: {
+    backgroundColor: '#10B981',
+  },
+  muiVerifyBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+
+  // Primary Login Submit Button
+  primarySubmitBtn: {
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
     marginTop: 18,
-    shadowColor: '#F59E0B',
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowColor: '#10B981',
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  primaryBtnDisabled: {
-    backgroundColor: '#282838',
-    borderColor: '#374151',
-    borderWidth: 1,
+  primaryBtnLocked: {
+    backgroundColor: '#E5E7EB',
     shadowOpacity: 0,
     elevation: 0,
   },
-  primaryBtnText: {
-    color: '#000000',
-    fontSize: 14.5,
+  primarySubmitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '800',
-    letterSpacing: 0.3,
   },
-  primaryBtnTextDisabled: {
-    color: '#6B7280',
-    fontWeight: '600',
+  primaryBtnTextLocked: {
+    color: '#9CA3AF',
   },
 
-  // Social Login
-  socialBox: {
-    paddingVertical: 12,
+  // Footer
+  footerSection: {
     alignItems: 'center',
+    marginTop: 20,
+    gap: 12,
   },
-  socialDesc: {
-    color: '#9CA3AF',
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 18,
-    lineHeight: 18,
+  langPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
   },
-  googleBtn: {
-    backgroundColor: '#EA4335',
-    width: '100%',
-    paddingVertical: 13,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  facebookBtn: {
-    backgroundColor: '#1877F2',
-    width: '100%',
-    paddingVertical: 13,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  socialBtnText: {
+  langPillText: {
     color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '700',
-    fontSize: 13.5,
+  },
+  termsText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  termsLink: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    textDecorationLine: 'underline',
   },
 });
