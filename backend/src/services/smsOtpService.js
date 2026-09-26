@@ -1,10 +1,11 @@
+const axios = require('axios');
 const twilio = require('twilio');
 const { cacheService } = require('../config/redis');
 
 let twilioClient = null;
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID || 'VA7c9dc753c2da55e6efaa1f5153a98141';
+const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
 if (accountSid && authToken) {
   try {
@@ -14,9 +15,12 @@ if (accountSid && authToken) {
   }
 }
 
+const twoFactorApiKey =
+  process.env.TWOFACTOR_API_KEY || '20d6d690-b96f-11f1-af74-0200cd936042';
+
 /**
- * Real SMS OTP Service powered by Twilio Verify API
- * Delivers Real SMS OTP to Indian & Global Mobile Numbers
+ * Real SMS OTP Service powered by 2Factor.in & Twilio
+ * Delivers 100% Real SMS OTP directly to user's mobile SIM inbox!
  */
 class SmsOtpService {
   /**
@@ -24,17 +28,41 @@ class SmsOtpService {
    * @param {string} rawPhoneNumber - 10 digit Indian number (e.g. 7982720270)
    */
   static async sendOtp(rawPhoneNumber) {
-    try {
-      const cleanDigits = rawPhoneNumber.replace(/\D/g, '').slice(-10);
-      if (!cleanDigits || cleanDigits.length !== 10) {
-        return { success: false, message: 'Please enter a valid 10-digit Indian mobile number' };
+    const cleanDigits = (rawPhoneNumber || '').replace(/\D/g, '').slice(-10);
+    if (!cleanDigits || cleanDigits.length !== 10) {
+      return { success: false, message: 'Please enter a valid 10-digit Indian mobile number' };
+    }
+    const formattedPhone = `+91${cleanDigits}`;
+
+    // 1. Primary: 2Factor.in Real Indian SMS Delivery (Instant & Free 200 SMS)
+    if (twoFactorApiKey) {
+      try {
+        console.log(`📡 [2Factor.in] Sending Real SMS OTP to ${cleanDigits}...`);
+        const url = `https://2factor.in/API/V1/${twoFactorApiKey}/SMS/${cleanDigits}/AUTOGEN3/OTP1`;
+        const res = await axios.get(url, { timeout: 10000 });
+
+        if (res.data && res.data.Status === 'Success') {
+          const sessionId = res.data.Details;
+          // Store session id for 10 minutes
+          await cacheService.set(`2factor_session:${cleanDigits}`, sessionId, 600);
+          console.log(`✅ [2Factor.in] Real SMS dispatched to ${cleanDigits}! Session ID: ${sessionId}`);
+
+          return {
+            success: true,
+            message: `SMS OTP code sent to +91 ${cleanDigits}!`,
+          };
+        } else {
+          console.warn('⚠️ [2Factor.in] Response not success:', res.data);
+        }
+      } catch (twoFactorErr) {
+        console.error('2Factor.in SMS Error:', twoFactorErr.response?.data || twoFactorErr.message);
       }
+    }
 
-      const formattedPhone = `+91${cleanDigits}`;
-
-      if (twilioClient && verifyServiceSid) {
-        console.log(`📡 Sending Real SMS OTP via Twilio Verify to ${formattedPhone}...`);
-
+    // 2. Secondary: Twilio Verify fallback
+    if (twilioClient && verifyServiceSid) {
+      try {
+        console.log(`📡 [Twilio] Sending SMS OTP to ${formattedPhone}...`);
         const verification = await twilioClient.verify.v2
           .services(verifyServiceSid)
           .verifications.create({
@@ -46,93 +74,79 @@ class SmsOtpService {
 
         return {
           success: true,
-          message: `Real SMS OTP has been sent to ${formattedPhone}!\nPlease check your mobile messages.`,
+          message: `SMS OTP code sent to +91 ${cleanDigits}!`,
         };
+      } catch (twilioErr) {
+        console.error('Twilio SMS Error:', twilioErr.message);
       }
-
-      // Fallback local OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      await cacheService.set(`otp:${cleanDigits}`, otp, 300);
-      console.log(`📱 [Local OTP Fallback] Number: ${formattedPhone} | OTP: ${otp}`);
-
-      return {
-        success: true,
-        message: `OTP sent to ${formattedPhone}`,
-        devOtp: process.env.NODE_ENV === 'production' ? undefined : otp,
-      };
-    } catch (error) {
-      console.error('Twilio SMS Error:', error.message);
-
-      // Check if error is due to Twilio Trial Account unverified recipient
-      const isTrialUnverified =
-        error.message &&
-        (error.message.includes('verified tester') ||
-          error.message.includes('unverified') ||
-          error.code === 60200 ||
-          error.code === 21608);
-
-      if (isTrialUnverified) {
-        const cleanDigits = rawPhoneNumber.replace(/\D/g, '').slice(-10);
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        await cacheService.set(`otp:${cleanDigits}`, otp, 300);
-        console.log(`⚠️ [Twilio Trial Unverified Number] Fallback OTP generated: ${otp} (Master code 123456 also works)`);
-
-        return {
-          success: true,
-          message: `Message Sent! (Twilio Trial Mode: Enter OTP 123456 to Login)`,
-          devOtp: otp,
-        };
-      }
-
-      return {
-        success: false,
-        message: error.message || 'Failed to deliver SMS OTP',
-      };
     }
+
+    return {
+      success: false,
+      message: 'Failed to deliver SMS OTP. Please try again or sign in with Gmail.',
+    };
   }
 
   /**
    * Verify User's Entered 6-Digit OTP
    */
   static async verifyOtp(rawPhoneNumber, enteredOtp) {
-    const cleanDigits = rawPhoneNumber.replace(/\D/g, '').slice(-10);
+    const cleanDigits = (rawPhoneNumber || '').replace(/\D/g, '').slice(-10);
     const formattedPhone = `+91${cleanDigits}`;
 
-    // Master test code
-    if (enteredOtp === '123456' || enteredOtp === '000000') {
-      return { valid: true };
+    if (!enteredOtp || enteredOtp.toString().trim().length < 6) {
+      return {
+        valid: false,
+        message: 'Please enter a valid 6-digit OTP code',
+      };
     }
 
-    if (twilioClient && verifyServiceSid) {
+    const cleanOtp = enteredOtp.toString().trim();
+
+    // 1. Primary: 2Factor.in Verification
+    if (twoFactorApiKey) {
       try {
-        console.log(`🔍 Verifying Twilio OTP code for ${formattedPhone}...`);
-        const verificationCheck = await twilioClient.verify.v2
-          .services(verifyServiceSid)
-          .verificationChecks.create({
-            to: formattedPhone,
-            code: enteredOtp.toString().trim(),
-          });
+        const sessionId = await cacheService.get(`2factor_session:${cleanDigits}`);
+        if (sessionId) {
+          console.log(`🔍 [2Factor.in] Verifying OTP for ${cleanDigits} with session ${sessionId}...`);
+          const url = `https://2factor.in/API/V1/${twoFactorApiKey}/SMS/VERIFY/${sessionId}/${cleanOtp}`;
+          const res = await axios.get(url, { timeout: 8000 });
 
-        console.log('✅ Twilio Verification Result:', verificationCheck.status);
-
-        if (verificationCheck.status === 'approved') {
-          return { valid: true };
-        } else {
+          if (res.data && res.data.Status === 'Success') {
+            console.log(`✅ [2Factor.in] OTP Matched successfully for ${cleanDigits}!`);
+            await cacheService.del(`2factor_session:${cleanDigits}`);
+            return { valid: true };
+          }
+        }
+      } catch (twoFactorVerifyErr) {
+        const errData = twoFactorVerifyErr.response?.data;
+        console.warn('⚠️ [2Factor.in] Verify Error:', errData || twoFactorVerifyErr.message);
+        if (errData && (errData.Details === 'OTP Mismatch' || errData.Status === 'Error')) {
           return {
             valid: false,
             message: 'Wrong OTP! Please enter correct 6 digit OTP',
           };
         }
-      } catch (err) {
-        console.error('Twilio verify error:', err.message);
       }
     }
 
-    // Fallback Redis/Memory cache verification
-    const storedOtp = await cacheService.get(`otp:${cleanDigits}`);
-    if (storedOtp && storedOtp.toString().trim() === enteredOtp.toString().trim()) {
-      await cacheService.del(`otp:${cleanDigits}`);
-      return { valid: true };
+    // 2. Secondary: Twilio Verify Check
+    if (twilioClient && verifyServiceSid) {
+      try {
+        console.log(`🔍 [Twilio] Verifying OTP for ${formattedPhone}...`);
+        const verificationCheck = await twilioClient.verify.v2
+          .services(verifyServiceSid)
+          .verificationChecks.create({
+            to: formattedPhone,
+            code: cleanOtp,
+          });
+
+        if (verificationCheck.status === 'approved') {
+          return { valid: true };
+        }
+      } catch (err) {
+        console.error('Twilio verify error:', err.message);
+      }
     }
 
     return {

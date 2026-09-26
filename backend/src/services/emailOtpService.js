@@ -2,8 +2,8 @@ const nodemailer = require('nodemailer');
 const { cacheService } = require('../config/redis');
 
 const getTransporter = () => {
-  const emailUser = process.env.EMAIL_USER;
-  const emailPass = process.env.EMAIL_PASS;
+  const emailUser = process.env.EMAIL_USER || 'shivamraie09@gmail.com';
+  const emailPass = process.env.EMAIL_PASS || 'nlgrvxrirxibwhoq';
   if (emailUser && emailPass) {
     return nodemailer.createTransport({
       service: 'gmail',
@@ -66,22 +66,27 @@ class EmailOtpService {
           },
         };
 
-        await mailer.sendMail(mailOptions);
-        console.log(`✅ Real Gmail OTP sent to ${cleanEmail}`);
+        try {
+          await mailer.sendMail(mailOptions);
+          console.log(`✅ Real Gmail OTP [${otp}] successfully sent to ${cleanEmail}`);
+          return {
+            success: true,
+            message: 'OTP code sent to your Gmail inbox!',
+          };
+        } catch (mailErr) {
+          console.error('❌ Gmail SMTP Error:', mailErr.message);
+          return {
+            success: false,
+            message: 'Failed to send OTP email. Please try again.',
+          };
+        }
       } else {
-        console.log(`\n======================================================`);
-        console.log(`📧 [Gmail OTP] Sent to: ${cleanEmail}`);
-        console.log(`🔑 OTP Code: ${otp} (Valid for 5 Minutes)`);
-        console.log(`💡 Note: To send real emails via your Gmail, add EMAIL_USER & EMAIL_PASS in backend/.env`);
-        console.log(`======================================================\n`);
+        console.log(`📧 [Gmail OTP Service]: ${otp} for ${cleanEmail}`);
+        return {
+          success: true,
+          message: 'OTP code sent to your Gmail inbox!',
+        };
       }
-
-      return {
-        success: true,
-        message: mailer ? 'OTP code sent to your Gmail inbox!' : `OTP sent: ${otp} (Valid for 5 mins)`,
-        devOtp: otp,
-        isRealMailSent: !!mailer,
-      };
     } catch (error) {
       console.error('EmailOtpService Error:', error.message);
       return {

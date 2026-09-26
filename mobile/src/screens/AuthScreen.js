@@ -11,6 +11,7 @@ import {
   Animated,
   Easing,
   Keyboard,
+  Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
@@ -18,6 +19,7 @@ import api from '../api/client';
 import ScreenContainer from '../components/ScreenContainer';
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
+import { useToast } from '../context/ToastContext';
 
 // Official Multi-Color Gmail 'M' Vector Icon (matching user reference screenshot)
 const GmailOfficialIcon = ({ size = 26 }) => (
@@ -310,12 +312,18 @@ const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => 
 
 export default function AuthScreen({ navigation, onLoginSuccess }) {
   const { t, openLanguageModal, activeLanguagePillText } = useLanguage();
+  const { showToast } = useToast();
 
   // 'phone' | 'email' | null
   const [activeModal, setActiveModal] = useState(null);
 
   // Phone Form State
+  const [phoneMode, setPhoneMode] = useState('login'); // 'login' | 'register'
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [phonePassword, setPhonePassword] = useState('');
+  const [phoneConfirmPassword, setPhoneConfirmPassword] = useState('');
+  const [showPhonePassword, setShowPhonePassword] = useState(false);
+  const [showPhoneConfirmPassword, setShowPhoneConfirmPassword] = useState(false);
   const [phoneOtp, setPhoneOtp] = useState('');
   const [phoneUserName, setPhoneUserName] = useState('');
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
@@ -324,7 +332,12 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [phoneVerifying, setPhoneVerifying] = useState(false);
 
   // Gmail / Email Form State
+  const [gmailMode, setGmailMode] = useState('login'); // 'login' | 'register'
   const [email, setEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [emailConfirmPassword, setEmailConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [emailOtp, setEmailOtp] = useState('');
   const [emailUserName, setEmailUserName] = useState('');
   const [emailOtpSent, setEmailOtpSent] = useState(false);
@@ -413,42 +426,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     ).start();
   }, []);
 
-  // Floating Hot-Toast Notification State
-  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
-  const toastAnim = useRef(new Animated.Value(-120)).current;
-  const toastTimerRef = useRef(null);
-
-  const showToast = (message, type = 'success') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ visible: true, message, type });
-
-    Animated.spring(toastAnim, {
-      toValue: 0,
-      friction: 7,
-      tension: 50,
-      useNativeDriver: true,
-    }).start();
-
-    toastTimerRef.current = setTimeout(() => {
-      hideToast();
-    }, 3500);
-  };
-
-  const hideToast = () => {
-    Animated.timing(toastAnim, {
-      toValue: -120,
-      duration: 260,
-      useNativeDriver: true,
-    }).start(() => {
-      setToast({ visible: false, message: '', type: 'success' });
-    });
-  };
-
   // Completely Reset All State on Modal Close
   const handleCloseModal = () => {
     setActiveModal(null);
     // Reset Phone
+    setPhoneMode('login');
     setPhoneNumber('');
+    setPhonePassword('');
+    setPhoneConfirmPassword('');
+    setShowPhonePassword(false);
+    setShowPhoneConfirmPassword(false);
     setPhoneOtp('');
     setPhoneUserName('');
     setPhoneOtpSent(false);
@@ -457,7 +444,12 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     setPhoneVerifying(false);
 
     // Reset Email
+    setGmailMode('login');
     setEmail('');
+    setEmailPassword('');
+    setEmailConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setEmailOtp('');
     setEmailUserName('');
     setEmailOtpSent(false);
@@ -476,7 +468,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleSendPhoneOtp = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!cleanPhone || cleanPhone.length !== 10) {
-      showToast(t('msgValidPhone', 'Please enter a valid 10-digit mobile number'), 'error');
+      showToast(t('Please enter a valid 10-digit mobile number'), 'error');
       return;
     }
 
@@ -486,18 +478,13 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       if (res.data.success) {
         setPhoneOtpSent(true);
         setIsPhoneOtpVerified(false);
-        if (res.data.devOtp) {
-          setPhoneOtp(res.data.devOtp);
-          showToast(`OTP: ${res.data.devOtp}`, 'success');
-        } else {
-          setPhoneOtp('');
-          showToast(t('msgOtpSent', 'Message Sent Successfully'), 'success');
-        }
+        setPhoneOtp('');
+        showToast(t(res.data.message || 'SMS OTP code sent to your mobile!'), 'success');
       } else {
-        showToast(res.data.message || t('msgOtpFailed', 'Failed to send OTP'), 'error');
+        showToast(t(res.data.message || 'Failed to send OTP'), 'error');
       }
     } catch (err) {
-      showToast(err.response?.data?.message || t('msgOtpFailed', 'Failed to send SMS OTP'), 'error');
+      showToast(t(err.response?.data?.message || 'Failed to send SMS OTP'), 'error');
     } finally {
       setPhoneSending(false);
     }
@@ -506,7 +493,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleVerifyPhoneOtp = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!phoneOtp.trim() || phoneOtp.trim().length < 6) {
-      showToast(t('msgEnter6DigitOtp', 'Please enter the 6-digit OTP code'), 'error');
+      showToast(t('Please enter the 6-digit OTP code'), 'error');
       return;
     }
 
@@ -518,27 +505,73 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       });
       if (res.data.success) {
         setIsPhoneOtpVerified(true);
-        showToast(t('msgOtpVerified', 'OTP Verified Successfully! ✅'), 'success');
+        showToast(t('OTP Verified Successfully! ✅'), 'success');
       } else {
         setIsPhoneOtpVerified(false);
-        showToast(res.data.message || t('msgWrongOtp', 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
+        showToast(t(res.data.message || 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
       }
     } catch (err) {
       setIsPhoneOtpVerified(false);
-      showToast(err.response?.data?.message || t('msgWrongOtp', 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
+      showToast(t(err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
     } finally {
       setPhoneVerifying(false);
     }
   };
 
-  const handlePhoneLoginSubmit = async () => {
+  // Register User with Phone + Verified OTP + Password
+  const handlePhoneRegisterSubmit = async () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      showToast(t('Please enter a valid 10-digit mobile number'), 'error');
+      return;
+    }
     if (!isPhoneOtpVerified) {
-      showToast(t('msgVerifyOtpFirst', 'Please verify your OTP first'), 'error');
+      showToast(t('Please verify your OTP first'), 'error');
       return;
     }
     if (!phoneUserName.trim()) {
-      showToast(t('msgEnterFullName', 'Please enter your full name'), 'error');
+      showToast(t('Please enter your full name'), 'error');
+      return;
+    }
+    if (!phonePassword || phonePassword.length < 4) {
+      showToast(t('Password must be at least 4 characters long'), 'error');
+      return;
+    }
+    if (phonePassword !== phoneConfirmPassword) {
+      showToast(t('Password and Confirm Password do not match!'), 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/phone-register', {
+        phoneNumber: cleanPhone,
+        name: phoneUserName.trim(),
+        password: phonePassword,
+        confirmPassword: phoneConfirmPassword,
+      });
+      if (res.data.success) {
+        showToast(t(res.data.message || 'Registration Successful! Welcome 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', res.data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        if (onLoginSuccess) onLoginSuccess(res.data.user);
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Registration failed'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Login User with Mobile Number + Password
+  const handlePhonePasswordLoginSubmit = async () => {
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      showToast(t('Please enter a valid 10-digit mobile number'), 'error');
+      return;
+    }
+    if (!phonePassword || !phonePassword.trim()) {
+      showToast(t('Please enter your password'), 'error');
       return;
     }
 
@@ -546,27 +579,28 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     try {
       const res = await api.post('/auth/phone-login', {
         phoneNumber: cleanPhone,
-        otp: phoneOtp.trim(),
-        name: phoneUserName.trim(),
+        password: phonePassword,
       });
       if (res.data.success) {
-        showToast(t('msgLoginSuccess', 'Login Successful! Welcome 🎉'), 'success');
+        showToast(t(res.data.message || 'Password Verified Successfully! Welcome 🎉'), 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
         await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
         if (onLoginSuccess) onLoginSuccess(res.data.user);
       }
     } catch (err) {
-      showToast(err.response?.data?.message || t('msgLoginFailed', 'Login failed'), 'error');
+      showToast(t(err.response?.data?.message || 'Invalid mobile number or password'), 'error');
     } finally {
       setLoading(false);
     }
   };
 
   // ---------------- GMAIL / EMAIL AUTH HANDLERS ----------------
+
+  // 1. Send OTP to Gmail
   const handleSendEmailOtp = async () => {
     const cleanEmail = email.toLowerCase().trim();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      showToast(t('msgValidEmail', 'Please enter a valid Gmail / Email address'), 'error');
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      showToast(t('Please enter a valid Gmail / Email address'), 'error');
       return;
     }
 
@@ -576,27 +610,23 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       if (res.data.success) {
         setEmailOtpSent(true);
         setIsEmailOtpVerified(false);
-        if (res.data.devOtp && !res.data.isRealMailSent) {
-          setEmailOtp(res.data.devOtp);
-          showToast(`OTP: ${res.data.devOtp}`, 'success');
-        } else {
-          setEmailOtp('');
-          showToast(t('msgOtpSent', 'OTP code sent to your Gmail inbox!'), 'success');
-        }
+        setEmailOtp(''); // Khali rahega taaki user apni real email se OTP dekh kar dale
+        showToast(t(res.data.message || 'OTP code sent to your Gmail inbox!'), 'success');
       } else {
-        showToast(res.data.message || t('msgOtpFailed', 'Failed to send OTP to email'), 'error');
+        showToast(t(res.data.message || 'Failed to send OTP to email'), 'error');
       }
     } catch (err) {
-      showToast(err.response?.data?.message || t('msgOtpFailed', 'Failed to send Email OTP'), 'error');
+      showToast(t(err.response?.data?.message || 'Failed to send Email OTP'), 'error');
     } finally {
       setEmailSending(false);
     }
   };
 
+  // 2. Verify Gmail OTP
   const handleVerifyEmailOtp = async () => {
     const cleanEmail = email.toLowerCase().trim();
     if (!emailOtp.trim() || emailOtp.trim().length < 6) {
-      showToast(t('msgEnter6DigitOtp', 'Please enter the 6-digit OTP code'), 'error');
+      showToast(t('Please enter the 6-digit OTP code'), 'error');
       return;
     }
 
@@ -608,27 +638,73 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       });
       if (res.data.success) {
         setIsEmailOtpVerified(true);
-        showToast(t('msgOtpVerified', 'OTP Verified Successfully! ✅'), 'success');
+        showToast(t('OTP Verified Successfully! ✅'), 'success');
       } else {
         setIsEmailOtpVerified(false);
-        showToast(res.data.message || t('msgWrongOtp', 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
+        showToast(t(res.data.message || 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
       }
     } catch (err) {
       setIsEmailOtpVerified(false);
-      showToast(err.response?.data?.message || t('msgWrongOtp', 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
+      showToast(t(err.response?.data?.message || 'Wrong OTP! Please enter correct 6 digit OTP'), 'error');
     } finally {
       setEmailVerifying(false);
     }
   };
 
-  const handleEmailLoginSubmit = async () => {
+  // 3. Register User with Gmail + Verified OTP + Password
+  const handleEmailRegisterSubmit = async () => {
     const cleanEmail = email.toLowerCase().trim();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      showToast(t('Please enter a valid Gmail / Email address'), 'error');
+      return;
+    }
     if (!isEmailOtpVerified) {
-      showToast(t('msgVerifyOtpFirst', 'Please verify your OTP first'), 'error');
+      showToast(t('Please verify your OTP first'), 'error');
       return;
     }
     if (!emailUserName.trim()) {
-      showToast(t('msgEnterFullName', 'Please enter your full name'), 'error');
+      showToast(t('Please enter your full name'), 'error');
+      return;
+    }
+    if (!emailPassword || emailPassword.length < 4) {
+      showToast(t('Password must be at least 4 characters long'), 'error');
+      return;
+    }
+    if (emailPassword !== emailConfirmPassword) {
+      showToast(t('Password and Confirm Password do not match!'), 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/email-register', {
+        email: cleanEmail,
+        name: emailUserName.trim(),
+        password: emailPassword,
+        confirmPassword: emailConfirmPassword,
+      });
+      if (res.data.success) {
+        showToast(t(res.data.message || 'Registration Successful! Welcome 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', res.data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        if (onLoginSuccess) onLoginSuccess(res.data.user);
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Registration failed'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 4. Login User with Gmail + Password
+  const handleEmailPasswordLoginSubmit = async () => {
+    const cleanEmail = email.toLowerCase().trim();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      showToast(t('Please enter a valid Gmail / Email address'), 'error');
+      return;
+    }
+    if (!emailPassword || !emailPassword.trim()) {
+      showToast(t('Please enter your password'), 'error');
       return;
     }
 
@@ -636,17 +712,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     try {
       const res = await api.post('/auth/email-login', {
         email: cleanEmail,
-        otp: emailOtp.trim(),
-        name: emailUserName.trim(),
+        password: emailPassword,
       });
       if (res.data.success) {
-        showToast(t('msgLoginSuccess', 'Login Successful! Welcome 🎉'), 'success');
+        showToast(t(res.data.message || 'Password Verified Successfully! Welcome 🎉'), 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
         await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
         if (onLoginSuccess) onLoginSuccess(res.data.user);
       }
     } catch (err) {
-      showToast(err.response?.data?.message || t('msgLoginFailed', 'Login failed'), 'error');
+      showToast(t(err.response?.data?.message || 'Invalid email or password'), 'error');
     } finally {
       setLoading(false);
     }
@@ -658,23 +733,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       contentContainerStyle={styles.scrollContent}
       scrollRef={scrollViewRef}
     >
-      {/* Floating Hot-Toast */}
-      {toast.visible && (
-        <Animated.View
-          style={[
-            styles.toastContainer,
-            toast.type === 'success' && styles.toastSuccess,
-            toast.type === 'error' && styles.toastError,
-            { transform: [{ translateY: toastAnim }] },
-          ]}
-        >
-          <TouchableOpacity style={styles.toastInner} activeOpacity={0.9} onPress={hideToast}>
-            <Text style={styles.toastIcon}>{toast.type === 'success' ? '✅' : '❌'}</Text>
-            <Text style={styles.toastText}>{toast.message}</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
       {/* Dynamic Animated Movable 3D Gaming & Music Background Icons */}
       <View style={styles.bgDecorations} pointerEvents="none">
         {/* Ambient Glow Orbs */}
@@ -712,11 +770,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         </Animated.View>
       </View>
 
-      {/* Top Bar with Language Selector */}
-      <View style={{ width: '100%', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 8, zIndex: 10 }}>
-        <LanguageSelectorButton variant="pill" />
-      </View>
-
       {/* Top Header & Big "Yo!" Logo matching screenshot */}
       <View style={styles.brandHeader}>
         <View style={styles.yoLogoContainer}>
@@ -751,27 +804,307 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             />
           </View>
         ) : activeModal === 'phone' ? (
-          /* Phone OTP Modal Card */
+          /* Mobile Phone Tabbed Modal Card (Login User vs Register User) */
           <View style={styles.authCard}>
+            {/* Modal Header */}
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderTitleWrap}>
-                <PhoneHandsetIcon size={20} color="#0284C7" />
-                <Text style={styles.cardTitle}>{t('Mobile Phone Login')}</Text>
+                <PhoneHandsetIcon size={22} color="#0284C7" />
+                <Text style={styles.cardTitle}>
+                  {phoneMode === 'register' ? t('Register New Account') : t('Mobile Number Login')}
+                </Text>
               </View>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeBtn} activeOpacity={0.7}>
                 <Text style={styles.closeBtnText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Mobile Number Row */}
-            <Text style={styles.inputLabel}>{t('Mobile Number')}</Text>
-            <View style={styles.inputRow}>
-              <View style={styles.phoneInputCombined}>
-                <View style={styles.countryCodeBadge}>
-                  <Text style={styles.countryBadgeText}>+91</Text>
+            {/* 2 Beautiful Toggle Buttons (Login User vs Register User) */}
+            <View style={styles.tabSwitcherContainer}>
+              <TouchableOpacity
+                style={[styles.tabButton, phoneMode === 'login' && styles.tabButtonActive]}
+                onPress={() => setPhoneMode('login')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.tabButtonText, phoneMode === 'login' && styles.tabButtonTextActive]}>
+                  🔑 {t('Login User')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.tabButton, phoneMode === 'register' && styles.tabButtonActive]}
+                onPress={() => setPhoneMode('register')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.tabButtonText, phoneMode === 'register' && styles.tabButtonTextActive]}>
+                  ✨ {t('Register User')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* ================= REGISTER USER FLOW ================= */}
+            {phoneMode === 'register' ? (
+              <View>
+                {/* STEP 1: Mobile Number + Get OTP */}
+                <View style={styles.labelFlexRow}>
+                  <Text style={styles.inputLabel}>
+                    1. {t('Mobile Number')} <Text style={styles.star}>*</Text>
+                  </Text>
+                  {isPhoneOtpVerified && <Text style={styles.verifiedText}>{t('Verified ✅')}</Text>}
                 </View>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      styles.flexInput,
+                      isPhoneOtpVerified && styles.inputVerified,
+                    ]}
+                    placeholder={t('Enter 10-digit number')}
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    editable={!isPhoneOtpVerified}
+                    value={phoneNumber}
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                    }}
+                    onChangeText={(val) => {
+                      setPhoneNumber(val);
+                      setPhoneOtpSent(false);
+                      setIsPhoneOtpVerified(false);
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.muiBtn,
+                      phoneOtpSent && styles.muiBtnResend,
+                      isPhoneOtpVerified && styles.muiBtnDisabled,
+                    ]}
+                    onPress={handleSendPhoneOtp}
+                    disabled={phoneSending || isPhoneOtpVerified}
+                    activeOpacity={0.8}
+                  >
+                    {phoneSending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.muiBtnText}>
+                        {isPhoneOtpVerified ? t('Verified') : (phoneOtpSent ? t('Resend') : t('Get OTP'))}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Prominent In-Card OTP Sent Confirmation Banner */}
+                {phoneOtpSent && !isPhoneOtpVerified && (
+                  <View style={styles.inlineSuccessBanner}>
+                    <Text style={styles.inlineSuccessIcon}>📩</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inlineSuccessTitle}>{t('SMS OTP code sent to your mobile!')} ✅</Text>
+                      <Text style={styles.inlineSuccessSub}>{t('Check your SMS messages')}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* STEP 2: Enter OTP + Verify Button (Enabled after Get OTP) */}
+                <View style={[styles.fieldSpacing, !phoneOtpSent && styles.fieldLockedOpacity]}>
+                  <View style={styles.labelFlexRow}>
+                    <Text style={styles.inputLabel}>
+                      2. {t('Enter 6-Digit SMS OTP')} <Text style={styles.star}>*</Text>
+                    </Text>
+                    {!phoneOtpSent && <Text style={styles.stepLockNotice}>🔒 {t('Tap "Get OTP" first')}</Text>}
+                    {isPhoneOtpVerified && <Text style={styles.verifiedText}>{t('Verified ✅')}</Text>}
+                  </View>
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.flexInput,
+                        !phoneOtpSent && styles.inputDisabled,
+                        isPhoneOtpVerified && styles.inputVerified,
+                      ]}
+                      placeholder={phoneOtpSent ? t('Enter 6-digit OTP') : t('Waiting for OTP...')}
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      editable={phoneOtpSent && !isPhoneOtpVerified}
+                      value={phoneOtp}
+                      onFocus={() => {
+                        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                      }}
+                      onChangeText={setPhoneOtp}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.muiVerifyBtn,
+                        !phoneOtpSent && styles.muiBtnDisabled,
+                        isPhoneOtpVerified && styles.muiVerifyBtnSuccess,
+                      ]}
+                      onPress={handleVerifyPhoneOtp}
+                      disabled={!phoneOtpSent || phoneVerifying || isPhoneOtpVerified}
+                      activeOpacity={0.8}
+                    >
+                      {phoneVerifying ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.muiVerifyBtnText}>
+                          {isPhoneOtpVerified ? t('Verified ✅') : t('Verify OTP')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* STEP 3: Full Name, Password & Confirm Password (Enabled after OTP Verified) */}
+                <View style={[styles.fieldSpacing, !isPhoneOtpVerified && styles.fieldLockedOpacity]}>
+                  <View style={styles.labelFlexRow}>
+                    <Text style={styles.inputLabel}>
+                      3. {t('Your Full Name')} <Text style={styles.star}>*</Text>
+                    </Text>
+                    {!isPhoneOtpVerified && <Text style={styles.stepLockNotice}>🔒 {t('Verify OTP first')}</Text>}
+                  </View>
+                  <TextInput
+                    style={[styles.input, !isPhoneOtpVerified && styles.inputDisabled]}
+                    placeholder={t('e.g. Rahul Sharma')}
+                    placeholderTextColor="#9CA3AF"
+                    editable={isPhoneOtpVerified}
+                    value={phoneUserName}
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+                    }}
+                    onChangeText={setPhoneUserName}
+                  />
+
+                  {/* Password Field */}
+                  <Text style={[styles.inputLabel, { marginTop: 10 }]}>
+                    4. {t('Create Password')} <Text style={styles.star}>*</Text>
+                  </Text>
+                  <View style={styles.passwordRow}>
+                    <TextInput
+                      style={[styles.input, styles.flexInput, !isPhoneOtpVerified && styles.inputDisabled]}
+                      placeholder={t('At least 4 characters')}
+                      placeholderTextColor="#9CA3AF"
+                      secureTextEntry={!showPhonePassword}
+                      editable={isPhoneOtpVerified}
+                      value={phonePassword}
+                      onFocus={() => {
+                        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 140);
+                      }}
+                      onChangeText={setPhonePassword}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeToggleBtn}
+                      onPress={() => setShowPhonePassword(!showPhonePassword)}
+                      disabled={!isPhoneOtpVerified}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.eyeIcon}>{showPhonePassword ? '👁️' : '🙈'}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Confirm Password Field */}
+                  <View style={styles.labelFlexRow}>
+                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>
+                      5. {t('Confirm Password')} <Text style={styles.star}>*</Text>
+                    </Text>
+                    {phoneConfirmPassword.length > 0 && (
+                      <Text
+                        style={[
+                          styles.matchIndicatorText,
+                          phonePassword === phoneConfirmPassword ? styles.matchSuccess : styles.matchError,
+                        ]}
+                      >
+                        {phonePassword === phoneConfirmPassword
+                          ? `✓ ${t('Passwords Match')}`
+                          : `✕ ${t('Mismatch')}`}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.passwordRow}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.flexInput,
+                        !isPhoneOtpVerified && styles.inputDisabled,
+                        phoneConfirmPassword.length > 0 &&
+                          phonePassword === phoneConfirmPassword &&
+                          styles.inputVerified,
+                      ]}
+                      placeholder={t('Re-enter your password')}
+                      placeholderTextColor="#9CA3AF"
+                      secureTextEntry={!showPhoneConfirmPassword}
+                      editable={isPhoneOtpVerified}
+                      value={phoneConfirmPassword}
+                      onFocus={() => {
+                        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 160);
+                      }}
+                      onChangeText={setPhoneConfirmPassword}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeToggleBtn}
+                      onPress={() => setShowPhoneConfirmPassword(!showPhoneConfirmPassword)}
+                      disabled={!isPhoneOtpVerified}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.eyeIcon}>{showPhoneConfirmPassword ? '👁️' : '🙈'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* STEP 4: Register Button */}
+                {(() => {
+                  const isReadyToRegister =
+                    isPhoneOtpVerified &&
+                    phoneUserName.trim().length > 0 &&
+                    phonePassword.length >= 4 &&
+                    phonePassword === phoneConfirmPassword;
+
+                  return (
+                    <TouchableOpacity
+                      style={[styles.primarySubmitBtn, !isReadyToRegister && styles.primaryBtnLocked]}
+                      onPress={handlePhoneRegisterSubmit}
+                      disabled={loading || !isReadyToRegister}
+                      activeOpacity={0.85}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#000" />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.primarySubmitBtnText,
+                            !isReadyToRegister && styles.primaryBtnTextLocked,
+                          ]}
+                        >
+                          {isReadyToRegister
+                            ? `✨ ${t('Register & Create Account')}`
+                            : !isPhoneOtpVerified
+                            ? `🔒 ${t('Verify OTP First')}`
+                            : `🔒 ${t('Fill All Required Fields')}`}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })()}
+
+                {/* Switch to Login Link */}
+                <TouchableOpacity
+                  style={styles.switchAuthModeLink}
+                  onPress={() => setPhoneMode('login')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.switchAuthModeText}>
+                    {t('Already have an account?')} <Text style={styles.switchAuthHighlight}>{t('Login User')}</Text>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* ================= LOGIN USER FLOW ================= */
+              <View>
+                {/* Mobile Number Row */}
+                <Text style={styles.inputLabel}>
+                  {t('Mobile Number')} <Text style={styles.star}>*</Text>
+                </Text>
                 <TextInput
-                  style={styles.phoneTextInputInside}
+                  style={styles.input}
                   placeholder={t('Enter 10-digit number')}
                   placeholderTextColor="#9CA3AF"
                   keyboardType="phone-pad"
@@ -780,211 +1113,450 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   onFocus={() => {
                     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
                   }}
-                  onChangeText={(val) => {
-                    setPhoneNumber(val);
-                    setIsPhoneOtpVerified(false);
-                  }}
+                  onChangeText={setPhoneNumber}
                 />
-              </View>
-              <TouchableOpacity
-                style={[styles.muiBtn, phoneOtpSent && styles.muiBtnResend]}
-                onPress={handleSendPhoneOtp}
-                disabled={phoneSending}
-                activeOpacity={0.8}
-              >
-                {phoneSending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.muiBtnText}>{phoneOtpSent ? t('Resend') : t('Get OTP')}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
 
-            {/* OTP Field + Verify OTP Button */}
-            {phoneOtpSent && (
-              <View style={styles.fieldSpacing}>
-                <View style={styles.labelFlexRow}>
-                  <Text style={styles.inputLabel}>{t('Enter 6-Digit SMS OTP')}</Text>
-                  {isPhoneOtpVerified && <Text style={styles.verifiedText}>{t('Verified ✅')}</Text>}
+                {/* Password Field */}
+                <View style={[styles.labelFlexRow, { marginTop: 12 }]}>
+                  <Text style={styles.inputLabel}>
+                    {t('Password')} <Text style={styles.star}>*</Text>
+                  </Text>
                 </View>
-                <View style={styles.inputRow}>
+                <View style={styles.passwordRow}>
                   <TextInput
-                    style={[styles.input, styles.flexInput, isPhoneOtpVerified && styles.inputVerified]}
-                    placeholder={t('Enter 6-digit OTP')}
+                    style={[styles.input, styles.flexInput]}
+                    placeholder={t('Enter your password')}
                     placeholderTextColor="#9CA3AF"
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    editable={!isPhoneOtpVerified}
-                    value={phoneOtp}
+                    secureTextEntry={!showPhonePassword}
+                    value={phonePassword}
                     onFocus={() => {
-                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
                     }}
-                    onChangeText={setPhoneOtp}
+                    onChangeText={setPhonePassword}
+                    onSubmitEditing={handlePhonePasswordLoginSubmit}
                   />
                   <TouchableOpacity
-                    style={[styles.muiVerifyBtn, isPhoneOtpVerified && styles.muiVerifyBtnSuccess]}
-                    onPress={handleVerifyPhoneOtp}
-                    disabled={phoneVerifying || isPhoneOtpVerified}
-                    activeOpacity={0.8}
+                    style={styles.eyeToggleBtn}
+                    onPress={() => setShowPhonePassword(!showPhonePassword)}
+                    activeOpacity={0.7}
                   >
-                    {phoneVerifying ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.muiVerifyBtnText}>
-                        {isPhoneOtpVerified ? t('Verified ✅') : t('Verify OTP')}
-                      </Text>
-                    )}
+                    <Text style={styles.eyeIcon}>{showPhonePassword ? '👁️' : '🙈'}</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Login Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.primarySubmitBtn,
+                    (!phoneNumber.trim() || !phonePassword.trim()) && styles.primaryBtnLocked,
+                  ]}
+                  onPress={handlePhonePasswordLoginSubmit}
+                  disabled={loading || !phoneNumber.trim() || !phonePassword.trim()}
+                  activeOpacity={0.85}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#000" />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.primarySubmitBtnText,
+                        (!phoneNumber.trim() || !phonePassword.trim()) && styles.primaryBtnTextLocked,
+                      ]}
+                    >
+                      🔑 {t('Login User')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Switch to Register Link */}
+                <TouchableOpacity
+                  style={styles.switchAuthModeLink}
+                  onPress={() => setPhoneMode('register')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.switchAuthModeText}>
+                    {t('New to YoYo?')} <Text style={styles.switchAuthHighlight}>{t('Register User')}</Text>
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
-
-            {/* Mandatory Name */}
-            <Text style={styles.inputLabel}>
-              {t('Your Full Name')} <Text style={styles.star}>*</Text>
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t('e.g. Rahul Sharma')}
-              placeholderTextColor="#9CA3AF"
-              value={phoneUserName}
-              onFocus={() => {
-                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
-              }}
-              onChangeText={setPhoneUserName}
-            />
-
-            {/* Login Button */}
-            <TouchableOpacity
-              style={[styles.primarySubmitBtn, !isPhoneOtpVerified && styles.primaryBtnLocked]}
-              onPress={handlePhoneLoginSubmit}
-              disabled={loading || !isPhoneOtpVerified}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <Text style={[styles.primarySubmitBtnText, !isPhoneOtpVerified && styles.primaryBtnTextLocked]}>
-                  {isPhoneOtpVerified ? t('Verify & Login') : t('Verify OTP First to Login 🔒')}
-                </Text>
-              )}
-            </TouchableOpacity>
           </View>
         ) : (
-          /* Gmail / Email OTP Modal Card */
+          /* Gmail / Email Tabbed Modal Card (Login User vs Register User) */
           <View style={styles.authCard}>
+            {/* Modal Header */}
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderTitleWrap}>
-                <GmailOfficialIcon size={22} />
-                <Text style={styles.cardTitle}>{t('Gmail / Email Login')}</Text>
+                <GmailOfficialIcon size={24} />
+                <Text style={styles.cardTitle}>
+                  {gmailMode === 'register' ? t('Register New Account') : t('Gmail Account Login')}
+                </Text>
               </View>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeBtn} activeOpacity={0.7}>
                 <Text style={styles.closeBtnText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Email Address Row */}
-            <Text style={styles.inputLabel}>{t('Gmail / Email Address')}</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={[styles.input, styles.flexInput]}
-                placeholder={t('Enter your email')}
-                placeholderTextColor="#9CA3AF"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onFocus={() => {
-                  setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-                }}
-                onChangeText={(val) => {
-                  setEmail(val);
-                  setIsEmailOtpVerified(false);
-                }}
-              />
+            {/* 2 Beautiful Toggle Buttons (Login User vs Register User) */}
+            <View style={styles.tabSwitcherContainer}>
               <TouchableOpacity
-                style={[styles.muiBtn, emailOtpSent && styles.muiBtnResend]}
-                onPress={handleSendEmailOtp}
-                disabled={emailSending}
+                style={[styles.tabButton, gmailMode === 'login' && styles.tabButtonActive]}
+                onPress={() => setGmailMode('login')}
                 activeOpacity={0.8}
               >
-                {emailSending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.muiBtnText}>{emailOtpSent ? t('Resend') : t('Get OTP')}</Text>
-                )}
+                <Text style={[styles.tabButtonText, gmailMode === 'login' && styles.tabButtonTextActive]}>
+                  🔑 {t('Login User')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.tabButton, gmailMode === 'register' && styles.tabButtonActive]}
+                onPress={() => setGmailMode('register')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.tabButtonText, gmailMode === 'register' && styles.tabButtonTextActive]}>
+                  ✨ {t('Register User')}
+                </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Email OTP Field + Verify OTP Button */}
-            {emailOtpSent && (
-              <View style={styles.fieldSpacing}>
+            {/* ================= REGISTER USER FLOW ================= */}
+            {gmailMode === 'register' ? (
+              <View>
+                {/* STEP 1: Gmail ID + Get OTP */}
                 <View style={styles.labelFlexRow}>
-                  <Text style={styles.inputLabel}>{t('Enter 6-Digit Email OTP')}</Text>
+                  <Text style={styles.inputLabel}>
+                    1. {t('Enter Gmail ID')} <Text style={styles.star}>*</Text>
+                  </Text>
                   {isEmailOtpVerified && <Text style={styles.verifiedText}>{t('Verified ✅')}</Text>}
                 </View>
                 <View style={styles.inputRow}>
                   <TextInput
                     style={[styles.input, styles.flexInput, isEmailOtpVerified && styles.inputVerified]}
-                    placeholder={t('Enter 6-digit OTP')}
+                    placeholder="example@gmail.com"
                     placeholderTextColor="#9CA3AF"
-                    keyboardType="number-pad"
-                    maxLength={6}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                     editable={!isEmailOtpVerified}
-                    value={emailOtp}
+                    value={email}
                     onFocus={() => {
                       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
                     }}
-                    onChangeText={setEmailOtp}
+                    onChangeText={(val) => {
+                      setEmail(val);
+                      setEmailOtpSent(false);
+                      setIsEmailOtpVerified(false);
+                    }}
                   />
                   <TouchableOpacity
-                    style={[styles.muiVerifyBtn, isEmailOtpVerified && styles.muiVerifyBtnSuccess]}
-                    onPress={handleVerifyEmailOtp}
-                    disabled={emailVerifying || isEmailOtpVerified}
+                    style={[
+                      styles.muiBtn,
+                      emailOtpSent && styles.muiBtnResend,
+                      isEmailOtpVerified && styles.muiBtnDisabled,
+                    ]}
+                    onPress={handleSendEmailOtp}
+                    disabled={emailSending || isEmailOtpVerified}
                     activeOpacity={0.8}
                   >
-                    {emailVerifying ? (
+                    {emailSending ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.muiVerifyBtnText}>
-                        {isEmailOtpVerified ? t('Verified ✅') : t('Verify OTP')}
+                      <Text style={styles.muiBtnText}>
+                        {isEmailOtpVerified ? t('Verified') : (emailOtpSent ? t('Resend') : t('Get OTP'))}
                       </Text>
                     )}
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.spamHelperText}>💡 {t('Check your Gmail Inbox & Spam folder')}</Text>
+
+                {/* Prominent In-Card OTP Sent Confirmation Banner */}
+                {emailOtpSent && !isEmailOtpVerified && (
+                  <View style={styles.inlineSuccessBanner}>
+                    <Text style={styles.inlineSuccessIcon}>📩</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inlineSuccessTitle}>{t('OTP code sent to your Gmail inbox!')} ✅</Text>
+                      <Text style={styles.inlineSuccessSub}>{t('Check your Gmail inbox / spam folder')}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* STEP 2: Enter OTP + Verify Button (Enabled after Get OTP) */}
+                <View style={[styles.fieldSpacing, !emailOtpSent && styles.fieldLockedOpacity]}>
+                  <View style={styles.labelFlexRow}>
+                    <Text style={styles.inputLabel}>
+                      2. {t('Enter 6-Digit Email OTP')} <Text style={styles.star}>*</Text>
+                    </Text>
+                    {!emailOtpSent && <Text style={styles.stepLockNotice}>🔒 {t('Tap "Get OTP" first')}</Text>}
+                    {isEmailOtpVerified && <Text style={styles.verifiedText}>{t('Verified ✅')}</Text>}
+                  </View>
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.flexInput,
+                        !emailOtpSent && styles.inputDisabled,
+                        isEmailOtpVerified && styles.inputVerified,
+                      ]}
+                      placeholder={emailOtpSent ? t('Enter 6-digit OTP') : t('Waiting for OTP...')}
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      editable={emailOtpSent && !isEmailOtpVerified}
+                      value={emailOtp}
+                      onFocus={() => {
+                        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                      }}
+                      onChangeText={setEmailOtp}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.muiVerifyBtn,
+                        !emailOtpSent && styles.muiBtnDisabled,
+                        isEmailOtpVerified && styles.muiVerifyBtnSuccess,
+                      ]}
+                      onPress={handleVerifyEmailOtp}
+                      disabled={!emailOtpSent || emailVerifying || isEmailOtpVerified}
+                      activeOpacity={0.8}
+                    >
+                      {emailVerifying ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.muiVerifyBtnText}>
+                          {isEmailOtpVerified ? t('Verified ✅') : t('Verify OTP')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  {emailOtpSent && !isEmailOtpVerified && (
+                    <Text style={styles.spamHelperText}>💡 {t('Check your Gmail Inbox & Spam folder')}</Text>
+                  )}
+                </View>
+
+                {/* STEP 3: Full Name, Password & Confirm Password (Enabled after OTP Verified) */}
+                <View style={[styles.fieldSpacing, !isEmailOtpVerified && styles.fieldLockedOpacity]}>
+                  <View style={styles.labelFlexRow}>
+                    <Text style={styles.inputLabel}>
+                      3. {t('Your Full Name')} <Text style={styles.star}>*</Text>
+                    </Text>
+                    {!isEmailOtpVerified && <Text style={styles.stepLockNotice}>🔒 {t('Verify OTP first')}</Text>}
+                  </View>
+                  <TextInput
+                    style={[styles.input, !isEmailOtpVerified && styles.inputDisabled]}
+                    placeholder={t('e.g. Rahul Sharma')}
+                    placeholderTextColor="#9CA3AF"
+                    editable={isEmailOtpVerified}
+                    value={emailUserName}
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+                    }}
+                    onChangeText={setEmailUserName}
+                  />
+
+                  {/* Password Field */}
+                  <Text style={[styles.inputLabel, { marginTop: 10 }]}>
+                    4. {t('Create Password')} <Text style={styles.star}>*</Text>
+                  </Text>
+                  <View style={styles.passwordRow}>
+                    <TextInput
+                      style={[styles.input, styles.flexInput, !isEmailOtpVerified && styles.inputDisabled]}
+                      placeholder={t('At least 4 characters')}
+                      placeholderTextColor="#9CA3AF"
+                      secureTextEntry={!showPassword}
+                      editable={isEmailOtpVerified}
+                      value={emailPassword}
+                      onFocus={() => {
+                        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 140);
+                      }}
+                      onChangeText={setEmailPassword}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeToggleBtn}
+                      onPress={() => setShowPassword(!showPassword)}
+                      disabled={!isEmailOtpVerified}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Confirm Password Field */}
+                  <View style={styles.labelFlexRow}>
+                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>
+                      5. {t('Confirm Password')} <Text style={styles.star}>*</Text>
+                    </Text>
+                    {emailConfirmPassword.length > 0 && (
+                      <Text
+                        style={[
+                          styles.matchIndicatorText,
+                          emailPassword === emailConfirmPassword ? styles.matchSuccess : styles.matchError,
+                        ]}
+                      >
+                        {emailPassword === emailConfirmPassword
+                          ? `✓ ${t('Passwords Match')}`
+                          : `✕ ${t('Mismatch')}`}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.passwordRow}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.flexInput,
+                        !isEmailOtpVerified && styles.inputDisabled,
+                        emailConfirmPassword.length > 0 &&
+                          emailPassword === emailConfirmPassword &&
+                          styles.inputVerified,
+                      ]}
+                      placeholder={t('Re-enter your password')}
+                      placeholderTextColor="#9CA3AF"
+                      secureTextEntry={!showConfirmPassword}
+                      editable={isEmailOtpVerified}
+                      value={emailConfirmPassword}
+                      onFocus={() => {
+                        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 160);
+                      }}
+                      onChangeText={setEmailConfirmPassword}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeToggleBtn}
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      disabled={!isEmailOtpVerified}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁️' : '🙈'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* STEP 4: Register Button */}
+                {(() => {
+                  const isReadyToRegister =
+                    isEmailOtpVerified &&
+                    emailUserName.trim().length > 0 &&
+                    emailPassword.length >= 4 &&
+                    emailPassword === emailConfirmPassword;
+
+                  return (
+                    <TouchableOpacity
+                      style={[styles.primarySubmitBtn, !isReadyToRegister && styles.primaryBtnLocked]}
+                      onPress={handleEmailRegisterSubmit}
+                      disabled={loading || !isReadyToRegister}
+                      activeOpacity={0.85}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#000" />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.primarySubmitBtnText,
+                            !isReadyToRegister && styles.primaryBtnTextLocked,
+                          ]}
+                        >
+                          {isReadyToRegister
+                            ? `✨ ${t('Register & Create Account')}`
+                            : !isEmailOtpVerified
+                            ? `🔒 ${t('Verify OTP First')}`
+                            : `🔒 ${t('Fill All Required Fields')}`}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })()}
+
+                {/* Switch to Login Link */}
+                <TouchableOpacity
+                  style={styles.switchAuthModeLink}
+                  onPress={() => setGmailMode('login')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.switchAuthModeText}>
+                    {t('Already have an account?')} <Text style={styles.switchAuthHighlight}>{t('Login User')}</Text>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* ================= LOGIN USER FLOW ================= */
+              <View>
+                {/* Gmail Address */}
+                <Text style={styles.inputLabel}>
+                  {t('Enter Gmail ID')} <Text style={styles.star}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="example@gmail.com"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onFocus={() => {
+                    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                  }}
+                  onChangeText={setEmail}
+                />
+
+                {/* Password Field */}
+                <View style={[styles.labelFlexRow, { marginTop: 12 }]}>
+                  <Text style={styles.inputLabel}>
+                    {t('Password')} <Text style={styles.star}>*</Text>
+                  </Text>
+                </View>
+                <View style={styles.passwordRow}>
+                  <TextInput
+                    style={[styles.input, styles.flexInput]}
+                    placeholder={t('Enter your password')}
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showPassword}
+                    value={emailPassword}
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+                    }}
+                    onChangeText={setEmailPassword}
+                    onSubmitEditing={handleEmailPasswordLoginSubmit}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeToggleBtn}
+                    onPress={() => setShowPassword(!showPassword)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Login Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.primarySubmitBtn,
+                    (!email.trim() || !emailPassword.trim()) && styles.primaryBtnLocked,
+                  ]}
+                  onPress={handleEmailPasswordLoginSubmit}
+                  disabled={loading || !email.trim() || !emailPassword.trim()}
+                  activeOpacity={0.85}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#000" />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.primarySubmitBtnText,
+                        (!email.trim() || !emailPassword.trim()) && styles.primaryBtnTextLocked,
+                      ]}
+                    >
+                      🔑 {t('Login User')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Switch to Register Link */}
+                <TouchableOpacity
+                  style={styles.switchAuthModeLink}
+                  onPress={() => setGmailMode('register')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.switchAuthModeText}>
+                    {t('New to YoYo?')} <Text style={styles.switchAuthHighlight}>{t('Register User')}</Text>
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
-
-            {/* Mandatory Name */}
-            <Text style={styles.inputLabel}>
-              {t('Your Full Name')} <Text style={styles.star}>*</Text>
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t('e.g. Rahul Sharma')}
-              placeholderTextColor="#9CA3AF"
-              value={emailUserName}
-              onFocus={() => {
-                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
-              }}
-              onChangeText={setEmailUserName}
-            />
-
-            {/* Login Button */}
-            <TouchableOpacity
-              style={[styles.primarySubmitBtn, !isEmailOtpVerified && styles.primaryBtnLocked]}
-              onPress={handleEmailLoginSubmit}
-              disabled={loading || !isEmailOtpVerified}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <Text style={[styles.primarySubmitBtnText, !isEmailOtpVerified && styles.primaryBtnTextLocked]}>
-                  {isEmailOtpVerified ? t('Verify & Login') : t('Verify OTP First to Login 🔒')}
-                </Text>
-              )}
-            </TouchableOpacity>
           </View>
         )}
 
@@ -1046,31 +1618,62 @@ const styles = StyleSheet.create({
     textShadowRadius: 8,
   },
 
-  // Toast
-  toastContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'web' ? 24 : 44,
-    left: 20,
-    right: 20,
-    zIndex: 99999,
+  // Center Pop-up Toast Modal Overlay
+  toastModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)', // Focus backdrop
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 28,
   },
   toastInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    backgroundColor: 'rgba(15, 23, 42, 0.96)',
-    borderWidth: 1.5,
+    borderRadius: 22,
+    backgroundColor: '#0F172A',
+    borderWidth: 2,
     borderColor: '#334155',
     shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
-    maxWidth: 440,
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 24,
+    maxWidth: 360,
     width: '100%',
+    overflow: 'hidden',
+  },
+  toastTouchContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     gap: 12,
+  },
+
+  // In-Card OTP Sent Confirmation Banner
+  inlineSuccessBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginVertical: 10,
+    gap: 10,
+  },
+  inlineSuccessIcon: {
+    fontSize: 22,
+  },
+  inlineSuccessTitle: {
+    color: '#065F46',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  inlineSuccessSub: {
+    color: '#047857',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
   },
   toastSuccess: {
     borderColor: '#10B981',
@@ -1081,13 +1684,14 @@ const styles = StyleSheet.create({
     shadowColor: '#EF4444',
   },
   toastIcon: {
-    fontSize: 16,
+    fontSize: 20,
   },
   toastText: {
     color: '#FFFFFF',
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '700',
     flex: 1,
+    lineHeight: 20,
   },
 
   // Brand Header
@@ -1308,12 +1912,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.2,
     borderColor: '#CBD5E1',
+    minHeight: 46,
+    height: 46,
     overflow: 'hidden',
+  },
+  phoneInputCombinedFull: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1.2,
+    borderColor: '#CBD5E1',
+    minHeight: 46,
+    height: 46,
+    overflow: 'hidden',
+    marginBottom: 6,
   },
   countryCodeBadge: {
     backgroundColor: '#EEF2F6',
-    paddingHorizontal: 10,
-    paddingVertical: 11,
+    paddingHorizontal: 12,
+    height: '100%',
     borderRightWidth: 1,
     borderRightColor: '#CBD5E1',
     justifyContent: 'center',
@@ -1322,15 +1941,16 @@ const styles = StyleSheet.create({
   countryBadgeText: {
     color: '#0F172A',
     fontWeight: '800',
-    fontSize: 13,
+    fontSize: 13.5,
   },
   phoneTextInputInside: {
     flex: 1,
+    height: '100%',
     color: '#0F172A',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    fontWeight: '600',
+    paddingVertical: 0,
+    fontSize: 15,
+    fontWeight: '700',
   },
   input: {
     backgroundColor: '#F8FAFC',
@@ -1363,6 +1983,10 @@ const styles = StyleSheet.create({
   muiBtnResend: {
     backgroundColor: '#64748B',
   },
+  muiBtnDisabled: {
+    backgroundColor: '#94A3B8',
+    opacity: 0.6,
+  },
   muiBtnText: {
     color: '#FFFFFF',
     fontWeight: '800',
@@ -1385,6 +2009,98 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 12,
+  },
+
+  // 2-Tab Switcher (Login User vs Register User)
+  tabSwitcherContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    gap: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  tabButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  tabButtonTextActive: {
+    color: '#0F172A',
+    fontWeight: '800',
+  },
+
+  // Locked field indicators
+  fieldLockedOpacity: {
+    opacity: 0.75,
+  },
+  stepLockNotice: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+  inputDisabled: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+    color: '#94A3B8',
+  },
+
+  // Password Input Row with Eye Toggle
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  eyeToggleBtn: {
+    position: 'absolute',
+    right: 12,
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  eyeIcon: {
+    fontSize: 16,
+  },
+  matchIndicatorText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
+  matchSuccess: {
+    color: '#10B981',
+  },
+  matchError: {
+    color: '#EF4444',
+  },
+
+  // Switch Auth Mode Link
+  switchAuthModeLink: {
+    marginTop: 14,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  switchAuthModeText: {
+    color: '#64748B',
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  switchAuthHighlight: {
+    color: '#4F46E5',
+    fontWeight: '800',
   },
 
   // Primary Submit Button

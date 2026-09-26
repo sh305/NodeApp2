@@ -11,6 +11,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import VoiceRoomScreen from './src/screens/VoiceRoomScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
 import { LanguageProvider } from './src/context/LanguageContext';
+import { ToastProvider } from './src/context/ToastContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -56,50 +57,52 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <LanguageProvider>
-        <NavigationContainer>
-          <StatusBar style="light" />
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {!currentUser ? (
-              <Stack.Screen name="Auth">
-                {(props) => (
-                  <AuthScreen
-                    {...props}
-                    onLoginSuccess={(user) => setCurrentUser(user)}
-                  />
-                )}
-              </Stack.Screen>
-            ) : (
-              <>
-                <Stack.Screen name="Home">
+        <ToastProvider>
+          <NavigationContainer>
+            <StatusBar style="light" />
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              {!currentUser ? (
+                <Stack.Screen name="Auth">
                   {(props) => (
-                    <HomeScreen
+                    <AuthScreen
                       {...props}
-                      currentUser={currentUser}
-                      onLogout={handleLogout}
+                      onLoginSuccess={(user) => setCurrentUser(user)}
                     />
                   )}
                 </Stack.Screen>
-                <Stack.Screen name="VoiceRoom">
-                  {(props) => (
-                    <VoiceRoomScreen
-                      {...props}
-                      currentUser={currentUser}
-                    />
-                  )}
-                </Stack.Screen>
-                <Stack.Screen name="UserProfile">
-                  {(props) => (
-                    <UserProfileScreen
-                      {...props}
-                      currentUser={currentUser}
-                      onLogout={handleLogout}
-                    />
-                  )}
-                </Stack.Screen>
-              </>
-            )}
-          </Stack.Navigator>
-        </NavigationContainer>
+              ) : (
+                <>
+                  <Stack.Screen name="Home">
+                    {(props) => (
+                      <HomeScreen
+                        {...props}
+                        currentUser={currentUser}
+                        onLogout={handleLogout}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="VoiceRoom">
+                    {(props) => (
+                      <VoiceRoomScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="UserProfile">
+                    {(props) => (
+                      <UserProfileScreen
+                        {...props}
+                        currentUser={currentUser}
+                        onLogout={handleLogout}
+                      />
+                    )}
+                  </Stack.Screen>
+                </>
+              )}
+            </Stack.Navigator>
+          </NavigationContainer>
+        </ToastProvider>
       </LanguageProvider>
     </SafeAreaProvider>
   );
