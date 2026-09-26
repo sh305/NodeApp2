@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import api from '../api/client';
 import ScreenContainer from '../components/ScreenContainer';
+import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
 
 // Official Multi-Color Gmail 'M' Vector Icon (matching user reference screenshot)
@@ -709,6 +710,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         <Animated.View style={[styles.floatingWrap, { bottom: '34%', left: '76%', transform: [{ translateY: floatAnim3 }] }]}>
           <Text style={[styles.floatingIcon, { fontSize: 34 }]}>🎵</Text>
         </Animated.View>
+      </View>
+
+      {/* Top Bar with Language Selector */}
+      <View style={{ width: '100%', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 8, zIndex: 10 }}>
+        <LanguageSelectorButton variant="pill" />
       </View>
 
       {/* Top Header & Big "Yo!" Logo matching screenshot */}

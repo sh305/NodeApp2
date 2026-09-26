@@ -5,9 +5,12 @@ import api from '../api/client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import ReportModal from '../components/ReportModal';
 import ScreenContainer from '../components/ScreenContainer';
+import LanguageSelectorButton from '../components/LanguageSelectorButton';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function UserProfileScreen({ route, navigation, currentUser, onLogout }) {
   const insets = useSafeAreaInsets();
+  const { t, openLanguageModal } = useLanguage();
   const userId = route.params?.userId || currentUser?._id;
 
   const [profile, setProfile] = useState(null);
@@ -27,12 +30,12 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
     } catch (err) {
       if (err.response?.status === 403 && err.response?.data?.isBlocked) {
         Alert.alert(
-          'Profile Inaccessible 🚷',
-          'Aap is user ki ID visit nahi kar sakte kyunki unhone aapko block kiya hua hai.',
-          [{ text: 'Back', onPress: () => navigation.goBack() }]
+          t('Profile Inaccessible 🚷'),
+          t('Aap is user ki ID visit nahi kar sakte kyunki unhone aapko block kiya hua hai.'),
+          [{ text: t('Back'), onPress: () => navigation.goBack() }]
         );
       } else {
-        Alert.alert('Error', err.response?.data?.message || 'Failed to load user profile');
+        Alert.alert(t('Error'), err.response?.data?.message || t('Failed to load user profile'));
       }
     } finally {
       setLoading(false);
@@ -49,34 +52,34 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
         const res = await api.post(`/users/${userId}/unblock`);
         if (res.data.success) {
           setIsBlocked(false);
-          Alert.alert('Unblocked', 'User ko unblock kar diya gaya hai.');
+          Alert.alert(t('Unblocked'), t('User ko unblock kar diya gaya hai.'));
         }
       } else {
         const res = await api.post(`/users/${userId}/block`);
         if (res.data.success) {
           setIsBlocked(true);
-          Alert.alert('Blocked', 'User ko block kar diya gaya hai. Ab wo aapki profile nahi dekh sakenge.');
+          Alert.alert(t('Blocked'), t('User ko block kar diya gaya hai. Ab wo aapki profile nahi dekh sakenge.'));
         }
       }
     } catch (e) {
-      Alert.alert('Error', e.response?.data?.message || 'Block/Unblock action failed');
+      Alert.alert(t('Error'), e.response?.data?.message || t('Block/Unblock action failed'));
     }
   };
 
   const handleConfirmLogout = () => {
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Kya aap account se logout karna chahte hain?');
+      const confirmed = window.confirm(t('Do you want to logout from your account?'));
       if (confirmed && onLogout) {
         onLogout();
       }
     } else {
       Alert.alert(
-        'Logout 🚪',
-        'Kya aap account se logout karna chahte hain?',
+        t('Logout') + ' 🚪',
+        t('Do you want to logout from your account?'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('Cancel'), style: 'cancel' },
           {
-            text: 'Logout',
+            text: t('Logout'),
             style: 'destructive',
             onPress: () => {
               if (onLogout) onLogout();
@@ -117,8 +120,8 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isSelf ? 'My Profile' : 'User Profile'}</Text>
-        <View style={{ width: 30 }} />
+        <Text style={styles.headerTitle}>{isSelf ? t('My Profile') : t('User Profile')}</Text>
+        <LanguageSelectorButton variant="icon" />
       </View>
 
       {/* Profile Card */}
@@ -137,12 +140,12 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               <View style={styles.walletPill}>
                 <Text style={styles.walletIcon}>🪙</Text>
                 <Text style={styles.walletValue}>{profile.coins || 1000}</Text>
-                <Text style={styles.walletLabel}>Coins</Text>
+                <Text style={styles.walletLabel}>{t('Coins')}</Text>
               </View>
               <View style={styles.walletPill}>
                 <Text style={styles.walletIcon}>💎</Text>
                 <Text style={styles.walletValue}>{profile.diamonds || 0}</Text>
-                <Text style={styles.walletLabel}>Diamonds</Text>
+                <Text style={styles.walletLabel}>{t('Diamonds')}</Text>
               </View>
             </View>
           )}
@@ -150,25 +153,30 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
           {/* Level & Frame Badges */}
           <View style={styles.badgesRow}>
             <View style={styles.wealthBadge}>
-              <Text style={styles.badgeText}>💰 Wealth Lv.{profile.wealthLevel || 1}</Text>
+              <Text style={styles.badgeText}>💰 {t('Wealth')} Lv.{profile.wealthLevel || 1}</Text>
             </View>
             <View style={styles.charmBadge}>
-              <Text style={styles.badgeText}>💖 Charm Lv.{profile.charmLevel || 1}</Text>
+              <Text style={styles.badgeText}>💖 {t('Charm')} Lv.{profile.charmLevel || 1}</Text>
             </View>
           </View>
 
           <View style={styles.frameBadge}>
             <Text style={styles.frameBadgeText}>
-              🎖️ Active Frame: {profile.activeFrame?.name || 'Novice Glow'}
+              🎖️ {t('Active Frame')}: {profile.activeFrame?.name || t('Novice Glow')}
             </Text>
           </View>
+
+          {/* App Language Card for Self Profile */}
+          {isSelf && (
+            <LanguageSelectorButton variant="card" style={{ marginTop: 16 }} />
+          )}
 
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
             {isSelf ? (
               /* MY PROFILE LOGOUT BUTTON */
               <TouchableOpacity style={styles.logoutBtn} onPress={handleConfirmLogout}>
-                <Text style={styles.logoutBtnText}>🚪 Logout Account</Text>
+                <Text style={styles.logoutBtnText}>🚪 {t('Logout Account')}</Text>
               </TouchableOpacity>
             ) : (
               /* OTHER USER ACTIONS */
@@ -178,7 +186,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
                   onPress={handleToggleBlock}
                 >
                   <Text style={styles.blockBtnText}>
-                    {isBlocked ? '🔓 Unblock User' : '🚷 Block User'}
+                    {isBlocked ? `🔓 ${t('Unblock User')}` : `🚷 ${t('Block User')}`}
                   </Text>
                 </TouchableOpacity>
 
@@ -186,7 +194,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
                   style={styles.reportBtn}
                   onPress={() => setReportModalVisible(true)}
                 >
-                  <Text style={styles.reportBtnText}>🚩 Report Profile (3d/7d/Perm)</Text>
+                  <Text style={styles.reportBtnText}>🚩 {t('Report Profile (3d/7d/Perm)')}</Text>
                 </TouchableOpacity>
               </>
             )}
