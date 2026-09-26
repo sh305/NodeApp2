@@ -46,8 +46,21 @@ const userSchema = new mongoose.Schema(
     },
     coins: {
       type: Number,
-      default: 1000, // Initial welcome coins
+      default: 0, // Initial wallet coins (0 as requested)
       min: 0,
+    },
+    gameCoins: {
+      type: Number,
+      default: 0, // Initial game coins (0 as requested, claim from silver chest)
+      min: 0,
+    },
+    gameChestStreak: {
+      type: Number,
+      default: 0,
+    },
+    lastGameChestClaim: {
+      type: Date,
+      default: null,
     },
     diamonds: {
       type: Number,
@@ -104,6 +117,26 @@ const userSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
+      },
+    ],
+    // Follow System
+    following: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    followers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    // Recently Visited Rooms
+    recentRooms: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Room',
       },
     ],
   },

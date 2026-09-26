@@ -7,10 +7,11 @@ When developing any new screens, components, or backend APIs in this project (wh
 ## 1. 📱 Mandatory Multi-Language & Localization Standard (`LanguageContext` & `<T>`)
 
 - **Rule Zero**: Regardless of whether the user prompts in Hindi, Hinglish, English, or any other language, **NEVER hardcode raw UI strings or raw error messages**.
+- **Base Language is ALWAYS Pure English**: All source string keys inside `t('...')`, `<T>...</T>`, backend JSON response messages, and placeholders **MUST ALWAYS be written in standard, clean English** (e.g. `t('Match lost!')`, NOT `t('Aap match haar gaye!')`). This ensures that when the user selects English, pure English is displayed, and when Hindi/other language is chosen, the engine translates it smoothly. NEVER write Hinglish or Hindi directly into source code.
 - **All Text & Labels**: Must be wrapped in `<T>Your Text</T>` (`import { T } from '../components/TranslatedText'`) or `t('Your Text')` (`import { useLanguage } from '../context/LanguageContext'`).
 - **All Alerts & Toasts**: Every `Alert.alert(...)`, `showToast(...)`, and notification must pass messages through `t(...)` (e.g. `showToast(t(res.data.message || 'Fallback error message'), 'error')`).
 - **All Placeholders**: Must use `placeholder={t('Enter something...')}`.
-- **Language Switcher**: Always include `<LanguageSelectorButton variant="pill" />` or `<LanguageSelectorButton variant="icon" />` or `<LanguageSelectorButton variant="card" />` in screen headers and settings menus.
+- **Language Switcher Placement (STRICT)**: **NEVER put language selector buttons or icons in screen headers (HomeScreen, VoiceRoom, or any top bar)**. Language selection belongs ONLY on the initial **Auth Screen (Login / Register footer)** and inside User Profile settings. The chosen language is stored permanently in storage and memory.
 - **Auto-Sync in RAM**: Whenever adding new strings, add them to `knownPhrases` Set in `LanguageContext.js` for instant lag-free translation.
 
 ---

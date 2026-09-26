@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import io from 'socket.io-client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { BASE_URL } from '../api/client';
 import RoomSeatGrid from '../components/RoomSeatGrid';
 import AvatarWithFrame from '../components/AvatarWithFrame';
@@ -70,6 +71,16 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   useEffect(() => {
     fetchRoomDetails();
+
+    // Record this room in user's recent rooms
+    api.post(`/users/recent-rooms/${roomId}`).catch(() => {});
+    AsyncStorage.getItem('@recent_room_ids')
+      .then((saved) => {
+        const ids = saved ? JSON.parse(saved) : [];
+        const updated = [roomId, ...ids.filter((id) => id !== roomId)].slice(0, 25);
+        AsyncStorage.setItem('@recent_room_ids', JSON.stringify(updated)).catch(() => {});
+      })
+      .catch(() => {});
 
     // Initialize Realtime Socket Connection
     const socket = io(BASE_URL, {

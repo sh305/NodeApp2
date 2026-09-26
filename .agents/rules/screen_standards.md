@@ -6,7 +6,7 @@ Whenever creating or modifying screens, components, or API endpoints in this pro
    - Irrespective of the prompt language (Hindi, English, Hinglish, etc.), NEVER hardcode raw strings.
    - Wrap all UI texts, labels, and badges with `<T>Text</T>` or `t('Text')`.
    - Wrap all `showToast(...)`, `Alert.alert(...)`, placeholders, and error responses with `t(...)`.
-   - Include `<LanguageSelectorButton />` on headers and menus.
+   - **Language Selector Rule (STRICT)**: NEVER add language icons or buttons to screen headers. Language switcher is ONLY on the Auth screen footer and Profile settings.
    - Register new phrases in `knownPhrases` in `LanguageContext.js`.
 
 2. **Universal Center Pop-up Toast**:

@@ -121,7 +121,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isSelf ? t('My Profile') : t('User Profile')}</Text>
-        <LanguageSelectorButton variant="icon" />
+        <View style={{ width: 28 }} />
       </View>
 
       {/* Profile Card */}
