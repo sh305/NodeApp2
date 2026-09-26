@@ -317,6 +317,12 @@ exports.getGameChestStatus = async (req, res) => {
     const nextRewardIndex = streak % CHEST_REWARDS.length;
     const nextReward = CHEST_REWARDS[nextRewardIndex];
 
+    // Testing override: ensure 2,000 game coins for princeraie09@gmail.com
+    if (user.email === 'princeraie09@gmail.com' && (user.gameCoins || 0) < 2000) {
+      user.gameCoins = 2000;
+      await user.save();
+    }
+
     return res.status(200).json({
       success: true,
       canClaim,

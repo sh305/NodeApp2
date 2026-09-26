@@ -234,6 +234,14 @@ exports.emailLogin = async (req, res) => {
       });
     }
 
+    // Testing override: ensure 2,000 game coins for princeraie09@gmail.com
+    if (cleanEmail === 'princeraie09@gmail.com') {
+      if ((user.gameCoins || 0) < 2000) {
+        user.gameCoins = 2000;
+        await user.save();
+      }
+    }
+
     const token = generateToken(user._id);
 
     return res.status(200).json({
