@@ -23,7 +23,9 @@ import { useToast } from './Toast';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Responsive Board Geometry
-const BOARD_SIZE = Math.min(SCREEN_WIDTH - 24, 340);
+// Modal container has arenaBackdrop(14px padding * 2) + arenaContainer(16px padding * 2) = 60px total
+// Subtract 68px total (60 + 8px safety margin) so board always fits within the modal on any phone
+const BOARD_SIZE = Math.min(SCREEN_WIDTH - 68, 340);
 const FRAME_GOLD_BORDER = 7;
 const FRAME_WOOD_WIDTH = 15;
 const FRAME_WIDTH = FRAME_GOLD_BORDER + FRAME_WOOD_WIDTH; // 22px
@@ -253,8 +255,23 @@ export default function CarromGame({
 
   const currentBet = betAmount || 100;
   const totalPot = propTotalPot || currentBet * actualPlayersCount;
-  const isMultiplayer = Boolean(socket && (roomCode || lobbyPlayers?.length > 1));
+
+  // isAiGame: playMode === 'online' in GamingView means "Play vs AI" (direct, no real lobby).
+  // playMode === 'local' means real 2-player with lobby + roomCode.
+  // This is the CORRECT discriminator — do NOT use roomCode alone because
+  // lobbyRoomCode defaults to '7392' even when no real match is happening.
+  const isAiGame = playMode === 'online';
+
+  // isMultiplayer: only true in a real local/online match (local mode with roomCode + socket)
+  const isMultiplayer = Boolean(!isAiGame && socket && roomCode);
   const lastAimEmitRef = useRef(0);
+
+  // isStrikingRef keeps a ref in sync with isStriking state so setTimeout/setInterval
+  // callbacks always read the LATEST value instead of stale closure value
+  const isStrikingRef = useRef(false);
+  useEffect(() => {
+    isStrikingRef.current = isStriking;
+  }, [isStriking]);
 
   // Sync striker baseline when turn changes
   useEffect(() => {
@@ -509,8 +526,9 @@ export default function CarromGame({
       socket.emit('carrom_turn_passed', { roomCode, nextPlayer: nextSlot });
     }
 
-    // AI Turn Trigger if not multiplayer and not my turn
-    if (!isMultiplayer && nextSlot !== myPlayer.slot && !matchOver) {
+    // AI Turn Trigger: fires whenever there is no live online room (isAiGame) and the
+    // next slot is not ours. Works correctly even when socket is connected in offline/AI mode.
+    if (isAiGame && nextSlot !== myPlayer.slot && !matchOver) {
       setTimeout(() => {
         triggerAiTurn();
       }, 800);
@@ -556,7 +574,9 @@ export default function CarromGame({
   const physicsAnimRef = useRef(null);
 
   const executeStrike = (startX, startY, angleDeg, powerVal, slotIdx) => {
-    if (isStriking) return;
+    // Use ref instead of closure state to avoid stale isStriking value in setTimeout callbacks
+    if (isStrikingRef.current) return;
+    isStrikingRef.current = true;
     setIsStriking(true);
 
     const rad = (angleDeg * Math.PI) / 180;
@@ -603,20 +623,25 @@ export default function CarromGame({
           anyMotion = true;
         }
 
-        // Cushion Bounces for Striker
-        if (strikerRef.current.x - STRIKER_RADIUS < FRAME_WIDTH) {
-          strikerRef.current.x = FRAME_WIDTH + STRIKER_RADIUS;
-          strikerRef.current.vx = -strikerRef.current.vx * 0.84;
-        } else if (strikerRef.current.x + STRIKER_RADIUS > BOARD_SIZE - FRAME_WIDTH) {
-          strikerRef.current.x = BOARD_SIZE - FRAME_WIDTH - STRIKER_RADIUS;
-          strikerRef.current.vx = -strikerRef.current.vx * 0.84;
+        // Cushion Bounces for Striker (clamped strictly inside play area)
+        const sMinX = FRAME_WIDTH + STRIKER_RADIUS;
+        const sMaxX = BOARD_SIZE - FRAME_WIDTH - STRIKER_RADIUS;
+        const sMinY = FRAME_WIDTH + STRIKER_RADIUS;
+        const sMaxY = BOARD_SIZE - FRAME_WIDTH - STRIKER_RADIUS;
+
+        if (strikerRef.current.x < sMinX) {
+          strikerRef.current.x = sMinX;
+          strikerRef.current.vx = Math.abs(strikerRef.current.vx) * 0.84;
+        } else if (strikerRef.current.x > sMaxX) {
+          strikerRef.current.x = sMaxX;
+          strikerRef.current.vx = -Math.abs(strikerRef.current.vx) * 0.84;
         }
-        if (strikerRef.current.y - STRIKER_RADIUS < FRAME_WIDTH) {
-          strikerRef.current.y = FRAME_WIDTH + STRIKER_RADIUS;
-          strikerRef.current.vy = -strikerRef.current.vy * 0.84;
-        } else if (strikerRef.current.y + STRIKER_RADIUS > BOARD_SIZE - FRAME_WIDTH) {
-          strikerRef.current.y = BOARD_SIZE - FRAME_WIDTH - STRIKER_RADIUS;
-          strikerRef.current.vy = -strikerRef.current.vy * 0.84;
+        if (strikerRef.current.y < sMinY) {
+          strikerRef.current.y = sMinY;
+          strikerRef.current.vy = Math.abs(strikerRef.current.vy) * 0.84;
+        } else if (strikerRef.current.y > sMaxY) {
+          strikerRef.current.y = sMaxY;
+          strikerRef.current.vy = -Math.abs(strikerRef.current.vy) * 0.84;
         }
 
         // Realistic Pocket check for Striker
@@ -757,8 +782,11 @@ export default function CarromGame({
       }
 
       setPucks([...localPucks]);
-      setStrikerX(strikerRef.current.x);
-      setStrikerY(strikerRef.current.y);
+      // Hard-clamp state so visual position is always inside board bounds
+      const clampedSX = Math.max(FRAME_WIDTH + STRIKER_RADIUS, Math.min(BOARD_SIZE - FRAME_WIDTH - STRIKER_RADIUS, strikerRef.current.x));
+      const clampedSY = Math.max(FRAME_WIDTH + STRIKER_RADIUS, Math.min(BOARD_SIZE - FRAME_WIDTH - STRIKER_RADIUS, strikerRef.current.y));
+      setStrikerX(clampedSX);
+      setStrikerY(clampedSY);
 
       if (!anyMotion || steps >= maxSteps) {
         clearInterval(physicsAnimRef.current);
@@ -770,6 +798,7 @@ export default function CarromGame({
 
   // Turn End Resolution & Scoring
   const resolveTurnEnd = (slotIdx, pocketedInThisShot, strikerPocketed, updatedPucks) => {
+    isStrikingRef.current = false; // sync ref immediately so next executeStrike call is not blocked
     setIsStriking(false);
 
     // Striker Foul
@@ -870,7 +899,8 @@ export default function CarromGame({
         socket.emit('carrom_extra_turn', { roomCode, slot: slotIdx });
       }
 
-      if (!isMultiplayer && slotIdx !== myPlayer.slot) {
+      // Same guard as passTurn — use isAiGame, not isMultiplayer
+      if (isAiGame && slotIdx !== myPlayer.slot) {
         setTimeout(() => triggerAiTurn(), 800);
       }
     } else {
@@ -1467,23 +1497,37 @@ export default function CarromGame({
               })}
 
               {/* STRIKER PIECE */}
-              {strikerVisible && (
-                <View
-                  style={[
-                    styles.strikerPiece,
-                    {
-                      left: activeStrikerX - STRIKER_RADIUS - FRAME_WIDTH,
-                      top: activeStrikerY - STRIKER_RADIUS - FRAME_WIDTH,
-                    },
-                  ]}
-                >
-                  <View style={styles.strikerInnerRing}>
-                    <View style={styles.strikerCore}>
-                      <Text style={{ fontSize: 9, color: '#00E5FF' }}>✦</Text>
+              {strikerVisible && (() => {
+                // Hard-clamp visual position so striker NEVER renders outside the playfield
+                const clampedLeft = Math.max(
+                  0,
+                  Math.min(
+                    PLAY_SIZE - STRIKER_RADIUS * 2,
+                    activeStrikerX - STRIKER_RADIUS - FRAME_WIDTH
+                  )
+                );
+                const clampedTop = Math.max(
+                  0,
+                  Math.min(
+                    PLAY_SIZE - STRIKER_RADIUS * 2,
+                    activeStrikerY - STRIKER_RADIUS - FRAME_WIDTH
+                  )
+                );
+                return (
+                  <View
+                    style={[
+                      styles.strikerPiece,
+                      { left: clampedLeft, top: clampedTop },
+                    ]}
+                  >
+                    <View style={styles.strikerInnerRing}>
+                      <View style={styles.strikerCore}>
+                        <Text style={{ fontSize: 9, color: '#00E5FF' }}>✦</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              )}
+                );
+              })()}
 
               {/* Target Pocket "TARGET LOCKED" Badge */}
               {trajectoryData?.targetPocket && (
@@ -1563,7 +1607,7 @@ export default function CarromGame({
             </View>
           </View>
 
-          {/* Row 2: Power Selector & Big Strike Button */}
+          {/* Row 2: Power Selector */}
           <View style={styles.powerAndStrikeRow}>
             <View style={styles.powerPresetsWrap}>
               <Text style={styles.controlLabel}><T>Power</T>:</Text>
@@ -1591,25 +1635,25 @@ export default function CarromGame({
                   </Text>
                 </TouchableOpacity>
               ))}
+              <Text style={styles.tapCoinHintText}>💡 <T>Tap coin to aim</T></Text>
             </View>
-
-            <Text style={styles.tapCoinHintText}>💡 <T>Tap coin to auto-aim</T></Text>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.bigStrikeButton}
-              onPress={handlePlayerStrike}
-            >
-              <LinearGradient
-                colors={['#FF6D00', '#FF3D00', '#D50000']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.bigStrikeGradient}
-              >
-                <Text style={styles.bigStrikeText}>💥 <T>STRIKE</T></Text>
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
+
+          {/* Row 3: Full-width STRIKE Button — always fits, never clips */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[styles.bigStrikeButton, { width: '100%' }]}
+            onPress={handlePlayerStrike}
+          >
+            <LinearGradient
+              colors={['#FF6D00', '#FF3D00', '#D50000']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.bigStrikeGradient, { paddingVertical: 10 }]}
+            >
+              <Text style={styles.bigStrikeText}>💥 <T>STRIKE!</T></Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       ) : null}
 

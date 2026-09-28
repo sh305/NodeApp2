@@ -1132,7 +1132,13 @@ export default function GamingView({
     <View style={styles.container}>
       {/* 1. TOP GAMING HEADER: Ludo, Tic Tac Toe, Carrom, Games */}
       <View style={[styles.gamingHeader, { paddingTop: Math.max(16, insets.top) }]}>
-        <View style={styles.gameTabsRow}>
+        {/* Horizontally scrollable tabs so all tabs + calendar are always accessible */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.gameTabsRow}
+        >
           {['Ludo', 'Tic Tac Toe', 'Carrom', 'Games'].map((tab) => {
             const isActive = activeGameTab === tab;
             return (
@@ -1149,9 +1155,9 @@ export default function GamingView({
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
 
-        {/* Top Right Calendar Daily Streak Icon (Directly after Games tab) */}
+        {/* Calendar Daily Streak Icon — pinned on right, always visible */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => setChestModalVisible(true)}
@@ -2649,20 +2655,26 @@ export default function GamingView({
 
             {/* ARENA: AUTHENTIC WOODEN CARROM BOARD ARENA */}
             {activeGameArena === 'carrom' && (
-              <CarromGame
-                playersCount={selectedPlayers || 2}
-                currentUser={currentUser}
-                gameMode={selectedGame?.mode || 'classic'}
-                betAmount={matchBet}
-                totalPot={matchTotalPot}
-                playMode={playMode}
-                lobbyPlayers={lobbyPlayers}
-                forfeitedUserIds={forfeitedUserIds}
-                socket={socketRef.current}
-                roomCode={lobbyRoomCode}
-                onWin={(game) => handleGameWin(game || 'Carrom Board')}
-                onLoss={(game) => handleGameLoss(game || 'Carrom Board')}
-              />
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ alignItems: 'center', paddingBottom: 8 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                <CarromGame
+                  playersCount={selectedPlayers || 2}
+                  currentUser={currentUser}
+                  gameMode={selectedGame?.mode || 'classic'}
+                  betAmount={matchBet}
+                  totalPot={matchTotalPot}
+                  playMode={playMode}
+                  lobbyPlayers={lobbyPlayers}
+                  forfeitedUserIds={forfeitedUserIds}
+                  socket={socketRef.current}
+                  roomCode={lobbyRoomCode}
+                  onWin={(game) => handleGameWin(game || 'Carrom Board')}
+                  onLoss={(game) => handleGameLoss(game || 'Carrom Board')}
+                />
+              </ScrollView>
             )}
 
             {/* ARENA: NEON GLOW TIC TAC TOE (ZERO KATA) ARENA */}
@@ -2707,14 +2719,16 @@ const styles = StyleSheet.create({
   gameTabsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 10,
+    paddingRight: 8,
   },
   gameTabItem: {
     paddingVertical: 4,
+    paddingHorizontal: 4,
     position: 'relative',
   },
   gameTabText: {
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: '700',
     color: '#64748B',
   },
