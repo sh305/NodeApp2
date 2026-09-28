@@ -24,6 +24,9 @@ import LudoGame from './LudoGame';
 import SnakeLadderGame from './SnakeLadderGame';
 import TicTacToeGame from './TicTacToeGame';
 import CarromGame from './CarromGame';
+import DiceBattleGame from './DiceBattleGame';
+import CardClashGame from './CardClashGame';
+import TimeBombGame from './TimeBombGame';
 
 // 7-Day Silver Chest Streak Rewards
 const CHEST_REWARDS = [100, 300, 600, 1000, 1500, 2200, 3500];
@@ -288,11 +291,20 @@ export default function GamingView({
       const isSnake = data?.gameName === 'Snake & Ladder' || selectedGame?.id === 'snake_ladder';
       const isTicTacToe = data?.gameName === 'Tic Tac Toe' || selectedGame?.id === 'tictactoe';
       const isCarrom = data?.gameName === 'Carrom Board' || selectedGame?.id === 'carrom';
+      const isDice = data?.gameName === 'Dice Battle' || selectedGame?.id === 'dice_battle';
+      const isCardClash = data?.gameName === 'High Card Clash' || selectedGame?.id === 'card_clash';
+      const isTimeBomb = data?.gameName === 'Time Bomb' || selectedGame?.id === 'time_bomb';
       if (data?.gameMode) {
         setSelectedGame((prev) => (prev ? { ...prev, mode: data.gameMode } : prev));
       }
       if (isCarrom) {
         setActiveGameArena('carrom');
+      } else if (isCardClash) {
+        setActiveGameArena('card_clash');
+      } else if (isDice) {
+        setActiveGameArena('dice_battle');
+      } else if (isTimeBomb) {
+        setActiveGameArena('time_bomb');
       } else if (isTicTacToe) {
         setActiveGameArena('tictactoe');
       } else if (isSnake) {
@@ -808,6 +820,12 @@ export default function GamingView({
     // Initialize specific game arena
     if (selectedGame.id === 'carrom') {
       setActiveGameArena('carrom');
+    } else if (selectedGame.id === 'card_clash') {
+      setActiveGameArena('card_clash');
+    } else if (selectedGame.id === 'dice_battle') {
+      setActiveGameArena('dice_battle');
+    } else if (selectedGame.id === 'time_bomb') {
+      setActiveGameArena('time_bomb');
     } else if (selectedGame.id === 'tictactoe') {
       setActiveGameArena('tictactoe');
     } else if (selectedGame.id === 'snake_ladder') {
@@ -872,6 +890,12 @@ export default function GamingView({
       // Initialize game arena directly against AI bot
       if (selectedGame.id === 'tictactoe') {
         setActiveGameArena('tictactoe');
+      } else if (selectedGame.id === 'card_clash') {
+        setActiveGameArena('card_clash');
+      } else if (selectedGame.id === 'dice_battle') {
+        setActiveGameArena('dice_battle');
+      } else if (selectedGame.id === 'time_bomb') {
+        setActiveGameArena('time_bomb');
       } else if (selectedGame.id === 'snake_ladder') {
         setActiveGameArena('snake_ladder');
       } else if (selectedGame.id === 'carrom') {
@@ -1139,7 +1163,7 @@ export default function GamingView({
           style={{ flex: 1 }}
           contentContainerStyle={styles.gameTabsRow}
         >
-          {['Ludo', 'Tic Tac Toe', 'Carrom', 'Games'].map((tab) => {
+          {['Ludo', 'Tic Tac Toe', 'Carrom', 'Dice Battle', 'Card Clash', 'Time Bomb', 'Games'].map((tab) => {
             const isActive = activeGameTab === tab;
             return (
               <TouchableOpacity
@@ -1586,6 +1610,366 @@ export default function GamingView({
           </View>
         )}
 
+        {/* ================= 4.3B DICE BATTLE TAB ================= */}
+        {activeGameTab === 'Dice Battle' && (
+          <View style={styles.gameTabContainer}>
+            {/* Neon Purple Dice Banner */}
+            <View style={[styles.gameBannerWrap, { backgroundColor: '#1E1435', borderColor: '#8B5CF6' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 24 }}>🎲</Text>
+                <Text style={[styles.dominoesTitle, { color: '#A78BFA', textShadowColor: '#7C3AED', textShadowRadius: 10 }]}>
+                  Dice Battle
+                </Text>
+              </View>
+              <View style={styles.betPill}>
+                <Text style={styles.betLabel}><T>BETS</T></Text>
+                <Image
+                  source={GREEN_COIN_IMG}
+                  style={{ width: 18, height: 18 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.betAmount}>{ludoBetAmount} <T>Coins</T></Text>
+              </View>
+              <Text style={styles.betSubLimit}><T>High Roller Duel • Best of 3 Rounds • Winner Takes Pot</T></Text>
+            </View>
+
+            {/* Mode Cards: 1 ON 1 Classic Duel & 1 ON 1 Turbo Blitz */}
+            <View style={styles.mainModesRow}>
+              {/* Card 1: 1 ON 1 Classic (Best of 3) */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[styles.mainModeCard, { borderColor: '#8B5CF6', backgroundColor: '#161129' }]}
+                onPress={() => openGameSetup('dice_battle', 'Dice Battle', 'classic', ludoBetAmount, 2)}
+              >
+                <LinearGradient
+                  colors={['#4C1D95', '#2E1065', '#161129']}
+                  style={styles.modeCardVisual}
+                >
+                  <View style={styles.pkBattleRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <Text style={{ fontSize: 28 }}>🎲</Text>
+                      <Text style={[styles.carromPieceLabel, { color: '#C4B5FD' }]}>Player 1</Text>
+                    </View>
+
+                    <View style={[styles.pkBadge, { backgroundColor: '#8B5CF6' }]}>
+                      <Text style={styles.pkText}>PK</Text>
+                    </View>
+
+                    <View style={{ alignItems: 'center' }}>
+                      <Text style={{ fontSize: 28 }}>🎲</Text>
+                      <Text style={[styles.carromPieceLabel, { color: '#F472B6' }]}>Player 2</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#8B5CF6' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('1 ON 1 Classic')}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Card 2: 1 ON 1 Turbo Blitz (1 Round Sudden Death) */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[styles.mainModeCard, { borderColor: '#EC4899', backgroundColor: '#1A0F24' }]}
+                onPress={() => openGameSetup('dice_battle', 'Dice Battle', 'turbo', ludoBetAmount, 2)}
+              >
+                <LinearGradient
+                  colors={['#831843', '#500724', '#1A0F24']}
+                  style={styles.modeCardVisual}
+                >
+                  <View style={styles.pkBattleRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <Text style={{ fontSize: 28 }}>⚡</Text>
+                      <Text style={[styles.carromPieceLabel, { color: '#F472B6' }]}>Blitz</Text>
+                    </View>
+
+                    <View style={[styles.pkBadge, { backgroundColor: '#EC4899', minWidth: 32, paddingHorizontal: 4 }]}>
+                      <Text style={[styles.pkText, { fontSize: 13 }]}>7s ⚡</Text>
+                    </View>
+
+                    <View style={{ alignItems: 'center' }}>
+                      <Text style={{ fontSize: 28 }}>💥</Text>
+                      <Text style={[styles.carromPieceLabel, { color: '#FCD34D' }]}>1 Roll</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#EC4899' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('1 ON 1 Turbo')}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Mode Card 3: 4 Players Rumble */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={[styles.mainModeCard, { width: '100%', marginTop: 8, borderColor: '#10B981', backgroundColor: '#091C15' }]}
+              onPress={() => openGameSetup('dice_battle', 'Dice Battle', 'classic', ludoBetAmount, 4)}
+            >
+              <LinearGradient
+                colors={['#064E3B', '#022C22', '#061912']}
+                style={[styles.modeCardVisual, { paddingVertical: 12 }]}
+              >
+                <View style={styles.pkBattleRow}>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 20 }}>🎲 🎲</Text>
+                    <Text style={[styles.carromPieceLabel, { color: '#6EE7B7' }]}>Group A</Text>
+                  </View>
+                  <View style={[styles.pkBadge, { backgroundColor: '#10B981', minWidth: 70 }]}>
+                    <Text style={[styles.pkText, { fontSize: 11 }]}>4 PLAYERS</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 20 }}>🎲 🎲</Text>
+                    <Text style={[styles.carromPieceLabel, { color: '#FDE047' }]}>Group B</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+              <View style={[styles.woodModeBtnWrap, { backgroundColor: '#10B981' }]}>
+                <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('4 Player Battle')}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ================= 4.3C CARD CLASH TAB ================= */}
+        {activeGameTab === 'Card Clash' && (
+          <View style={styles.gameTabContainer}>
+            {/* Crimson Casino Banner */}
+            <View style={[styles.gameBannerWrap, { backgroundColor: '#1A0B10', borderColor: '#EF4444' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 24 }}>🃏</Text>
+                <Text style={[styles.dominoesTitle, { color: '#F87171', textShadowColor: '#DC2626', textShadowRadius: 10 }]}>
+                  High Card Clash
+                </Text>
+              </View>
+              <View style={styles.betPill}>
+                <Text style={styles.betLabel}><T>BETS</T></Text>
+                <Image
+                  source={GREEN_COIN_IMG}
+                  style={{ width: 18, height: 18 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.betAmount}>{ludoBetAmount} <T>Coins</T></Text>
+              </View>
+              <Text style={styles.betSubLimit}><T>High Card Duel • Ace is High • Winner Takes Pot</T></Text>
+            </View>
+
+            {/* Mode Cards: 1 ON 1 Classic, 1 ON 1 Turbo, 4 Player Battle */}
+            <View style={styles.mainModesRow}>
+              {/* Card 1: 1 ON 1 Classic (Best of 3) */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[styles.mainModeCard, { borderColor: '#EF4444', backgroundColor: '#1E1015' }]}
+                onPress={() => openGameSetup('card_clash', 'High Card Clash', 'classic', ludoBetAmount, 2)}
+              >
+                <LinearGradient
+                  colors={['#7F1D1D', '#450A0A', '#1E1015']}
+                  style={styles.modeCardVisual}
+                >
+                  <View style={styles.pkBattleRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ width: 38, height: 52, backgroundColor: '#FFFFFF', borderRadius: 6, borderWidth: 2, borderColor: '#EF4444', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 18, color: '#EF4444', fontWeight: '900', lineHeight: 20 }}>A</Text>
+                        <Text style={{ fontSize: 12, color: '#EF4444', lineHeight: 13 }}>♠</Text>
+                      </View>
+                      <Text style={[styles.carromPieceLabel, { color: '#FCA5A5', marginTop: 3 }]}>Player 1</Text>
+                    </View>
+
+                    <View style={[styles.pkBadge, { backgroundColor: '#EF4444' }]}>
+                      <Text style={styles.pkText}>PK</Text>
+                    </View>
+
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ width: 38, height: 52, backgroundColor: '#FFFFFF', borderRadius: 6, borderWidth: 2, borderColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 18, color: '#DC2626', fontWeight: '900', lineHeight: 20 }}>K</Text>
+                        <Text style={{ fontSize: 12, color: '#DC2626', lineHeight: 13 }}>♥</Text>
+                      </View>
+                      <Text style={[styles.carromPieceLabel, { color: '#60A5FA', marginTop: 3 }]}>Player 2</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#EF4444' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('1 ON 1 Classic')}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Card 2: 1 ON 1 Turbo Blitz */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[styles.mainModeCard, { borderColor: '#F59E0B', backgroundColor: '#1F160A' }]}
+                onPress={() => openGameSetup('card_clash', 'High Card Clash', 'turbo', ludoBetAmount, 2)}
+              >
+                <LinearGradient
+                  colors={['#78350F', '#451A03', '#1F160A']}
+                  style={styles.modeCardVisual}
+                >
+                  <View style={styles.pkBattleRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ width: 38, height: 52, backgroundColor: '#1C1C1E', borderRadius: 6, borderWidth: 2, borderColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 16, color: '#F59E0B', fontWeight: '900', lineHeight: 18 }}>🃏</Text>
+                        <Text style={{ fontSize: 9, color: '#F59E0B', fontWeight: '800', lineHeight: 11 }}>TURBO</Text>
+                      </View>
+                      <Text style={[styles.carromPieceLabel, { color: '#FCD34D', marginTop: 3 }]}>Blitz</Text>
+                    </View>
+
+                    <View style={[styles.pkBadge, { backgroundColor: '#F59E0B', minWidth: 32, paddingHorizontal: 4 }]}>
+                      <Text style={[styles.pkText, { fontSize: 13, color: '#000000' }]}>7s ⚡</Text>
+                    </View>
+
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ width: 38, height: 52, backgroundColor: '#FFFFFF', borderRadius: 6, borderWidth: 2, borderColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 18, color: '#B45309', fontWeight: '900', lineHeight: 20 }}>A</Text>
+                        <Text style={{ fontSize: 12, color: '#B45309', lineHeight: 13 }}>♦</Text>
+                      </View>
+                      <Text style={[styles.carromPieceLabel, { color: '#FCD34D', marginTop: 3 }]}>1 Draw</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#F59E0B' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#000000', fontWeight: '900' }]}>{t('1 ON 1 Turbo')}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Mode Card 3: 4 Players Rumble */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={[styles.mainModeCard, { width: '100%', marginTop: 8, borderColor: '#3B82F6', backgroundColor: '#0F172A' }]}
+              onPress={() => openGameSetup('card_clash', 'High Card Clash', 'classic', ludoBetAmount, 4)}
+            >
+              <LinearGradient
+                colors={['#1E3A8A', '#172554', '#0F172A']}
+                style={[styles.modeCardVisual, { paddingVertical: 12 }]}
+              >
+                <View style={styles.pkBattleRow}>
+                  <View style={{ alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', gap: 3 }}>
+                      <View style={{ width: 26, height: 36, backgroundColor: '#FFFFFF', borderRadius: 4, borderWidth: 1.5, borderColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '900', lineHeight: 14 }}>A</Text>
+                        <Text style={{ fontSize: 9, color: '#EF4444', lineHeight: 10 }}>♥</Text>
+                      </View>
+                      <View style={{ width: 26, height: 36, backgroundColor: '#FFFFFF', borderRadius: 4, borderWidth: 1.5, borderColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 13, color: '#1D4ED8', fontWeight: '900', lineHeight: 14 }}>K</Text>
+                        <Text style={{ fontSize: 9, color: '#1D4ED8', lineHeight: 10 }}>♠</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.carromPieceLabel, { color: '#93C5FD' }]}>Side A</Text>
+                  </View>
+                  <View style={[styles.pkBadge, { backgroundColor: '#3B82F6', minWidth: 70 }]}>
+                    <Text style={[styles.pkText, { fontSize: 11 }]}>4 PLAYERS</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', gap: 3 }}>
+                      <View style={{ width: 26, height: 36, backgroundColor: '#FFFFFF', borderRadius: 4, borderWidth: 1.5, borderColor: '#EF4444', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '900', lineHeight: 14 }}>Q</Text>
+                        <Text style={{ fontSize: 9, color: '#EF4444', lineHeight: 10 }}>♦</Text>
+                      </View>
+                      <View style={{ width: 26, height: 36, backgroundColor: '#FFFFFF', borderRadius: 4, borderWidth: 1.5, borderColor: '#EF4444', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 13, color: '#1D4ED8', fontWeight: '900', lineHeight: 14 }}>J</Text>
+                        <Text style={{ fontSize: 9, color: '#1D4ED8', lineHeight: 10 }}>♣</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.carromPieceLabel, { color: '#FCA5A5' }]}>Side B</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+              <View style={[styles.woodModeBtnWrap, { backgroundColor: '#3B82F6' }]}>
+                <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('4 Player Battle')}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ================= 4.3D TIME BOMB TAB ================= */}
+        {activeGameTab === 'Time Bomb' && (
+          <View style={styles.gameTabContainer}>
+            <Text style={styles.sectionHeader}>{t('Time Bomb Pass')}</Text>
+            <Text style={styles.betSubLimit}><T>Pass the bomb before it blows! Last survivor wins the pot.</T></Text>
+
+            {/* 2 Player Mode */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={[styles.mainModeCard, { borderColor: '#EF4444', backgroundColor: '#150005' }]}
+              onPress={() => openGameSetup('time_bomb', 'Time Bomb', 'classic', ludoBetAmount, 2)}
+            >
+              <LinearGradient colors={['#450a0a', '#7f1d1d', '#1a0000']} style={[styles.modeCardVisual, { paddingVertical: 14 }]}>
+                <View style={styles.pkBattleRow}>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 36 }}>{'💣'}</Text>
+                    <Text style={[styles.carromPieceLabel, { color: '#FCA5A5' }]}>Player 1</Text>
+                  </View>
+                  <View style={[styles.pkBadge, { backgroundColor: '#EF4444' }]}>
+                    <Text style={styles.pkText}>PASS</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 36 }}>{'🤲'}</Text>
+                    <Text style={[styles.carromPieceLabel, { color: '#FCA5A5' }]}>Player 2</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+              <View style={[styles.woodModeBtnWrap, { backgroundColor: '#EF4444' }]}>
+                <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('1 ON 1 Duel')}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 3 Player Mode */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={[styles.mainModeCard, { borderColor: '#F59E0B', backgroundColor: '#150a00', marginTop: 8 }]}
+              onPress={() => openGameSetup('time_bomb', 'Time Bomb', 'classic', ludoBetAmount, 3)}
+            >
+              <LinearGradient colors={['#451a03', '#92400e', '#1a0a00']} style={[styles.modeCardVisual, { paddingVertical: 14 }]}>
+                <View style={styles.pkBattleRow}>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 28 }}>{'😎'}</Text>
+                    <Text style={[styles.carromPieceLabel, { color: '#FCD34D' }]}>P1</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 36 }}>{'💣'}</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 28 }}>{'🤖'}</Text>
+                    <Text style={[styles.carromPieceLabel, { color: '#FCD34D' }]}>P2+P3</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+              <View style={[styles.woodModeBtnWrap, { backgroundColor: '#F59E0B' }]}>
+                <Text style={[styles.woodModeBtnText, { color: '#000000', fontWeight: '900' }]}>{t('3 Player Bomb')}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 4 Player Mode */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={[styles.mainModeCard, { width: '100%', marginTop: 8, borderColor: '#8B5CF6', backgroundColor: '#0d0015' }]}
+              onPress={() => openGameSetup('time_bomb', 'Time Bomb', 'classic', ludoBetAmount, 4)}
+            >
+              <LinearGradient colors={['#2e1065', '#4c1d95', '#0d0015']} style={[styles.modeCardVisual, { paddingVertical: 12 }]}>
+                <View style={styles.pkBattleRow}>
+                  <View style={{ alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', gap: 2 }}>
+                      <Text style={{ fontSize: 22 }}>{'😎'}</Text>
+                      <Text style={{ fontSize: 22 }}>{'🤖'}</Text>
+                    </View>
+                    <Text style={[styles.carromPieceLabel, { color: '#C4B5FD' }]}>Team A</Text>
+                  </View>
+                  <View style={[styles.pkBadge, { backgroundColor: '#8B5CF6', minWidth: 70 }]}>
+                    <Text style={[styles.pkText, { fontSize: 11 }]}>4 BOMB</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', gap: 2 }}>
+                      <Text style={{ fontSize: 22 }}>{'👻'}</Text>
+                      <Text style={{ fontSize: 22 }}>{'🦊'}</Text>
+                    </View>
+                    <Text style={[styles.carromPieceLabel, { color: '#C4B5FD' }]}>Team B</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+              <View style={[styles.woodModeBtnWrap, { backgroundColor: '#8B5CF6' }]}>
+                <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('4 Player Chaos')}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* ================= 4.4 ALL GAMES TAB ================= */}
         {activeGameTab === 'Games' && (
           <View style={styles.gameTabContainer}>
@@ -1595,6 +1979,9 @@ export default function GamingView({
                 { id: 'Ludo', name: 'Ludo Classic', icon: '🎲', color: '#00C853' },
                 { id: 'Tic Tac Toe', name: 'Tic Tac Toe', icon: '❌⭕', color: '#00E5FF' },
                 { id: 'Carrom', name: 'Carrom Board', icon: '🎯', color: '#D97706' },
+                { id: 'Dice Battle', name: 'Dice Battle', icon: '🎲', color: '#8B5CF6' },
+                { id: 'Card Clash', name: 'High Card Clash', icon: '🃏', color: '#EF4444' },
+                { id: 'Time Bomb', name: 'Time Bomb Pass', icon: '💣', color: '#DC2626' },
               ].map((g) => (
                 <TouchableOpacity
                   key={g.id}
@@ -2591,6 +2978,7 @@ export default function GamingView({
                 {activeGameArena === 'snake_ladder' && '🐍🪜 Snakes & Ladders'}
                 {activeGameArena === 'tictactoe' && '❌⭕ Tic Tac Toe (Zero Kata)'}
                 {activeGameArena === 'carrom' && '🎯 Carrom Board Battle'}
+                {activeGameArena === 'time_bomb' && '💣 Time Bomb Pass'}
               </Text>
               <TouchableOpacity
                 onPress={handleExitArenaPress}
@@ -2673,6 +3061,76 @@ export default function GamingView({
                   roomCode={lobbyRoomCode}
                   onWin={(game) => handleGameWin(game || 'Carrom Board')}
                   onLoss={(game) => handleGameLoss(game || 'Carrom Board')}
+                />
+              </ScrollView>
+            )}
+
+            {/* ARENA: 3D HIGH ROLLER DICE BATTLE ARENA */}
+            {activeGameArena === 'dice_battle' && (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ alignItems: 'center', paddingBottom: 16 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                <DiceBattleGame
+                  playersCount={selectedPlayers || 2}
+                  currentUser={currentUser}
+                  gameMode={selectedGame?.mode || 'classic'}
+                  betAmount={matchBet}
+                  totalPot={matchTotalPot}
+                  playMode={playMode}
+                  lobbyPlayers={lobbyPlayers}
+                  forfeitedUserIds={forfeitedUserIds}
+                  socket={socketRef.current}
+                  roomCode={lobbyRoomCode}
+                  onWin={(game) => handleGameWin(game || 'Dice Battle')}
+                  onLoss={(game) => handleGameLoss(game || 'Dice Battle')}
+                />
+              </ScrollView>
+            )}
+
+            {/* ARENA: ROYAL CASINO HIGH CARD CLASH ARENA */}
+            {activeGameArena === 'card_clash' && (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ alignItems: 'center', paddingBottom: 16 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                <CardClashGame
+                  playersCount={selectedPlayers || 2}
+                  currentUser={currentUser}
+                  gameMode={selectedGame?.mode || 'classic'}
+                  betAmount={matchBet}
+                  totalPot={matchTotalPot}
+                  playMode={playMode}
+                  lobbyPlayers={lobbyPlayers}
+                  forfeitedUserIds={forfeitedUserIds}
+                  socket={socketRef.current}
+                  roomCode={lobbyRoomCode}
+                  onWin={(game) => handleGameWin(game || 'High Card Clash')}
+                  onLoss={(game) => handleGameLoss(game || 'High Card Clash')}
+                />
+              </ScrollView>
+            )}
+
+            {/* ARENA: TIME BOMB PASS ARENA */}
+            {activeGameArena === 'time_bomb' && (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ alignItems: 'center', paddingBottom: 16 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                <TimeBombGame
+                  playersCount={selectedPlayers || 2}
+                  currentUser={currentUser}
+                  betAmount={matchBet}
+                  totalPot={matchTotalPot}
+                  playMode={playMode}
+                  lobbyPlayers={lobbyPlayers}
+                  socket={socketRef.current}
+                  roomCode={lobbyRoomCode}
+                  onWin={(game) => handleGameWin(game || 'Time Bomb')}
+                  onLoss={(game) => handleGameLoss(game || 'Time Bomb')}
                 />
               </ScrollView>
             )}

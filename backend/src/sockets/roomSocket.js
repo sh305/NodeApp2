@@ -865,6 +865,91 @@ function initRoomSockets(io) {
       socket.to(`game_lobby_${cleanCode}`).emit('carrom_sync_board', data);
     });
 
+    // Multiplayer Dice Battle In-Game Event Relays
+    socket.on('dice_battle_join', ({ roomCode }) => {
+      const cleanCode = String(roomCode || '').trim();
+      if (cleanCode) {
+        socket.join(`game_lobby_${cleanCode}`);
+        console.log(`🎲 [Dice Battle] Socket ${socket.id} joined room game_lobby_${cleanCode}`);
+      }
+    });
+
+    socket.on('dice_battle_roll', (data) => {
+      const cleanCode = String(data?.roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+      console.log(`🎲 [Dice Battle] Roll in room ${cleanCode} from slot ${data?.fromSlot}, values:`, data?.diceValues);
+      socket.to(`game_lobby_${cleanCode}`).emit('dice_battle_roll', data);
+    });
+
+    socket.on('dice_battle_turn_passed', ({ roomCode, nextSlot }) => {
+      const cleanCode = String(roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+      console.log(`🎲 [Dice Battle] Turn passed in room ${cleanCode} -> nextSlot: ${nextSlot}`);
+      socket.to(`game_lobby_${cleanCode}`).emit('dice_battle_turn_passed', { nextSlot });
+    });
+
+    socket.on('dice_battle_sync_round', (data) => {
+      const cleanCode = String(data?.roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+      socket.to(`game_lobby_${cleanCode}`).emit('dice_battle_sync_round', data);
+    });
+
+    // Multiplayer Card Clash In-Game Event Relays
+    socket.on('card_clash_join', ({ roomCode }) => {
+      const cleanCode = String(roomCode || '').trim();
+      if (cleanCode) {
+        socket.join(`game_lobby_${cleanCode}`);
+        console.log(`🃏 [Card Clash] Socket ${socket.id} joined room game_lobby_${cleanCode}`);
+      }
+    });
+
+    socket.on('card_clash_reveal', (data) => {
+      const cleanCode = String(data?.roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+      console.log(`🃏 [Card Clash] Reveal in room ${cleanCode} from slot ${data?.fromSlot}, card:`, data?.card);
+      socket.to(`game_lobby_${cleanCode}`).emit('card_clash_reveal', data);
+    });
+
+    socket.on('card_clash_turn_passed', ({ roomCode, nextSlot }) => {
+      const cleanCode = String(roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+      console.log(`🃏 [Card Clash] Turn passed in room ${cleanCode} -> nextSlot: ${nextSlot}`);
+      socket.to(`game_lobby_${cleanCode}`).emit('card_clash_turn_passed', { nextSlot });
+    });
+
+    socket.on('card_clash_sync_round', (data) => {
+      const cleanCode = String(data?.roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+      socket.to(`game_lobby_${cleanCode}`).emit('card_clash_sync_round', data);
+    });
+
+    // ── TIME BOMB PASS GAME ────────────────────────────────────────
+    socket.on('time_bomb_join', ({ roomCode }) => {
+      const cleanCode = String(roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+    });
+
+    socket.on('time_bomb_pass', (data) => {
+      const cleanCode = String(data?.roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+      socket.to(`game_lobby_${cleanCode}`).emit('time_bomb_passed', data);
+    });
+
+    socket.on('time_bomb_exploded', (data) => {
+      const cleanCode = String(data?.roomCode || '').trim();
+      if (!cleanCode) return;
+      socket.join(`game_lobby_${cleanCode}`);
+      socket.to(`game_lobby_${cleanCode}`).emit('time_bomb_exploded', data);
+    });
+
     // Handle mid-match quit / forfeit
     socket.on('player_quit_match', async ({ roomCode, userId }) => {
       try {
