@@ -10,13 +10,20 @@ import {
   Animated,
   ActivityIndicator,
   Platform,
+  TextInput,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
-import api from '../api/client';
+import io from 'socket.io-client';
+import api, { BASE_URL } from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
+import { T } from './TranslatedText';
 import { useToast } from './Toast';
 import LudoGame from './LudoGame';
+import SnakeLadderGame from './SnakeLadderGame';
+import TicTacToeGame from './TicTacToeGame';
+import CarromGame from './CarromGame';
 
 // 7-Day Silver Chest Streak Rewards
 const CHEST_REWARDS = [100, 300, 600, 1000, 1500, 2200, 3500];
@@ -60,6 +67,36 @@ export default function GamingView({
   const [selectedGame, setSelectedGame] = useState(null); // { id: 'ludo', name: 'Ludo', mode: '1on1', bet: 100, players: 2 }
   const [playMode, setPlayMode] = useState('online'); // 'online' or 'local'
   const [selectedPlayers, setSelectedPlayers] = useState(2); // 2 or 4
+  const [ludoBetAmount, setLudoBetAmount] = useState(100);
+  const [betSelectModalVisible, setBetSelectModalVisible] = useState(false);
+  const [matchBet, setMatchBet] = useState(100);
+  const matchBetRef = useRef(100);
+  useEffect(() => {
+    matchBetRef.current = matchBet;
+  }, [matchBet]);
+
+  const [matchTotalPot, setMatchTotalPot] = useState(200);
+  const matchTotalPotRef = useRef(200);
+  useEffect(() => {
+    matchTotalPotRef.current = matchTotalPot;
+  }, [matchTotalPot]);
+
+  // Real-Time Socket & Game Lobby State (Real Registered Users Only)
+  const socketRef = useRef(null);
+  const [localLobbyVisible, setLocalLobbyVisible] = useState(false);
+  const [lobbyRoomCode, setLobbyRoomCode] = useState('7392');
+  const lobbyRoomCodeRef = useRef(lobbyRoomCode);
+  useEffect(() => {
+    lobbyRoomCodeRef.current = lobbyRoomCode;
+  }, [lobbyRoomCode]);
+  const [lobbyPlayers, setLobbyPlayers] = useState([]);
+  const [forfeitedUserIds, setForfeitedUserIds] = useState([]);
+  const [joinGameCodeModalVisible, setJoinGameCodeModalVisible] = useState(false);
+  const [enteredGameCode, setEnteredGameCode] = useState('');
+  const [verifyingGameCode, setVerifyingGameCode] = useState(false);
+  const [lobbyActivityNotice, setLobbyActivityNotice] = useState(null);
+  const [codePreviewLobby, setCodePreviewLobby] = useState(null);
+  const [activeWaitingLobbies, setActiveWaitingLobbies] = useState([]);
 
   // Interactive In-App Game Modal (Playable arena)
   const [activeGameArena, setActiveGameArena] = useState(null); // 'ludo', 'dominos', 'uno'
@@ -153,6 +190,199 @@ export default function GamingView({
     fetchChestStatus();
   }, []);
 
+  // Initialize Real-Time Game Lobby Socket Connection
+  useEffect(() => {
+    const socket = io(BASE_URL, {
+      transports: ['websocket'],
+    });
+    socketRef.current = socket;
+
+    // Listen for lobby updates (when real registered player joins)
+    socket.on('game_lobby_updated', (lobby) => {
+      setLobbyRoomCode(lobby.roomCode);
+      const maxP = lobby.maxPlayers || selectedPlayers || 2;
+      const fullSlots = [];
+      const colors = [
+        { color: '#DC2626', colorKey: 'red' },
+        { color: '#10B981', colorKey: 'green' },
+        { color: '#F59E0B', colorKey: 'yellow' },
+        { color: '#2563EB', colorKey: 'blue' },
+      ];
+      for (let s = 1; s <= maxP; s++) {
+        const existing = lobby.players?.find((p) => p.slot === s);
+        if (existing) {
+          fullSlots.push(existing);
+        } else {
+          const c = colors[s - 1] || colors[1];
+          fullSlots.push({
+            slot: s,
+            userId: null,
+            name: `Player ${s}`,
+            avatar: null,
+            color: c.color,
+            colorKey: c.colorKey,
+            isHost: false,
+            status: 'waiting',
+          });
+        }
+      }
+      setLobbyPlayers(fullSlots);
+      setLocalLobbyVisible(true);
+    });
+
+    // Listen for another player entering the lobby with code
+    socket.on('player_entered_lobby', (data) => {
+      if (data?.roomCode && String(data.roomCode) !== String(lobbyRoomCodeRef.current)) {
+        return;
+      }
+      setLobbyActivityNotice(data);
+      if (data?.name) {
+        showToast(`${data.name} ${t('entered the lobby waiting room!')}`, 'info');
+      }
+    });
+
+    // Listen for player leaving the waiting lobby
+    socket.on('player_left_lobby', (data) => {
+      setLobbyActivityNotice(null);
+    });
+
+    // Listen for direct coin balance update from socket
+    socket.on('user_coins_updated', (data) => {
+      if (typeof data?.gameCoins === 'number') {
+        setGameCoins(data.gameCoins);
+      }
+    });
+
+    // Listen for active game waiting lobbies list
+    socket.on('active_game_lobbies_list', (list) => {
+      setActiveWaitingLobbies(Array.isArray(list) ? list : []);
+    });
+    socket.on('active_game_lobbies_changed', (list) => {
+      setActiveWaitingLobbies(Array.isArray(list) ? list : []);
+    });
+
+    // Listen for match start (both real devices launch arena together)
+    socket.on('game_match_started', async (data) => {
+      setPlayMode('local');
+      setLobbyActivityNotice(null);
+      if (data?.players) {
+        setLobbyPlayers(data.players);
+      }
+      if (data?.roomCode) {
+        setLobbyRoomCode(data.roomCode);
+      }
+      const betAmt = Number(data?.bet) || Number(selectedGame?.bet) || matchBetRef.current || 100;
+      const totalPotAmt =
+        Number(data?.totalPot) ||
+        betAmt * (data?.playersCount || data?.players?.length || selectedPlayers || 2);
+      matchBetRef.current = betAmt;
+      matchTotalPotRef.current = totalPotAmt;
+      setMatchBet(betAmt);
+      setMatchTotalPot(totalPotAmt);
+      // Deduct bet coins atomically at the exact moment the match starts
+      setGameCoins((prev) => Math.max(0, prev - betAmt));
+      fetchChestStatus();
+      setForfeitedUserIds([]);
+      setLocalLobbyVisible(false);
+      setGameResult(null);
+      const isSnake = data?.gameName === 'Snake & Ladder' || selectedGame?.id === 'snake_ladder';
+      const isTicTacToe = data?.gameName === 'Tic Tac Toe' || selectedGame?.id === 'tictactoe';
+      const isCarrom = data?.gameName === 'Carrom Board' || selectedGame?.id === 'carrom';
+      if (data?.gameMode) {
+        setSelectedGame((prev) => (prev ? { ...prev, mode: data.gameMode } : prev));
+      }
+      if (isCarrom) {
+        setActiveGameArena('carrom');
+      } else if (isTicTacToe) {
+        setActiveGameArena('tictactoe');
+      } else if (isSnake) {
+        setActiveGameArena('snake_ladder');
+      } else {
+        setActiveGameArena('ludo');
+      }
+    });
+
+    // Listen for match ended because opponent quit (Last remaining player wins entire pot!)
+    socket.on('game_match_ended_by_forfeit', (data) => {
+      fetchChestStatus();
+      const isWinner = String(data?.winner?.userId) === String(currentUser?._id);
+      if (isWinner) {
+        const pot = Number(data?.totalPot) || matchTotalPotRef.current || 200;
+        const bet = Number(data?.bet) || matchBetRef.current || 100;
+        const profit = Math.max(0, pot - bet);
+        setGameCoins((prev) => prev + pot);
+        showToast(
+          `${t('Opponent left the match! You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${pot})`,
+          'success'
+        );
+        setGameResult('won');
+        // Auto-close arena after celebratory result so user exits game
+        setTimeout(() => {
+          setActiveGameArena(null);
+          setGameResult(null);
+        }, 3500);
+      } else {
+        setActiveGameArena(null);
+        setGameResult(null);
+      }
+    });
+
+    // Listen for player forfeited in >2 players match
+    socket.on('player_forfeited_mid_game', (data) => {
+      if (data?.quitter?.userId) {
+        setForfeitedUserIds((prev) => [...prev, String(data.quitter.userId)]);
+      }
+      if (data?.quitter?.name) {
+        showToast(
+          `${data.quitter.name} ${t('left the match. Game continues for the remaining pot!')}`,
+          'info'
+        );
+      }
+    });
+
+    // Listen for normal match finish
+    socket.on('game_match_finished', (data) => {
+      const isWinner = String(data?.winner?.userId) === String(currentUser?._id);
+      if (isWinner) {
+        const pot = Number(data?.totalPot) || matchTotalPotRef.current || 200;
+        const bet = Number(data?.bet) || matchBetRef.current || 100;
+        const profit = Math.max(0, pot - bet);
+        setGameCoins((prev) => prev + pot);
+        fetchChestStatus();
+        showToast(
+          `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${pot})`,
+          'success'
+        );
+        setGameResult('won');
+      } else {
+        setGameResult('lost');
+      }
+      // Auto-close arena after result so user exits game
+      setTimeout(() => {
+        setActiveGameArena(null);
+        setGameResult(null);
+      }, 3500);
+    });
+
+    // Listen for lobby errors
+    socket.on('game_lobby_error', ({ message }) => {
+      showToast(t(message), 'error');
+    });
+
+    // Listen for disbanded lobby
+    socket.on('game_lobby_disbanded', ({ message }) => {
+      showToast(t(message || 'Host left the game room.'), 'info');
+      setLobbyActivityNotice(null);
+      setLocalLobbyVisible(false);
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
+
   // Handle Silver Chest Claim
   const handleClaimChest = async () => {
     if (claimingChest) return;
@@ -193,6 +423,410 @@ export default function GamingView({
     setSetupModalVisible(true);
   };
 
+  // Close and leave lobby
+  const handleCloseLobby = () => {
+    if (socketRef.current && lobbyRoomCode) {
+      socketRef.current.emit('leave_game_lobby', {
+        roomCode: lobbyRoomCode,
+        userId: currentUser?._id,
+      });
+    }
+    setLocalLobbyVisible(false);
+  };
+
+  // Open Local Game Lobby (Waiting Room with Game Code)
+  const openLocalLobby = () => {
+    const requiredBet = selectedGame?.bet || ludoBetAmount || 100;
+    matchBetRef.current = requiredBet;
+    matchTotalPotRef.current = requiredBet * (selectedPlayers || 2);
+    setMatchBet(requiredBet);
+    setMatchTotalPot(requiredBet * (selectedPlayers || 2));
+    if (gameCoins < requiredBet) {
+      showToast(
+        t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+        'error'
+      );
+      setSetupModalVisible(false);
+      setChestModalVisible(true);
+      return;
+    }
+
+    setPlayMode('local');
+    setSetupModalVisible(false);
+
+    // Local Play / Match Lobby with 4-digit Game Code registered on server
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setLobbyRoomCode(code);
+
+    const slots = [
+      {
+        slot: 1,
+        userId: currentUser?._id?.toString(),
+        name: currentUser?.name || 'You',
+        avatar: currentUser?.avatar,
+        color: '#DC2626',
+        colorKey: 'red',
+        isHost: true,
+        status: 'ready',
+      },
+      {
+        slot: 2,
+        userId: null,
+        name: 'Player 2',
+        avatar: null,
+        color: '#10B981',
+        colorKey: 'green',
+        isHost: false,
+        status: 'waiting',
+      },
+    ];
+
+    if (selectedPlayers === 4) {
+      slots.push(
+        {
+          slot: 3,
+          userId: null,
+          name: 'Player 3',
+          avatar: null,
+          color: '#F59E0B',
+          colorKey: 'yellow',
+          isHost: false,
+          status: 'waiting',
+        },
+        {
+          slot: 4,
+          userId: null,
+          name: 'Player 4',
+          avatar: null,
+          color: '#2563EB',
+          colorKey: 'blue',
+          isHost: false,
+          status: 'waiting',
+        }
+      );
+    }
+
+    setLobbyPlayers(slots);
+    setLocalLobbyVisible(true);
+
+    if (socketRef.current) {
+      if (!socketRef.current.connected) {
+        socketRef.current.connect();
+      }
+      socketRef.current.emit(
+        'create_game_lobby',
+        {
+          roomCode: code,
+          gameCode: code,
+          gameName: selectedGame?.name || 'Ludo',
+          gameMode: selectedGame?.mode || 'classic',
+          bet: selectedGame?.bet || ludoBetAmount || 100,
+          maxPlayers: selectedPlayers || 2,
+          userId: currentUser?._id,
+        },
+        (res) => {
+          if (res?.error) {
+            console.warn('[LOBBY] Error creating lobby on server:', res.error);
+          } else {
+            console.log('[LOBBY] Lobby registered on server with code:', code);
+          }
+        }
+      );
+    }
+  };
+
+  // Handle typing game code and real-time preview of host's bet
+  const handleCodeChange = (text) => {
+    const clean = text.replace(/[^0-9]/g, '').slice(0, 6);
+    setEnteredGameCode(clean);
+    if (clean.length === 4 && socketRef.current) {
+      if (!socketRef.current.connected) {
+        socketRef.current.connect();
+      }
+      socketRef.current.emit('get_lobby_preview', { code: clean }, (res) => {
+        if (res?.found) {
+          setCodePreviewLobby(res);
+        } else {
+          setCodePreviewLobby(null);
+        }
+      });
+    } else {
+      setCodePreviewLobby(null);
+    }
+  };
+
+  useEffect(() => {
+    if (joinGameCodeModalVisible && socketRef.current) {
+      setCodePreviewLobby(null);
+      if (!socketRef.current.connected) {
+        socketRef.current.connect();
+      }
+      socketRef.current.emit('get_active_game_lobbies');
+    }
+  }, [joinGameCodeModalVisible]);
+
+  // Verify 4-digit Game Code and enter that exact lobby
+  const handleVerifyAndJoinGameCode = () => {
+    const cleanCode = enteredGameCode.trim();
+    if (!cleanCode) {
+      showToast(t('Please enter a valid Game Code!'), 'error');
+      return;
+    }
+
+    const requiredBet = codePreviewLobby?.bet || selectedGame?.bet || 100;
+    if (gameCoins < requiredBet) {
+      showToast(
+        t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+        'error'
+      );
+      setJoinGameCodeModalVisible(false);
+      setChestModalVisible(true);
+      return;
+    }
+
+    // Check for game mismatch or mode mismatch before attempting join
+    if (codePreviewLobby && selectedGame?.name) {
+      const hostGame = String(codePreviewLobby.gameName || 'Ludo').toLowerCase().trim();
+      const myGame = String(selectedGame.name || 'Ludo').toLowerCase().trim();
+      if (hostGame !== myGame) {
+        showToast(
+          `${t('This code is for')} ${codePreviewLobby.gameName}! ${t('Please join from')} ${codePreviewLobby.gameName}.`,
+          'error'
+        );
+        return;
+      }
+
+      const hostMode = String(codePreviewLobby.gameMode || 'classic').toLowerCase().trim();
+      const myMode = String(selectedGame.mode || 'classic').toLowerCase().trim();
+      if (hostMode !== myMode) {
+        const hostModeTitle = hostMode === 'turbo' ? t('Turbo') : t('Classic');
+        showToast(
+          `${t('This code is for')} ${hostModeTitle} ${t('mode!')} ${t('Please join from')} ${hostModeTitle}.`,
+          'error'
+        );
+        return;
+      }
+    }
+
+    if (!socketRef.current) {
+      showToast(t('Connecting to game server...'), 'info');
+      return;
+    }
+
+    if (!socketRef.current.connected) {
+      socketRef.current.connect();
+    }
+
+    setVerifyingGameCode(true);
+    socketRef.current.emit(
+      'verify_and_enter_game_code',
+      {
+        roomCode: cleanCode,
+        gameCode: cleanCode,
+        userId: currentUser?._id,
+        expectedGameName: selectedGame?.name,
+        expectedGameMode: selectedGame?.mode || 'classic',
+      },
+      (res) => {
+        setVerifyingGameCode(false);
+        if (res?.error) {
+          showToast(t(res.error), 'error');
+          return;
+        }
+
+        if (res?.lobby) {
+          setPlayMode('local');
+          setJoinGameCodeModalVisible(false);
+          setSetupModalVisible(false);
+          setLobbyRoomCode(res.lobby.roomCode);
+          if (res.lobby.bet) {
+            const joinedBet = Number(res.lobby.bet);
+            matchBetRef.current = joinedBet;
+            matchTotalPotRef.current = joinedBet * (res.lobby.maxPlayers || 2);
+            setMatchBet(joinedBet);
+            setLudoBetAmount(joinedBet);
+            const isCarromMatch = res.lobby.gameName === 'Carrom Board';
+            const isSnakeMatch = res.lobby.gameName === 'Snake & Ladder';
+            const isTicTacToeMatch = res.lobby.gameName === 'Tic Tac Toe';
+            setSelectedGame({
+              id: isCarromMatch ? 'carrom' : isTicTacToeMatch ? 'tictactoe' : isSnakeMatch ? 'snake_ladder' : 'ludo',
+              name: res.lobby.gameName || 'Ludo',
+              mode: res.lobby.gameMode || selectedGame?.mode || 'classic',
+              bet: joinedBet,
+              players: res.lobby.maxPlayers || 2,
+            });
+          }
+
+          const maxP = res.lobby.maxPlayers || 2;
+          setSelectedPlayers(maxP);
+
+          const colors = [
+            { color: '#DC2626', colorKey: 'red' },
+            { color: '#10B981', colorKey: 'green' },
+            { color: '#F59E0B', colorKey: 'yellow' },
+            { color: '#2563EB', colorKey: 'blue' },
+          ];
+          const fullSlots = [];
+          for (let s = 1; s <= maxP; s++) {
+            const existing = res.lobby.players?.find((p) => p.slot === s);
+            if (existing) {
+              fullSlots.push(existing);
+            } else {
+              const c = colors[s - 1] || colors[1];
+              fullSlots.push({
+                slot: s,
+                userId: null,
+                name: `Player ${s}`,
+                avatar: null,
+                color: c.color,
+                colorKey: c.colorKey,
+                isHost: false,
+                status: 'waiting',
+              });
+            }
+          }
+          setLobbyPlayers(fullSlots);
+          setLocalLobbyVisible(true);
+          showToast(t('Joined match lobby successfully! Ready to play.'), 'success');
+        }
+      }
+    );
+  };
+
+  // Handle tap on circular avatar slot
+  const handleSlotPress = (slotNum) => {
+    const slot = lobbyPlayers.find((p) => p.slot === slotNum);
+    if (!slot) return;
+
+    if (slot.status === 'ready') {
+      // If player is already in slot and not host, allow removal
+      if (!slot.isHost) {
+        if (socketRef.current && lobbyRoomCode) {
+          socketRef.current.emit('leave_game_lobby', {
+            roomCode: lobbyRoomCode,
+            gameCode: lobbyRoomCode,
+            userId: slot.userId || currentUser?._id,
+          });
+        }
+        setLobbyPlayers((prev) =>
+          prev.map((p) =>
+            p.slot === slotNum
+              ? {
+                ...p,
+                userId: null,
+                name: `Player ${slotNum}`,
+                avatar: null,
+                status: 'waiting',
+              }
+              : p
+          )
+        );
+        showToast(t('Player removed from slot'), 'info');
+      }
+      return;
+    }
+
+    const requiredBet = selectedGame?.bet || 100;
+    if (gameCoins < requiredBet) {
+      showToast(
+        t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+        'error'
+      );
+      setChestModalVisible(true);
+      return;
+    }
+
+    // Check if the current user is ALREADY joined in any slot in this room
+    const isCurrentUserAlreadyJoined = lobbyPlayers.some(
+      (p) => p.status === 'ready' && String(p.userId) === String(currentUser?._id)
+    );
+
+    if (isCurrentUserAlreadyJoined) {
+      showToast(
+        `${t('Waiting for Player 2! Share Game Code #')}${lobbyRoomCode}${t(' with them to join.')}`,
+        'info'
+      );
+      return;
+    }
+
+    // Claim slot on real-time server
+    if (socketRef.current && lobbyRoomCode) {
+      if (!socketRef.current.connected) {
+        socketRef.current.connect();
+      }
+      socketRef.current.emit(
+        'claim_lobby_slot',
+        { roomCode: lobbyRoomCode, gameCode: lobbyRoomCode, slotNum, userId: currentUser?._id },
+        (response) => {
+          if (response?.error) {
+            showToast(t(response.error), 'error');
+          }
+        }
+      );
+    }
+  };
+
+  // Launch the match once required real registered players have joined
+  const handleConfirmStartFromLobby = async () => {
+    const isCurrentHost =
+      lobbyPlayers.some((p) => p.isHost && String(p.userId) === String(currentUser?._id)) ||
+      String(lobbyPlayers.find((p) => p.slot === 1)?.userId) === String(currentUser?._id);
+
+    if (!isCurrentHost) {
+      showToast(t('Only the lobby host can start the match!'), 'info');
+      return;
+    }
+
+    const readyCount = lobbyPlayers.filter((p) => p.status === 'ready').length;
+    if (readyCount < 2) {
+      showToast(t('Minimum 2 registered players required to start match!'), 'info');
+      return;
+    }
+
+    const requiredBet = selectedGame?.bet || matchBetRef.current || ludoBetAmount || 100;
+    if (gameCoins < requiredBet) {
+      showToast(
+        t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+        'error'
+      );
+      setLocalLobbyVisible(false);
+      setChestModalVisible(true);
+      return;
+    }
+
+    // Deduct bet is handled atomically for all participating players by backend start_game_match
+    if (socketRef.current && lobbyRoomCode) {
+      socketRef.current.emit('start_game_match', {
+        roomCode: lobbyRoomCode,
+        userId: currentUser?._id,
+      });
+    }
+
+    setLocalLobbyVisible(false);
+    setGameResult(null);
+
+    // Initialize specific game arena
+    if (selectedGame.id === 'carrom') {
+      setActiveGameArena('carrom');
+    } else if (selectedGame.id === 'tictactoe') {
+      setActiveGameArena('tictactoe');
+    } else if (selectedGame.id === 'snake_ladder') {
+      setActiveGameArena('snake_ladder');
+    } else if (
+      selectedGame.id === 'ludo' ||
+      selectedGame.id === 'marvel_ludo'
+    ) {
+      setLudoPlayerPos(0);
+      setLudoOpponentPos(0);
+      setLudoTurn('player');
+      setActiveGameArena('ludo');
+    } else if (selectedGame.id === 'uno') {
+      setUnoTurn('player');
+      setUnoOpponentCount(5);
+      setActiveGameArena('uno');
+    }
+  };
+
   // Launch the Game after checking bet coins
   const handleStartGame = async () => {
     if (!selectedGame) return;
@@ -211,38 +845,51 @@ export default function GamingView({
       return;
     }
 
-    // Deduct bet from server
-    try {
-      const res = await api.post('/users/game/deduct-bet', {
-        betAmount: selectedGame.bet,
-        gameName: selectedGame.name,
-      });
-      if (res.data?.success) {
-        setGameCoins(res.data.gameCoins);
+    if (playMode === 'online') {
+      // Direct Play against AI - No waiting lobby!
+      setSetupModalVisible(false);
+      const onlineBet = selectedGame?.bet || ludoBetAmount || 100;
+      matchBetRef.current = onlineBet;
+      matchTotalPotRef.current = onlineBet * (selectedPlayers || 2);
+      setMatchBet(onlineBet);
+      setMatchTotalPot(onlineBet * (selectedPlayers || 2));
+
+      // Deduct bet from server
+      try {
+        const res = await api.post('/users/game/deduct-bet', {
+          betAmount: onlineBet,
+          gameName: selectedGame?.name || 'Ludo',
+        });
+        if (res.data?.success) {
+          setGameCoins(res.data.gameCoins);
+        }
+      } catch (err) {
+        setGameCoins((prev) => Math.max(0, prev - (selectedGame?.bet || 100)));
       }
-    } catch (err) {
-      // If error, deduct locally
-      setGameCoins((prev) => Math.max(0, prev - selectedGame.bet));
+
+      setGameResult(null);
+
+      // Initialize game arena directly against AI bot
+      if (selectedGame.id === 'tictactoe') {
+        setActiveGameArena('tictactoe');
+      } else if (selectedGame.id === 'snake_ladder') {
+        setActiveGameArena('snake_ladder');
+      } else if (selectedGame.id === 'carrom') {
+        setActiveGameArena('carrom');
+      } else if (
+        selectedGame.id === 'ludo' ||
+        selectedGame.id === 'marvel_ludo'
+      ) {
+        setLudoPlayerPos(0);
+        setLudoOpponentPos(0);
+        setLudoTurn('player');
+        setActiveGameArena('ludo');
+      }
+      return;
     }
 
-    setSetupModalVisible(false);
-    setGameResult(null);
-
-    // Initialize specific game arena
-    if (selectedGame.id === 'ludo' || selectedGame.id === 'marvel_ludo' || selectedGame.id === 'snake_ladder') {
-      setLudoPlayerPos(0);
-      setLudoOpponentPos(0);
-      setLudoTurn('player');
-      setActiveGameArena('ludo');
-    } else if (selectedGame.id === 'dominos') {
-      setDominoScore({ player: 0, opponent: 0 });
-      setDominoOpponentCount(4);
-      setActiveGameArena('dominos');
-    } else if (selectedGame.id === 'uno') {
-      setUnoTurn('player');
-      setUnoOpponentCount(5);
-      setActiveGameArena('uno');
-    }
+    // Local Mode: Open Lobby with Game Code for 2nd player to join
+    openLocalLobby();
   };
 
   // ================= LUDO GAME LOGIC =================
@@ -386,9 +1033,19 @@ export default function GamingView({
   // Win Handler: Awards exact combined pot of all players (bet × players)
   const handleGameWin = async (gameName) => {
     setGameResult('won');
-    const bet = selectedGame?.bet || 100;
+    const bet = matchBetRef.current || matchBet || selectedGame?.bet || ludoBetAmount || 100;
     const players = selectedPlayers || 2;
-    const totalPot = bet * players; // Exact total coins pool from all players!
+    const totalPot = matchTotalPotRef.current || matchTotalPot || (bet * players); // Exact total coins pool from all players!
+    const profit = Math.max(0, totalPot - bet);
+
+    if (playMode === 'local' && socketRef.current && lobbyRoomCode) {
+      // Backend socket atomically awards totalPot in MongoDB and broadcasts game_match_finished
+      socketRef.current.emit('player_won_match', {
+        roomCode: lobbyRoomCode,
+        userId: currentUser?._id,
+      });
+      return;
+    }
 
     try {
       const res = await api.post('/users/game/award-win', {
@@ -398,7 +1055,7 @@ export default function GamingView({
       if (res.data?.success) {
         setGameCoins(res.data.gameCoins);
         showToast(
-          `${t('Victory!')} ${t('You won')} +${totalPot} ${t('Game Coins!')} 🏆🎉`,
+          `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
           'success'
         );
         return;
@@ -408,7 +1065,7 @@ export default function GamingView({
     }
 
     showToast(
-      `${t('Victory!')} ${t('You won')} +${totalPot} ${t('Game Coins!')} 🏆🎉`,
+      `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
       'success'
     );
   };
@@ -416,7 +1073,7 @@ export default function GamingView({
   // Loss Handler: Confirms loss & logs deduction
   const handleGameLoss = async (gameName) => {
     setGameResult('lost');
-    const bet = selectedGame?.bet || 100;
+    const bet = matchBet || selectedGame?.bet || 100;
     try {
       await api.post('/users/game/forfeit', {
         betAmount: bet,
@@ -445,6 +1102,15 @@ export default function GamingView({
   const handleConfirmQuitGame = async () => {
     setQuitConfirmModalVisible(false);
     const bet = selectedGame?.bet || 100;
+
+    // Notify backend socket if local / lobby multiplayer match
+    if (playMode === 'local' && socketRef.current && lobbyRoomCode) {
+      socketRef.current.emit('player_quit_match', {
+        roomCode: lobbyRoomCode,
+        userId: currentUser?._id,
+      });
+    }
+
     try {
       await api.post('/users/game/forfeit', {
         betAmount: bet,
@@ -454,6 +1120,7 @@ export default function GamingView({
     } catch (e) {
       // Handled silently
     }
+    fetchChestStatus();
     setActiveGameArena(null);
     showToast(
       `${t('Match forfeited!')} -${bet} ${t('Game Coins deducted.')}`,
@@ -463,10 +1130,10 @@ export default function GamingView({
 
   return (
     <View style={styles.container}>
-      {/* 1. TOP GAMING HEADER: Ludo, Dominos, UNO, Games + Top Right Treasure Icon */}
+      {/* 1. TOP GAMING HEADER: Ludo, Tic Tac Toe, Carrom, Games */}
       <View style={[styles.gamingHeader, { paddingTop: Math.max(16, insets.top) }]}>
         <View style={styles.gameTabsRow}>
-          {['Ludo', 'Dominos', 'UNO', 'Games'].map((tab) => {
+          {['Ludo', 'Tic Tac Toe', 'Carrom', 'Games'].map((tab) => {
             const isActive = activeGameTab === tab;
             return (
               <TouchableOpacity
@@ -621,255 +1288,294 @@ export default function GamingView({
                   resizeMode="contain"
                 />
               </View>
-              {/* Bets Pill */}
-              <View style={styles.betPill}>
+              {/* Bets Pill - Tap to choose match stakes */}
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={styles.betPill}
+                onPress={() => setBetSelectModalVisible(true)}
+              >
                 <Text style={styles.betLabel}>{t('BETS')}</Text>
                 <Image
                   source={GREEN_COIN_IMG}
                   style={{ width: 18, height: 18 }}
                   resizeMode="contain"
                 />
-                <Text style={styles.betAmount}>100</Text>
-              </View>
+                <Text style={styles.betAmount}>{ludoBetAmount}</Text>
+                <Text style={styles.betPillChevron}>▾</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Main Mode Cards: 1 ON 1 & 4 Players */}
+            {/* Main Mode Cards: 1 ON 1 Classic & 1 ON 1 Turbo */}
             <View style={styles.mainModesRow}>
-              {/* Card 1: 1 ON 1 (2 Players) */}
+              {/* Card 1: 1 ON 1 Classic */}
               <TouchableOpacity
                 activeOpacity={0.88}
-                style={styles.mainModeCard}
-                onPress={() => openGameSetup('ludo', 'Ludo', '1on1', 100, 2)}
+                style={[styles.mainModeCard, { borderColor: '#10B981' }]}
+                onPress={() => openGameSetup('ludo', 'Ludo', 'classic', ludoBetAmount, 2)}
               >
                 <LinearGradient
                   colors={['#E8F5E9', '#C8E6C9', '#A5D6A7']}
                   style={styles.modeCardVisual}
                 >
                   <View style={styles.pkBattleRow}>
-                    <Text style={{ fontSize: 44 }}>👑</Text>
+                    <Text style={{ fontSize: 44 }}>🎲</Text>
                     <View style={styles.pkBadge}>
                       <Text style={styles.pkText}>PK</Text>
                     </View>
-                    <Text style={{ fontSize: 44 }}>👑</Text>
+                    <Text style={{ fontSize: 44 }}>🎲</Text>
                   </View>
                 </LinearGradient>
-                <View style={styles.modeBtnWrap}>
-                  <Text style={styles.modeBtnText}>{t('1 ON 1')}</Text>
+                <View style={[styles.modeBtnWrap, { backgroundColor: '#10B981' }]}>
+                  <Text style={styles.modeBtnText}>{t('1 ON 1 Classic')}</Text>
                 </View>
               </TouchableOpacity>
 
-              {/* Card 2: 4 Players */}
+              {/* Card 2: 1 ON 1 Turbo */}
               <TouchableOpacity
                 activeOpacity={0.88}
-                style={styles.mainModeCard}
-                onPress={() => openGameSetup('ludo', 'Ludo', '4players', 100, 4)}
+                style={[styles.mainModeCard, { borderColor: '#F59E0B' }]}
+                onPress={() => openGameSetup('ludo', 'Ludo', 'turbo', ludoBetAmount, 2)}
               >
                 <LinearGradient
-                  colors={['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+                  colors={['#FEF3C7', '#FDE68A', '#FCD34D']}
                   style={styles.modeCardVisual}
                 >
-                  <View style={styles.pkFourGrid}>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <Text style={{ fontSize: 28 }}>👑</Text>
-                      <Text style={{ fontSize: 28 }}>👑</Text>
+                  <View style={styles.pkBattleRow}>
+                    <Text style={{ fontSize: 40 }}>🎲</Text>
+                    <View style={[styles.pkBadge, { backgroundColor: '#F59E0B', minWidth: 26, paddingHorizontal: 4 }]}>
+                      <Text style={{ fontSize: 14 }}>⚡</Text>
                     </View>
-                    <View style={styles.pkBadgeSmall}>
-                      <Text style={styles.pkTextSmall}>PK</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <Text style={{ fontSize: 28 }}>👑</Text>
-                      <Text style={{ fontSize: 28 }}>👑</Text>
-                    </View>
+                    <Text style={{ fontSize: 40 }}>🎲</Text>
                   </View>
                 </LinearGradient>
-                <View style={styles.modeBtnWrap}>
-                  <Text style={styles.modeBtnText}>{t('4 Players')}</Text>
+                <View style={[styles.modeBtnWrap, { backgroundColor: '#F59E0B' }]}>
+                  <Text style={[styles.modeBtnText, { color: '#000000', fontWeight: '900' }]}>{t('1 ON 1 Turbo')}</Text>
                 </View>
               </TouchableOpacity>
             </View>
 
             {/* Bottom Mini Game Cards: Marvel Ludo, Snake & Ladder, Ludo Coin */}
-            <View style={styles.miniCardsRow}>
-              {/* Mini Card 1: Marvel Ludo */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.miniCard, { backgroundColor: '#4F46E5' }]}
-                onPress={() => openGameSetup('marvel_ludo', 'Marvel Ludo', 'voice', 100, 4)}
-              >
-                <Text style={{ fontSize: 26, alignSelf: 'center' }}>🎙️🎲</Text>
-                <Text style={styles.miniCardTitle}>{t('Marvel Ludo')}</Text>
-              </TouchableOpacity>
+            {/* 
+            
+            
+            */}
 
-              {/* Mini Card 2: Snake & Ladder */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.miniCard, { backgroundColor: '#7C3AED' }]}
-                onPress={() => openGameSetup('snake_ladder', 'Snake & Ladder', 'classic', 100, 2)}
-              >
-                <Text style={{ fontSize: 26, alignSelf: 'center' }}>🐍🪜</Text>
-                <Text style={styles.miniCardTitle}>{t('Snake&Ladder')}</Text>
-              </TouchableOpacity>
-
-              {/* Mini Card 3: Ludo Coin */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.miniCard, { backgroundColor: '#2563EB' }]}
-                onPress={() => openGameSetup('ludo', 'Ludo Coin', 'coin', 100, 2)}
-              >
-                <Text style={{ fontSize: 26, alignSelf: 'center' }}>🪙🎯</Text>
-                <Text style={styles.miniCardTitle}>{t('Ludo Coin')}</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         )}
 
-        {/* ================= 4.2 DOMINOS TAB ================= */}
-        {activeGameTab === 'Dominos' && (
+        {/* ================= 4.2 TIC TAC TOE (ZERO KATA) TAB ================= */}
+        {activeGameTab === 'Tic Tac Toe' && (
           <View style={styles.gameTabContainer}>
-            {/* 3D Dominoes Logo Banner */}
-            <View style={styles.gameBannerWrap}>
-              <Text style={styles.dominoesTitle}>Dominoes</Text>
+            {/* Neon Tic Tac Toe Logo Banner */}
+            <View style={[styles.gameBannerWrap, { backgroundColor: '#070714', borderColor: '#00E5FF' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 24 }}>❌⭕</Text>
+                <Text style={[styles.dominoesTitle, { color: '#00E5FF', textShadowColor: '#00E5FF', textShadowRadius: 10 }]}>
+                  Tic Tac Toe
+                </Text>
+              </View>
               <View style={styles.betPill}>
-                <Text style={styles.betLabel}>{t('BETS')}</Text>
+                <Text style={styles.betLabel}><T>BETS</T></Text>
                 <Image
                   source={GREEN_COIN_IMG}
                   style={{ width: 18, height: 18 }}
                   resizeMode="contain"
                 />
-                <Text style={styles.betAmount}>{t('5/Point')}</Text>
+                <Text style={styles.betAmount}>{ludoBetAmount} <T>Coins</T></Text>
               </View>
-              <Text style={styles.betSubLimit}>{t('200 Limits/Round')}</Text>
+              <Text style={styles.betSubLimit}><T>Zero Kata Battle • Winner Takes Pot</T></Text>
             </View>
 
-            {/* Wooden Domino Cards: 1 ON 1 & 4 Players */}
+            {/* Mode Cards: 1 ON 1 Classic & 1 ON 1 Turbo */}
             <View style={styles.mainModesRow}>
-              {/* Card 1: 1 ON 1 Dominoes */}
+              {/* Card 1: 1 ON 1 Classic */}
               <TouchableOpacity
                 activeOpacity={0.88}
-                style={[styles.mainModeCard, styles.woodCardBorder]}
-                onPress={() => openGameSetup('dominos', 'Dominos', '1on1', 50, 2)}
+                style={[styles.mainModeCard, { borderColor: '#00E5FF', backgroundColor: '#0F172A' }]}
+                onPress={() => openGameSetup('tictactoe', 'Tic Tac Toe', 'classic', ludoBetAmount, 2)}
               >
                 <LinearGradient
-                  colors={['#8D6E63', '#6D4C41', '#4E342E']}
+                  colors={['#1E1B4B', '#0F172A', '#02020A']}
                   style={styles.modeCardVisual}
                 >
                   <View style={styles.pkBattleRow}>
-                    <View style={styles.dominoTileBox}>
-                      <Text style={styles.dominoDots}>::</Text>
+                    <Text style={{ fontSize: 36, color: '#FF1744', fontWeight: '900', textShadowColor: '#FF1744', textShadowRadius: 12 }}>✕</Text>
+                    <View style={[styles.pkBadge, { backgroundColor: '#00E5FF' }]}>
+                      <Text style={[styles.pkText, { color: '#000000' }]}>PK</Text>
                     </View>
-                    <View style={styles.pkBadge}>
-                      <Text style={styles.pkText}>PK</Text>
-                    </View>
-                    <View style={styles.dominoTileBox}>
-                      <Text style={styles.dominoDots}>:·:</Text>
-                    </View>
+                    <Text style={{ fontSize: 38, color: '#00E5FF', fontWeight: '900', textShadowColor: '#00E5FF', textShadowRadius: 12 }}>◯</Text>
                   </View>
                 </LinearGradient>
-                <View style={styles.woodModeBtnWrap}>
-                  <Text style={styles.woodModeBtnText}>{t('1 ON 1')}</Text>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#00E5FF' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#000000', fontWeight: '900' }]}>{t('1 ON 1 Classic')}</Text>
                 </View>
               </TouchableOpacity>
 
-              {/* Card 2: 4 Players Dominoes */}
+              {/* Card 2: 1 ON 1 Quick Battle */}
               <TouchableOpacity
                 activeOpacity={0.88}
-                style={[styles.mainModeCard, styles.woodCardBorder]}
-                onPress={() => openGameSetup('dominos', 'Dominos', '4players', 50, 4)}
+                style={[styles.mainModeCard, { borderColor: '#FF1744', backgroundColor: '#0F172A' }]}
+                onPress={() => openGameSetup('tictactoe', 'Tic Tac Toe', 'turbo', ludoBetAmount, 2)}
               >
                 <LinearGradient
-                  colors={['#8D6E63', '#6D4C41', '#4E342E']}
+                  colors={['#3B0764', '#0F172A', '#02020A']}
                   style={styles.modeCardVisual}
                 >
-                  <View style={styles.pkFourGrid}>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <View style={styles.dominoTileMini}><Text style={styles.dominoDotsMini}>::</Text></View>
-                      <View style={styles.dominoTileMini}><Text style={styles.dominoDotsMini}>:·:</Text></View>
+                  <View style={styles.pkBattleRow}>
+                    <Text style={{ fontSize: 36, color: '#FF1744', fontWeight: '900', textShadowColor: '#FF1744', textShadowRadius: 12 }}>✕</Text>
+                    <View style={[styles.pkBadge, { backgroundColor: '#FF1744', minWidth: 26, paddingHorizontal: 4 }]}>
+                      <Text style={{ fontSize: 14 }}>⚡</Text>
                     </View>
-                    <View style={styles.pkBadgeSmall}>
-                      <Text style={styles.pkTextSmall}>PK</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <View style={styles.dominoTileMini}><Text style={styles.dominoDotsMini}>:::</Text></View>
-                      <View style={styles.dominoTileMini}><Text style={styles.dominoDotsMini}>·</Text></View>
-                    </View>
+                    <Text style={{ fontSize: 38, color: '#00E5FF', fontWeight: '900', textShadowColor: '#00E5FF', textShadowRadius: 12 }}>◯</Text>
                   </View>
                 </LinearGradient>
-                <View style={styles.woodModeBtnWrap}>
-                  <Text style={styles.woodModeBtnText}>{t('4 Players')}</Text>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#FF1744' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('1 ON 1 Turbo')}</Text>
                 </View>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* ================= 4.3 UNO TAB ================= */}
-        {activeGameTab === 'UNO' && (
+        {/* ================= 4.3 CARROM BOARD TAB ================= */}
+        {activeGameTab === 'Carrom' && (
           <View style={styles.gameTabContainer}>
-            {/* 3D UNO Logo Banner */}
-            <View style={styles.gameBannerWrap}>
-              <View style={styles.unoTitleRow}>
-                <View style={[styles.unoCardDeco, { backgroundColor: '#EF4444' }]} />
-                <View style={[styles.unoCardDeco, { backgroundColor: '#3B82F6', marginLeft: -8 }]} />
-                <View style={[styles.unoCardDeco, { backgroundColor: '#10B981', marginLeft: -8 }]} />
-                <Text style={styles.unoTitleText}>UNO</Text>
+            {/* Wooden Carrom Logo Banner */}
+            <View style={[styles.gameBannerWrap, { backgroundColor: '#2B1707', borderColor: '#D97706' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 24 }}>🎯</Text>
+                <Text style={[styles.dominoesTitle, { color: '#F59E0B', textShadowColor: '#B45309', textShadowRadius: 10 }]}>
+                  Carrom Board
+                </Text>
               </View>
               <View style={styles.betPill}>
-                <Text style={styles.betLabel}>{t('BETS')}</Text>
+                <Text style={styles.betLabel}><T>BETS</T></Text>
                 <Image
                   source={GREEN_COIN_IMG}
                   style={{ width: 18, height: 18 }}
                   resizeMode="contain"
                 />
-                <Text style={styles.betAmount}>100</Text>
+                <Text style={styles.betAmount}>{ludoBetAmount} <T>Coins</T></Text>
               </View>
+              <Text style={styles.betSubLimit}><T>Authentic Disc Battle • Winner Takes Pot</T></Text>
             </View>
 
-            {/* Big UNO Wooden Deck Card with "Play Now" button */}
+            {/* Mode Cards: 1 ON 1 Classic & 1 ON 1 Turbo */}
+            <View style={styles.mainModesRow}>
+              {/* Card 1: 1 ON 1 Classic */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[styles.mainModeCard, { borderColor: '#D97706', backgroundColor: '#1E1710' }]}
+                onPress={() => openGameSetup('carrom', 'Carrom Board', 'classic', ludoBetAmount, 2)}
+              >
+                <LinearGradient
+                  colors={['#5D3A1A', '#3E2410', '#1C0E05']}
+                  style={styles.modeCardVisual}
+                >
+                  <View style={styles.pkBattleRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={styles.miniCarromBoardVisual}>
+                        <View style={styles.miniCarromPocketTL} />
+                        <View style={styles.miniCarromPocketTR} />
+                        <View style={styles.miniCarromPocketBL} />
+                        <View style={styles.miniCarromPocketBR} />
+                        <View style={styles.miniCarromQueenCenter}>
+                          <Text style={{ fontSize: 8 }}>👑</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.carromPieceLabel}>{t('Board')}</Text>
+                    </View>
+
+                    <View style={[styles.pkBadge, { backgroundColor: '#D97706' }]}>
+                      <Text style={styles.pkText}>PK</Text>
+                    </View>
+
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={styles.carromStrikerVisual}>
+                        <View style={styles.carromStrikerCore}>
+                          <Text style={{ fontSize: 11, color: '#00E5FF', fontWeight: '900' }}>✦</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.carromPieceLabel, { color: '#00E5FF' }]}>{t('Striker')}</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#D97706' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#000000', fontWeight: '900' }]}>{t('1 ON 1 Classic')}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Card 2: 1 ON 1 Turbo Blitz */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[styles.mainModeCard, { borderColor: '#F59E0B', backgroundColor: '#1E1710' }]}
+                onPress={() => openGameSetup('carrom', 'Carrom Board', 'turbo', ludoBetAmount, 2)}
+              >
+                <LinearGradient
+                  colors={['#78350F', '#451A03', '#1C0E05']}
+                  style={styles.modeCardVisual}
+                >
+                  <View style={styles.pkBattleRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={[styles.carromStrikerVisual, { borderColor: '#F59E0B', shadowColor: '#F59E0B' }]}>
+                        <View style={[styles.carromStrikerCore, { borderColor: '#EF4444' }]}>
+                          <Text style={{ fontSize: 11, color: '#F59E0B', fontWeight: '900' }}>⚡</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.carromPieceLabel, { color: '#F59E0B' }]}>{t('Striker')}</Text>
+                    </View>
+
+                    <View style={[styles.pkBadge, { backgroundColor: '#EF4444', minWidth: 28, paddingHorizontal: 4 }]}>
+                      <Text style={[styles.pkText, { fontSize: 13 }]}>7s ⚡</Text>
+                    </View>
+
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={styles.miniCarromBoardVisual}>
+                        <View style={styles.miniCarromPocketTL} />
+                        <View style={styles.miniCarromPocketTR} />
+                        <View style={styles.miniCarromPocketBL} />
+                        <View style={styles.miniCarromPocketBR} />
+                        <View style={styles.miniCarromQueenCenter}>
+                          <Text style={{ fontSize: 8 }}>👑</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.carromPieceLabel}>{t('Board')}</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#F59E0B' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#000000', fontWeight: '900' }]}>{t('1 ON 1 Turbo')}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Mode Card 3: 4 Players Team Battle */}
             <TouchableOpacity
-              activeOpacity={0.9}
-              style={styles.unoBigCard}
-              onPress={() => openGameSetup('uno', 'UNO', 'classic', 100, 4)}
+              activeOpacity={0.88}
+              style={[styles.mainModeCard, { width: '100%', marginTop: 8, borderColor: '#3B82F6', backgroundColor: '#10172A' }]}
+              onPress={() => openGameSetup('carrom', 'Carrom Board', 'classic', ludoBetAmount, 4)}
             >
               <LinearGradient
-                colors={['#8D6E63', '#6D4C41', '#4E342E']}
-                style={styles.unoCardVisual}
+                colors={['#1E3A8A', '#172554', '#0F172A']}
+                style={[styles.modeCardVisual, { paddingVertical: 12 }]}
               >
-                {/* Fan of UNO cards */}
-                <View style={styles.unoCardsFan}>
-                  {[
-                    { bg: '#EF4444', num: '4' },
-                    { bg: '#10B981', num: '7' },
-                    { bg: '#3B82F6', num: '9' },
-                    { bg: '#F59E0B', num: '1' },
-                    { bg: '#EF4444', num: '8' },
-                    { bg: '#3B82F6', num: '5' },
-                    { bg: '#10B981', num: '6' },
-                    { bg: '#F59E0B', num: '4' },
-                  ].map((card, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.unoFanCard,
-                        {
-                          backgroundColor: card.bg,
-                          marginLeft: i === 0 ? 0 : -14,
-                          transform: [{ rotate: `${(i - 3.5) * 4}deg` }],
-                        },
-                      ]}
-                    >
-                      <Text style={styles.unoFanNum}>{card.num}</Text>
-                    </View>
-                  ))}
+                <View style={styles.pkBattleRow}>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18 }}>🔴 🔵</Text>
+                    <Text style={[styles.carromPieceLabel, { color: '#60A5FA' }]}>Team A</Text>
+                  </View>
+                  <View style={[styles.pkBadge, { backgroundColor: '#3B82F6', minWidth: 64 }]}>
+                    <Text style={[styles.pkText, { fontSize: 11 }]}>4 PLAYERS</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18 }}>⚫ 🟢</Text>
+                    <Text style={[styles.carromPieceLabel, { color: '#F87171' }]}>Team B</Text>
+                  </View>
                 </View>
-
-                {/* Big Orange "Play Now" Button */}
-                <LinearGradient
-                  colors={['#FF9100', '#FF6D00']}
-                  style={styles.unoPlayNowBtn}
-                >
-                  <Text style={styles.unoPlayNowText}>{t('Play Now')}</Text>
-                </LinearGradient>
               </LinearGradient>
+              <View style={[styles.woodModeBtnWrap, { backgroundColor: '#3B82F6' }]}>
+                <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('4 Player Battle')}</Text>
+              </View>
             </TouchableOpacity>
           </View>
         )}
@@ -881,8 +1587,8 @@ export default function GamingView({
             <View style={styles.allGamesGrid}>
               {[
                 { id: 'Ludo', name: 'Ludo Classic', icon: '🎲', color: '#00C853' },
-                { id: 'Dominos', name: 'Dominoes', icon: '🁢', color: '#795548' },
-                { id: 'UNO', name: 'UNO Cards', icon: '🃏', color: '#E53935' },
+                { id: 'Tic Tac Toe', name: 'Tic Tac Toe', icon: '❌⭕', color: '#00E5FF' },
+                { id: 'Carrom', name: 'Carrom Board', icon: '🎯', color: '#D97706' },
               ].map((g) => (
                 <TouchableOpacity
                   key={g.id}
@@ -1075,6 +1781,83 @@ export default function GamingView({
               </TouchableOpacity>
             </View>
 
+            {/* Mode Banner Indicator */}
+            <View style={[styles.setupModeBadge, selectedGame?.mode === 'turbo' ? styles.setupModeBadgeTurbo : styles.setupModeBadgeClassic]}>
+              <Text style={[styles.setupModeBadgeText, selectedGame?.mode === 'turbo' ? { color: '#F59E0B' } : { color: '#10B981' }]}>
+                {selectedGame?.mode === 'turbo' ? t('⚡ Turbo Mode Selected (7s Blitz)') : t('👑 Classic Mode Selected (20s Relaxed)')}
+              </Text>
+            </View>
+
+            {/* Game Selector for Board Games (Ludo vs Snake & Ladder) */}
+            {(selectedGame?.id === 'ludo' || selectedGame?.id === 'snake_ladder') && (
+              <>
+                <Text style={styles.setupSectionLabel}>{t('Select Game')}:</Text>
+                <View style={styles.gameSelectRow}>
+                  {/* Option 1: Ludo */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={[
+                      styles.gameSelectOptionBtn,
+                      selectedGame?.id === 'ludo' && styles.gameSelectOptionBtnActive,
+                    ]}
+                    onPress={() =>
+                      setSelectedGame((prev) => ({
+                        ...prev,
+                        id: 'ludo',
+                        name: 'Ludo',
+                      }))
+                    }
+                  >
+                    <Text style={{ fontSize: 26 }}>🎲</Text>
+                    <Text
+                      style={[
+                        styles.gameSelectOptionText,
+                        selectedGame?.id === 'ludo' && styles.gameSelectOptionTextActive,
+                      ]}
+                    >
+                      {t('Ludo')}
+                    </Text>
+                    {selectedGame?.id === 'ludo' && (
+                      <View style={styles.gameSelectCheckBadge}>
+                        <Text style={styles.gameSelectCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Option 2: Snake & Ladder */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={[
+                      styles.gameSelectOptionBtn,
+                      selectedGame?.id === 'snake_ladder' && styles.gameSelectOptionBtnActive,
+                    ]}
+                    onPress={() =>
+                      setSelectedGame((prev) => ({
+                        ...prev,
+                        id: 'snake_ladder',
+                        name: 'Snake & Ladder',
+                      }))
+                    }
+                  >
+                    <Text style={{ fontSize: 26 }}>🐍🪜</Text>
+                    <Text
+                      style={[
+                        styles.gameSelectOptionText,
+                        selectedGame?.id === 'snake_ladder' && styles.gameSelectOptionTextActive,
+                      ]}
+                    >
+                      {t('Snake & Ladder')}
+                    </Text>
+                    {selectedGame?.id === 'snake_ladder' && (
+                      <View style={styles.gameSelectCheckBadge}>
+                        <Text style={styles.gameSelectCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
             {/* Mode Selector: Online vs Local */}
             <Text style={styles.setupSectionLabel}>{t('Select Play Mode')}:</Text>
             <View style={styles.modeToggleRow}>
@@ -1084,7 +1867,10 @@ export default function GamingView({
                   styles.modeOptionBtn,
                   playMode === 'online' && styles.modeOptionBtnActive,
                 ]}
-                onPress={() => setPlayMode('online')}
+                onPress={() => {
+                  setPlayMode('online');
+                  setSelectedPlayers(2);
+                }}
               >
                 <Text style={{ fontSize: 24 }}>🌐</Text>
                 <Text style={[styles.modeOptionText, playMode === 'online' && styles.modeOptionTextActive]}>
@@ -1109,30 +1895,34 @@ export default function GamingView({
               </TouchableOpacity>
             </View>
 
-            {/* Players Count Selector */}
-            <Text style={styles.setupSectionLabel}>{t('Number of Players')}:</Text>
-            <View style={styles.playersToggleRow}>
-              {[2, 4].map((count) => (
-                <TouchableOpacity
-                  key={count}
-                  activeOpacity={0.85}
-                  style={[
-                    styles.playerCountBtn,
-                    selectedPlayers === count && styles.playerCountBtnActive,
-                  ]}
-                  onPress={() => setSelectedPlayers(count)}
-                >
-                  <Text
-                    style={[
-                      styles.playerCountText,
-                      selectedPlayers === count && styles.playerCountTextActive,
-                    ]}
-                  >
-                    {count === 2 ? t('2 Players (1 ON 1)') : t('4 Players')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Players Count Selector - Only shown in Local Play */}
+            {playMode === 'local' && (
+              <>
+                <Text style={styles.setupSectionLabel}>{t('Number of Players')}:</Text>
+                <View style={styles.playersToggleRow}>
+                  {[2, 4].map((count) => (
+                    <TouchableOpacity
+                      key={count}
+                      activeOpacity={0.85}
+                      style={[
+                        styles.playerCountBtn,
+                        selectedPlayers === count && styles.playerCountBtnActive,
+                      ]}
+                      onPress={() => setSelectedPlayers(count)}
+                    >
+                      <Text
+                        style={[
+                          styles.playerCountText,
+                          selectedPlayers === count && styles.playerCountTextActive,
+                        ]}
+                      >
+                        {count === 2 ? t('2 Players (1 ON 1)') : t('4 Players')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
 
             {/* Bet Info & Balance Verification */}
             <View style={styles.betSummaryBox}>
@@ -1201,13 +1991,547 @@ export default function GamingView({
                 style={styles.startGameActionGradient}
               >
                 <Text style={styles.startGameActionText}>
-                  {playMode === 'online' ? t('Find Match & Play 🎮') : t('Start Local Game 🎮')}
+                  {playMode === 'online' ? t('Play Online 🎮') : t('Start Local Game 🎮')}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
+
+            {/* Join Game with Game Code Button - only shown in Local Play */}
+            {playMode === 'local' && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.joinGameCodeActionBtn}
+                onPress={() => {
+                  setEnteredGameCode('');
+                  setJoinGameCodeModalVisible(true);
+                }}
+              >
+                <LinearGradient
+                  colors={['#3B82F6', '#2563EB']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.joinGameCodeGradient}
+                >
+                  <Text style={styles.joinGameCodeActionText}>
+                    🔑 {t('Join Game')}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
+
+      {/* ================= MODAL 1.5: BET SELECTION POPUP MODAL ================= */}
+      <Modal visible={betSelectModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.betModalBox}>
+            {/* Header */}
+            <View style={styles.betModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Image
+                  source={GREEN_COIN_IMG}
+                  style={{ width: 28, height: 28 }}
+                  resizeMode="contain"
+                />
+                <View>
+                  <Text style={styles.betModalTitle}>{t('Select Bet Amount')}</Text>
+                  <Text style={styles.betModalSub}>{t('Choose match stakes in Game Coins')}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setBetSelectModalVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.modalCloseCircle}
+              >
+                <Text style={styles.modalCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Current Balance Row */}
+            <View style={styles.betModalBalanceRow}>
+              <Text style={styles.betModalBalanceLabel}>{t('Your Balance')}:</Text>
+              <View style={styles.betModalBalancePill}>
+                <Image
+                  source={GREEN_COIN_IMG}
+                  style={{ width: 16, height: 16 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.betModalBalanceValue}>{gameCoins} {t('Game Coins')}</Text>
+              </View>
+            </View>
+
+            {/* Bet Amounts Row: 100, 200, 500, 700, 1000 */}
+            <View style={styles.betGrid}>
+              {[100, 200, 500, 700, 1000].map((amount) => {
+                const isSelected = ludoBetAmount === amount;
+                const hasEnough = gameCoins >= amount;
+                return (
+                  <TouchableOpacity
+                    key={amount}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.betCard,
+                      isSelected && styles.betCardSelected,
+                    ]}
+                    onPress={() => {
+                      setLudoBetAmount(amount);
+                      setMatchBet(amount);
+                      matchBetRef.current = amount;
+                      matchTotalPotRef.current = amount * (selectedPlayers || 2);
+                      setSelectedGame((prev) => (prev ? { ...prev, bet: amount } : prev));
+                      setBetSelectModalVisible(false);
+                      if (!hasEnough) {
+                        showToast(
+                          `${t('Bet set to')} ${amount} ${t('Game Coins!')} ⚠️ ${t('Insufficient Game Coins to play. Claim from Silver Chest.')}`,
+                          'info'
+                        );
+                      } else {
+                        showToast(
+                          `${t('Bet set to')} ${amount} ${t('Game Coins!')} 🪙`,
+                          'success'
+                        );
+                      }
+                    }}
+                  >
+                    {isSelected && (
+                      <View style={styles.betSelectedBadge}>
+                        <Text style={styles.betSelectedBadgeText}>✓</Text>
+                      </View>
+                    )}
+                    <Image
+                      source={GREEN_COIN_IMG}
+                      style={styles.betCardCoinImg}
+                      resizeMode="contain"
+                    />
+                    <Text
+                      style={[
+                        styles.betCardAmountText,
+                        isSelected && styles.betCardAmountTextSelected,
+                      ]}
+                    >
+                      {amount}
+                    </Text>
+                    <Text style={styles.betCardLabel}>{t('Coins')}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.betNoticeText}>
+              💡 {t('All players must have at least the selected bet amount to join the match.')}
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL 2.1: ENTER GAME CODE MODAL ================= */}
+      <Modal visible={joinGameCodeModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.joinCodeModalBox}>
+            <View style={styles.setupHeaderRow}>
+              <Text style={[styles.setupTitle, { color: '#FFFFFF' }]}>🔑 {t('Join Game with Game Code')}</Text>
+              <TouchableOpacity onPress={() => setJoinGameCodeModalVisible(false)}>
+                <Text style={styles.modalCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.joinCodePromptText}>
+              {t('Enter the 4-digit Game Code shared by Player 1:')}
+            </Text>
+
+            <TextInput
+              style={styles.joinCodeInputField}
+              value={enteredGameCode}
+              onChangeText={handleCodeChange}
+              placeholder={t('Enter 4-digit Game Code')}
+              placeholderTextColor="#64748B"
+              keyboardType="number-pad"
+              maxLength={4}
+              autoFocus
+            />
+
+            {/* LIVE PREVIEW OF HOST'S BET & GAME DETAILS (Shown ONLY after 4-digit code is typed) */}
+            {codePreviewLobby && (
+              <View style={styles.lobbyPreviewBox}>
+                <View style={styles.lobbyPreviewTopRow}>
+                  {codePreviewLobby.hostAvatar ? (
+                    <Image source={{ uri: codePreviewLobby.hostAvatar }} style={styles.lobbyPreviewAvatar} />
+                  ) : (
+                    <View style={styles.lobbyPreviewAvatarPlaceholder}>
+                      <Text style={{ fontSize: 13 }}>👑</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.lobbyPreviewHostName}>
+                      {codePreviewLobby.hostName} ({t('Host')})
+                    </Text>
+                    <Text style={styles.lobbyPreviewSubText}>
+                      🎮 {t(codePreviewLobby.gameName || 'Ludo')} • {codePreviewLobby.gameMode === 'turbo' ? t('Turbo ⚡') : t('Classic 👑')} • {codePreviewLobby.maxPlayers} {t('Players')}
+                    </Text>
+                  </View>
+                  <View style={styles.lobbyPreviewLiveBadge}>
+                    <Text style={styles.lobbyPreviewLiveBadgeText}>{t('Room')} #{codePreviewLobby.roomCode}</Text>
+                  </View>
+                </View>
+
+                {/* Big Clear Stake / Bet Display */}
+                <View style={styles.lobbyPreviewBetRow}>
+                  <Text style={styles.lobbyPreviewBetLabel}>
+                    💰 {t('Match Bet Set by Host')}:
+                  </Text>
+                  <View style={styles.lobbyPreviewBetPill}>
+                    <Image
+                      source={GREEN_COIN_IMG}
+                      style={{ width: 18, height: 18 }}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.lobbyPreviewBetAmount}>
+                      {codePreviewLobby.bet}
+                    </Text>
+                    <Text style={styles.lobbyPreviewBetCoins}>{t('Coins')}</Text>
+                  </View>
+                </View>
+
+                {/* Balance & Game Matching Eligibility Status */}
+                {(() => {
+                  const hostGame = String(codePreviewLobby?.gameName || 'Ludo').toLowerCase().trim();
+                  const myGame = String(selectedGame?.name || 'Ludo').toLowerCase().trim();
+                  const isGameMismatch = Boolean(codePreviewLobby && hostGame !== myGame);
+
+                  const hostMode = String(codePreviewLobby?.gameMode || 'classic').toLowerCase().trim();
+                  const myMode = String(selectedGame?.mode || 'classic').toLowerCase().trim();
+                  const isModeMismatch = Boolean(codePreviewLobby && hostMode !== myMode);
+
+                  if (isGameMismatch) {
+                    return (
+                      <View style={styles.lobbyPreviewNoticeError}>
+                        <Text style={styles.lobbyPreviewNoticeTextError}>
+                          🚫 {t('Game Mismatch!')} {t('This code is for')} {codePreviewLobby.gameName}. {t('Please join from')} {codePreviewLobby.gameName}.
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  if (isModeMismatch) {
+                    const hostModeTitle = hostMode === 'turbo' ? t('Turbo') : t('Classic');
+                    return (
+                      <View style={styles.lobbyPreviewNoticeError}>
+                        <Text style={styles.lobbyPreviewNoticeTextError}>
+                          🚫 {t('Mode Mismatch!')} {t('Host created a')} {hostModeTitle} {t('match.')} {t('Please join from')} {hostModeTitle}.
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  if (gameCoins < codePreviewLobby.bet) {
+                    return (
+                      <View style={styles.lobbyPreviewNoticeError}>
+                        <Text style={styles.lobbyPreviewNoticeTextError}>
+                          ⚠️ {t('Insufficient Coins!')} {t('You have')} {gameCoins} / {codePreviewLobby.bet} {t('required coins.')}
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View style={styles.lobbyPreviewNoticeSuccess}>
+                      <Text style={styles.lobbyPreviewNoticeTextSuccess}>
+                        ✅ {t('You have sufficient coins to join this match.')}
+                      </Text>
+                    </View>
+                  );
+                })()}
+              </View>
+            )}
+
+            {/* Join Lobby Action Button - Disabled if mismatch, coins are insufficient or code incomplete */}
+            {(() => {
+              const isInsufficient = Boolean(codePreviewLobby && gameCoins < codePreviewLobby.bet);
+              const hostGame = String(codePreviewLobby?.gameName || 'Ludo').toLowerCase().trim();
+              const myGame = String(selectedGame?.name || 'Ludo').toLowerCase().trim();
+              const isGameMismatch = Boolean(codePreviewLobby && hostGame !== myGame);
+
+              const hostMode = String(codePreviewLobby?.gameMode || 'classic').toLowerCase().trim();
+              const myMode = String(selectedGame?.mode || 'classic').toLowerCase().trim();
+              const isModeMismatch = Boolean(codePreviewLobby && hostMode !== myMode);
+              const isCodeComplete = enteredGameCode.trim().length === 4;
+              const isWaitingForPreview = isCodeComplete && !codePreviewLobby;
+
+              const isDisabled =
+                verifyingGameCode || isInsufficient || isGameMismatch || isModeMismatch || !isCodeComplete || isWaitingForPreview;
+
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  style={[styles.verifyCodeActionBtn, isDisabled && { opacity: 0.6 }]}
+                  disabled={isDisabled}
+                  onPress={handleVerifyAndJoinGameCode}
+                >
+                  <LinearGradient
+                    colors={isDisabled ? ['#475569', '#334155'] : ['#00E676', '#00C853']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.verifyCodeGradient}
+                  >
+                    {verifyingGameCode ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.verifyCodeActionText}>
+                        {isWaitingForPreview
+                          ? t('Checking Room... ⏳')
+                          : isGameMismatch
+                            ? `${t('Wrong Game: Open ')}${codePreviewLobby?.gameName || 'Game'} ⚠️`
+                            : isModeMismatch
+                              ? `${t('Wrong Mode: Open ')}${hostMode === 'turbo' ? t('Turbo ⚡') : t('Classic 👑')} ⚠️`
+                              : isInsufficient
+                                ? t('Insufficient Coins to Join ⚠️')
+                                : t('Join Lobby 🚀')}
+                      </Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL 2.2: LOCAL MATCH LOBBY (WAITING ROOM) ================= */}
+      <Modal visible={localLobbyVisible} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.lobbyModalBox}>
+            {/* Header */}
+            <View style={styles.lobbyHeaderRow}>
+              <View>
+                <Text style={styles.lobbyTitle}>
+                  🎮 {t(selectedGame?.name || 'Ludo')} {t('Match Lobby')}
+                </Text>
+                <View style={styles.lobbyCodeRow}>
+                  <View style={styles.lobbyCodePill}>
+                    <Text style={styles.lobbyCodeLabel}>{t('Game Code')}:</Text>
+                    <Text style={styles.lobbyCodeValue}>#{lobbyRoomCode}</Text>
+                  </View>
+                  <Text style={styles.lobbyModeSubtitle}>• {selectedPlayers} {t('Player Mode')}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={handleCloseLobby}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.modalCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Waiting Notice Pill */}
+            <View style={styles.lobbyStatusPill}>
+              <Text style={styles.lobbyStatusPillText}>
+                {lobbyPlayers.filter((p) => p.status === 'ready').length < 2
+                  ? t('Waiting for Player 2 to join... ⏳')
+                  : `${lobbyPlayers.filter((p) => p.status === 'ready').length}/${selectedPlayers} ${t('Players Ready')} ✅`}
+              </Text>
+            </View>
+
+            {/* Players Grid */}
+            <View style={styles.lobbyPlayersGrid}>
+              {lobbyPlayers.map((player) => {
+                const isReady = player.status === 'ready';
+                return (
+                  <View
+                    key={player.slot}
+                    style={[
+                      styles.lobbyPlayerCard,
+                      selectedPlayers === 4 && styles.lobbyPlayerCard4,
+                      isReady ? styles.lobbyPlayerCardReady : styles.lobbyPlayerCardWaiting,
+                    ]}
+                  >
+                    {isReady ? (
+                      <TouchableOpacity
+                        activeOpacity={player.isHost ? 1 : 0.75}
+                        onPress={() => !player.isHost && handleSlotPress(player.slot)}
+                        style={[
+                          styles.lobbyPlayerAvatarCircle,
+                          { borderColor: player.color, borderWidth: 2.5 },
+                        ]}
+                      >
+                        {player.avatar ? (
+                          <Image
+                            source={{ uri: player.avatar }}
+                            style={styles.lobbyPlayerAvatarImg}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Text style={styles.lobbyPlayerAvatarText}>
+                            {player.isHost ? '👑' : '👤'}
+                          </Text>
+                        )}
+                        {player.isHost && (
+                          <View style={styles.lobbyHostCrownBadge}>
+                            <Text style={{ fontSize: 10 }}>👑</Text>
+                          </View>
+                        )}
+                        {!player.isHost && (
+                          <View style={styles.lobbyRemovePlayerBadge}>
+                            <Text style={{ fontSize: 9, color: '#FFFFFF', fontWeight: 'bold' }}>✕</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        activeOpacity={0.75}
+                        style={styles.lobbyPlayerAvatarCircleEmpty}
+                        onPress={() => handleSlotPress(player.slot)}
+                      >
+                        <Text style={styles.lobbyPlusIcon}>+</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <Text style={styles.lobbyPlayerName} numberOfLines={1}>
+                      {isReady ? player.name : `${t('Player')} ${player.slot}`}
+                    </Text>
+
+                    {isReady ? (
+                      <View style={styles.lobbyReadyBadge}>
+                        <Text style={styles.lobbyReadyBadgeText}>
+                          {t('Ready ✅')}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.lobbySlotTapHint}>
+                        {t('Tap + to Join')}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Min 2 Players Requirement Hint */}
+            <View style={styles.lobbyRequirementBox}>
+              <Text style={styles.lobbyRequirementText}>
+                💡 {t('Minimum 2 players required to start match')}
+              </Text>
+            </View>
+
+            {/* Action Buttons: ONLY HOST CAN START MATCH */}
+            {(() => {
+              const isCurrentHost =
+                lobbyPlayers.some((p) => p.isHost && String(p.userId) === String(currentUser?._id)) ||
+                String(lobbyPlayers.find((p) => p.slot === 1)?.userId) === String(currentUser?._id);
+
+              if (isCurrentHost) {
+                return lobbyPlayers.filter((p) => p.status === 'ready').length >= 2 ? (
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    style={styles.lobbyStartActionBtn}
+                    onPress={handleConfirmStartFromLobby}
+                  >
+                    <LinearGradient
+                      colors={['#00E676', '#00C853']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.lobbyStartGradient}
+                    >
+                      <Text style={styles.lobbyStartActionText}>
+                        {t('Start Match Now 🚀')} (
+                        {lobbyPlayers.filter((p) => p.status === 'ready').length}/
+                        {selectedPlayers})
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.lobbyStartActionBtnDisabled}>
+                    <Text style={styles.lobbyStartActionTextDisabled}>
+                      {selectedPlayers === 2
+                        ? t('Waiting for Player 2 to join... ⏳')
+                        : t('Waiting for at least 2 players... ⏳')}
+                    </Text>
+                  </View>
+                );
+              }
+
+              // Guest Player (Player 2) - No Start Button, only waiting status
+              return (
+                <View style={styles.lobbyGuestWaitingBox}>
+                  <Text style={styles.lobbyGuestWaitingText}>
+                    ⏳ {t('Waiting for Host to start match...')}
+                  </Text>
+                </View>
+              );
+            })()}
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.lobbyCancelBtn}
+              onPress={handleCloseLobby}
+            >
+              <Text style={styles.lobbyCancelBtnText}>{t('Cancel Lobby')}</Text>
+            </TouchableOpacity>
+
+            {/* Connected / Joined Players Display under Cancel Lobby */}
+            <View style={styles.lobbyJoinedSummaryBox}>
+              <View style={styles.lobbySummaryHeader}>
+                <View style={styles.lobbyLiveDot} />
+                <Text style={styles.lobbySummaryTitle}>
+                  {t('Lobby Activity & Connected Players')}:
+                </Text>
+              </View>
+
+              <View style={styles.lobbyConnectedPlayersList}>
+                {lobbyPlayers.filter((p) => p.status === 'ready').map((player) => (
+                  <View key={player.slot} style={styles.lobbyConnectedPlayerRow}>
+                    {player.avatar ? (
+                      <Image source={{ uri: player.avatar }} style={styles.lobbyConnectedAvatar} />
+                    ) : (
+                      <View style={styles.lobbyConnectedAvatarPlaceholder}>
+                        <Text style={{ fontSize: 13 }}>{player.isHost ? '👑' : '👤'}</Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={styles.lobbyConnectedName} numberOfLines={1}>
+                        {player.name} {player.isHost ? `(${t('Host')})` : `(${t('Player')} ${player.slot})`}
+                      </Text>
+                      <Text style={styles.lobbyConnectedSub}>
+                        {player.isHost ? t('Created this room') : t('Joined via Game Code')}
+                      </Text>
+                    </View>
+                    <View style={styles.lobbyOnlineBadge}>
+                      <Text style={styles.lobbyOnlineBadgeText}>{t('In Lobby')} 🟢</Text>
+                    </View>
+                  </View>
+                ))}
+
+                {lobbyActivityNotice && !lobbyPlayers.some((p) => p.name === lobbyActivityNotice.name && p.status === 'ready') && (
+                  <View style={styles.lobbyActivityNoticeRow}>
+                    {lobbyActivityNotice.avatar ? (
+                      <Image source={{ uri: lobbyActivityNotice.avatar }} style={styles.lobbyConnectedAvatar} />
+                    ) : (
+                      <View style={styles.lobbyConnectedAvatarPlaceholder}>
+                        <Text style={{ fontSize: 13 }}>👤</Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={styles.lobbyConnectedName} numberOfLines={1}>
+                        {lobbyActivityNotice.name}
+                      </Text>
+                      <Text style={styles.lobbyConnectedNoticeSub}>
+                        {t('is in this lobby! Waiting to tap +')}
+                      </Text>
+                    </View>
+                    <View style={styles.lobbyWaitingBadge}>
+                      <Text style={styles.lobbyWaitingBadgeText}>⏳</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+
+
+
 
       {/* ================= MODAL 2.5: QUIT GAME FORFEIT CONFIRMATION ================= */}
       <Modal visible={quitConfirmModalVisible} transparent animationType="fade">
@@ -1258,8 +2582,9 @@ export default function GamingView({
             <View style={styles.arenaHeader}>
               <Text style={styles.arenaTitle}>
                 {activeGameArena === 'ludo' && '🎲 Ludo Battle'}
-                {activeGameArena === 'dominos' && '🁢 Dominoes Match'}
-                {activeGameArena === 'uno' && '🃏 UNO Arena'}
+                {activeGameArena === 'snake_ladder' && '🐍🪜 Snakes & Ladders'}
+                {activeGameArena === 'tictactoe' && '❌⭕ Tic Tac Toe (Zero Kata)'}
+                {activeGameArena === 'carrom' && '🎯 Carrom Board Battle'}
               </Text>
               <TouchableOpacity
                 onPress={handleExitArenaPress}
@@ -1274,8 +2599,8 @@ export default function GamingView({
               <View style={[styles.resultBanner, gameResult === 'won' ? styles.resultBannerWon : styles.resultBannerLost]}>
                 <Text style={[styles.resultBannerTitle, gameResult === 'lost' && { color: '#DC2626' }]}>
                   {gameResult === 'won'
-                    ? `${t('VICTORY! 🏆')} +${(selectedGame?.bet || 100) * (selectedPlayers || 2)} ${t('Game Coins!')}`
-                    : `${t('DEFEAT 😢')} -${selectedGame?.bet || 100} ${t('Game Coins deducted.')}`}
+                    ? `${t('VICTORY! 🏆')} +${Math.max(0, (matchTotalPotRef.current || matchTotalPot || ((matchBetRef.current || matchBet || 100) * (selectedPlayers || 2))) - (matchBetRef.current || matchBet || 100))} ${t('Game Coins!')} (${t('Total Pot')}: ${matchTotalPotRef.current || matchTotalPot || ((matchBetRef.current || matchBet || 100) * (selectedPlayers || 2))})`
+                    : `${t('DEFEAT 😢')} -${matchBetRef.current || matchBet || 100} ${t('Game Coins deducted.')}`}
                 </Text>
                 <TouchableOpacity
                   style={[styles.resultPlayAgainBtn, gameResult === 'lost' && { backgroundColor: '#EF4444' }]}
@@ -1291,93 +2616,71 @@ export default function GamingView({
               <LudoGame
                 playersCount={selectedPlayers || 2}
                 currentUser={currentUser}
-                betAmount={selectedGame?.bet || 100}
+                gameMode={selectedGame?.mode || 'classic'}
+                betAmount={matchBet}
+                totalPot={matchTotalPot}
+                playMode={playMode}
+                lobbyPlayers={lobbyPlayers}
+                forfeitedUserIds={forfeitedUserIds}
+                socket={socketRef.current}
+                roomCode={lobbyRoomCode}
                 onWin={(game) => handleGameWin(game || 'Ludo')}
                 onLoss={(game) => handleGameLoss(game || 'Ludo')}
               />
             )}
 
-            {/* ARENA 2: UNO ARENA */}
-            {activeGameArena === 'uno' && (
-              <View style={styles.unoArenaBox}>
-                {/* Opponent Area */}
-                <View style={styles.unoOpponentRow}>
-                  <Text style={styles.unoOpponentLabel}>
-                    🤖 {t('Opponent Cards')}: {unoOpponentCount}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 4 }}>
-                    {Array.from({ length: Math.min(unoOpponentCount, 6) }).map((_, i) => (
-                      <View key={i} style={styles.unoCardBackMini} />
-                    ))}
-                  </View>
-                </View>
-
-                {/* Discard & Draw Deck */}
-                <View style={styles.unoDeckRow}>
-                  <TouchableOpacity
-                    style={styles.unoDrawDeckBtn}
-                    onPress={handleDrawUnoCard}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.unoDrawText}>🃏 {t('Draw')}</Text>
-                  </TouchableOpacity>
-
-                  <View style={[styles.unoDiscardCard, { backgroundColor: unoDiscardTop.color }]}>
-                    <Text style={styles.unoDiscardValue}>{unoDiscardTop.value}</Text>
-                  </View>
-                </View>
-
-                {/* Player's Hand of Cards */}
-                <Text style={styles.unoHandTitle}>{t('Your Cards (Tap to Play)')}:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.unoHandList}>
-                  {unoPlayerCards.map((card) => (
-                    <TouchableOpacity
-                      key={card.id}
-                      style={[styles.unoHandCard, { backgroundColor: card.color }]}
-                      activeOpacity={0.8}
-                      onPress={() => handlePlayUnoCard(card)}
-                    >
-                      <Text style={styles.unoHandValue}>{card.value}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
+            {/* ARENA: AUTHENTIC 10x10 SNAKES & LADDERS ARENA */}
+            {activeGameArena === 'snake_ladder' && (
+              <SnakeLadderGame
+                playersCount={selectedPlayers || 2}
+                currentUser={currentUser}
+                gameMode={selectedGame?.mode || 'classic'}
+                betAmount={matchBet}
+                totalPot={matchTotalPot}
+                playMode={playMode}
+                lobbyPlayers={lobbyPlayers}
+                forfeitedUserIds={forfeitedUserIds}
+                socket={socketRef.current}
+                roomCode={lobbyRoomCode}
+                onWin={(game) => handleGameWin(game || 'Snake & Ladder')}
+                onLoss={(game) => handleGameLoss(game || 'Snake & Ladder')}
+              />
             )}
 
-            {/* ARENA 3: DOMINOS ARENA */}
-            {activeGameArena === 'dominos' && (
-              <View style={styles.dominoArenaBox}>
-                <Text style={styles.dominoArenaTitle}>{t('Dominoes Board')}</Text>
-                {/* Board Tiles Line */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dominoBoardScroll}>
-                  <View style={styles.dominoBoardRow}>
-                    {dominoBoardLine.map((tItem, idx) => (
-                      <View key={idx} style={styles.dominoPlacedTile}>
-                        <Text style={styles.dominoTileDots}>{tItem.left}</Text>
-                        <View style={styles.dominoDivider} />
-                        <Text style={styles.dominoTileDots}>{tItem.right}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
+            {/* ARENA: AUTHENTIC WOODEN CARROM BOARD ARENA */}
+            {activeGameArena === 'carrom' && (
+              <CarromGame
+                playersCount={selectedPlayers || 2}
+                currentUser={currentUser}
+                gameMode={selectedGame?.mode || 'classic'}
+                betAmount={matchBet}
+                totalPot={matchTotalPot}
+                playMode={playMode}
+                lobbyPlayers={lobbyPlayers}
+                forfeitedUserIds={forfeitedUserIds}
+                socket={socketRef.current}
+                roomCode={lobbyRoomCode}
+                onWin={(game) => handleGameWin(game || 'Carrom Board')}
+                onLoss={(game) => handleGameLoss(game || 'Carrom Board')}
+              />
+            )}
 
-                {/* Player's Hand */}
-                <Text style={styles.dominoHandTitle}>{t('Your Tiles (Tap matching tile)')}:</Text>
-                <View style={styles.dominoHandRow}>
-                  {dominoPlayerHand.map((tile) => (
-                    <TouchableOpacity
-                      key={tile.id}
-                      style={styles.dominoHandTile}
-                      activeOpacity={0.8}
-                      onPress={() => handlePlayDominoTile(tile)}
-                    >
-                      <Text style={styles.dominoHandTileDots}>{tile.left}</Text>
-                      <View style={styles.dominoHandDivider} />
-                      <Text style={styles.dominoHandTileDots}>{tile.right}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+            {/* ARENA: NEON GLOW TIC TAC TOE (ZERO KATA) ARENA */}
+            {activeGameArena === 'tictactoe' && (
+              <TicTacToeGame
+                playersCount={selectedPlayers || 2}
+                currentUser={currentUser}
+                gameMode={selectedGame?.mode || 'classic'}
+                betAmount={matchBet}
+                totalPot={matchTotalPot}
+                playMode={playMode}
+                lobbyPlayers={lobbyPlayers}
+                forfeitedUserIds={forfeitedUserIds}
+                socket={socketRef.current}
+                roomCode={lobbyRoomCode}
+                onWin={(game) => handleGameWin(game || 'Tic Tac Toe')}
+                onLoss={(game) => handleGameLoss(game || 'Tic Tac Toe')}
+              />
             )}
           </View>
         </View>
@@ -1620,6 +2923,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#00C853',
   },
+  betPillChevron: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#00C853',
+    marginLeft: 1,
+  },
   betSubLimit: {
     fontSize: 11,
     color: '#94A3B8',
@@ -1709,6 +3018,98 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
+  },
+  miniCarromBoardVisual: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#EDD6B3',
+    borderWidth: 2.5,
+    borderColor: '#5D3A1A',
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  miniCarromPocketTL: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#111827',
+  },
+  miniCarromPocketTR: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#111827',
+  },
+  miniCarromPocketBL: {
+    position: 'absolute',
+    bottom: 2,
+    left: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#111827',
+  },
+  miniCarromPocketBR: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#111827',
+  },
+  miniCarromQueenCenter: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#DC2626',
+    borderWidth: 1,
+    borderColor: '#FDE047',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  carromStrikerVisual: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 2.5,
+    borderColor: '#00E5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#00E5FF',
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  carromStrikerCore: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#0F172A',
+    borderWidth: 1.5,
+    borderColor: '#D97706',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  carromPieceLabel: {
+    color: '#94A3B8',
+    fontSize: 9,
+    fontWeight: '800',
+    marginTop: 2,
+    textTransform: 'uppercase',
   },
 
   // Domino Visuals
@@ -1957,6 +3358,141 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+  // Bet Selection Modal
+  betModalBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 390,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  betModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  betModalTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  betModalSub: {
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalCloseCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  betModalBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  betModalBalanceLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  betModalBalancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  betModalBalanceValue: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#00C853',
+  },
+  betGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginBottom: 16,
+  },
+  betCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    position: 'relative',
+  },
+  betCardSelected: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#00C853',
+    shadowColor: '#00C853',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  betSelectedBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -4,
+    backgroundColor: '#00C853',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  betSelectedBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  betCardCoinImg: {
+    width: 32,
+    height: 32,
+    marginBottom: 6,
+  },
+  betCardAmountText: {
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: '#1E293B',
+  },
+  betCardAmountTextSelected: {
+    color: '#00C853',
+  },
+  betCardLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  betNoticeText: {
+    fontSize: 11,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 16,
+    paddingHorizontal: 8,
+  },
+
   // Game Setup Modal
   setupModalBox: {
     backgroundColor: '#FFFFFF',
@@ -1982,6 +3518,78 @@ const styles = StyleSheet.create({
     color: '#475569',
     marginTop: 10,
     marginBottom: 8,
+  },
+  setupModeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setupModeBadgeClassic: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: '#10B981',
+  },
+  setupModeBadgeTurbo: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: '#F59E0B',
+  },
+  setupModeBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  gameSelectRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  gameSelectOptionBtn: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    position: 'relative',
+  },
+  gameSelectOptionBtnActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#6366F1',
+    shadowColor: '#6366F1',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  gameSelectOptionText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#64748B',
+    marginTop: 6,
+  },
+  gameSelectOptionTextActive: {
+    color: '#4F46E5',
+    fontWeight: '900',
+  },
+  gameSelectCheckBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+    backgroundColor: '#4F46E5',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gameSelectCheckText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
   },
   modeToggleRow: {
     flexDirection: 'row',
@@ -2106,6 +3714,630 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 14.5,
   },
+  joinGameCodeActionBtn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  joinGameCodeGradient: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinGameCodeActionText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '800',
+  },
+
+  // Join Game with Code Modal Styles
+  joinCodeModalBox: {
+    backgroundColor: '#1E1E2D',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 380,
+    padding: 22,
+    borderWidth: 1.5,
+    borderColor: '#374151',
+  },
+  joinCodePromptText: {
+    color: '#94A3B8',
+    fontSize: 13.5,
+    marginVertical: 12,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  joinCodeInputField: {
+    backgroundColor: '#0F0F1A',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: 4,
+    borderWidth: 1.5,
+    borderColor: '#3B82F6',
+    marginBottom: 18,
+  },
+  verifyCodeActionBtn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  verifyCodeGradient: {
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyCodeActionText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '900',
+  },
+
+  // Lobby Preview inside Join Modal
+  lobbyPreviewBox: {
+    backgroundColor: '#0F0F1A',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#3B82F6',
+  },
+  lobbyPreviewTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  lobbyPreviewAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#3B82F6',
+  },
+  lobbyPreviewAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#374151',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lobbyPreviewHostName: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  lobbyPreviewSubText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  lobbyPreviewLiveBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+  },
+  lobbyPreviewLiveBadgeText: {
+    color: '#60A5FA',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  lobbyPreviewBetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E1E2D',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#00E676',
+    marginBottom: 8,
+  },
+  lobbyPreviewBetLabel: {
+    color: '#F8FAFC',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  lobbyPreviewBetPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  lobbyPreviewBetAmount: {
+    color: '#00E676',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  lobbyPreviewBetCoins: {
+    color: '#A7F3D0',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  lobbyPreviewNoticeError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  lobbyPreviewNoticeTextError: {
+    color: '#F87171',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  lobbyPreviewNoticeSuccess: {
+    backgroundColor: 'rgba(0, 230, 118, 0.15)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#00E676',
+  },
+  lobbyPreviewNoticeTextSuccess: {
+    color: '#4ADE80',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  // Active Waiting Lobbies Quick List
+  activeLobbiesSection: {
+    marginBottom: 16,
+  },
+  activeLobbiesHeader: {
+    color: '#94A3B8',
+    fontSize: 11.5,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  activeLobbyQuickCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F0F1A',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#374151',
+    marginBottom: 6,
+  },
+  activeLobbyHostName: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  activeLobbyDetails: {
+    color: '#94A3B8',
+    fontSize: 10.5,
+    marginTop: 1,
+  },
+  activeLobbyBetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#00E676',
+  },
+  activeLobbyBetText: {
+    color: '#00E676',
+    fontSize: 11.5,
+    fontWeight: '900',
+  },
+
+  // Local Match Lobby Modal Styles
+  lobbyModalBox: {
+    backgroundColor: '#1E1E2D',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 380,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: '#374151',
+  },
+  lobbyHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  lobbyTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  lobbyCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 5,
+  },
+  lobbyCodePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    gap: 4,
+  },
+  lobbyCodeLabel: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  lobbyCodeValue: {
+    color: '#FDE68A',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  lobbyModeSubtitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  lobbySub: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  lobbyStatusPill: {
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderWidth: 1,
+    borderColor: '#6366F1',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  lobbyStatusPillText: {
+    color: '#A5B4FC',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  lobbyStakesCard: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  lobbyStakesGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  lobbyStakeColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  lobbyStakeLabel: {
+    fontSize: 10,
+    color: '#94A3B8',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  lobbyStakeValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  lobbyCoinIcon: {
+    width: 18,
+    height: 18,
+  },
+  lobbyTrophyEmoji: {
+    fontSize: 16,
+  },
+  lobbyStakeAmount: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FDE68A',
+  },
+  lobbyPotAmount: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#34D399',
+  },
+  lobbyStakeCurrency: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#E2E8F0',
+  },
+  lobbyStakeSubLabel: {
+    fontSize: 9,
+    color: '#FBBF24',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  lobbyPotSubLabel: {
+    fontSize: 9,
+    color: '#34D399',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  lobbyStakeDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  lobbyPlayersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+  },
+  lobbyPlayerCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#262638',
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#374151',
+  },
+  lobbyPlayerCard4: {
+    minWidth: '46%',
+  },
+  lobbyPlayerCardReady: {
+    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+  },
+  lobbyPlayerCardWaiting: {
+    borderColor: '#4B5563',
+    borderStyle: 'dashed',
+  },
+  lobbyPlayerAvatarCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    backgroundColor: '#1E1E2D',
+    position: 'relative',
+  },
+  lobbyPlayerAvatarCircleEmpty: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#6366F1',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+  },
+  lobbyPlayerAvatarImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  lobbyPlusIcon: {
+    fontSize: 26,
+    color: '#818CF8',
+    fontWeight: '900',
+    lineHeight: 30,
+  },
+  lobbyHostCrownBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#F59E0B',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lobbyRemovePlayerBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 9,
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lobbySlotTapHint: {
+    color: '#818CF8',
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+
+
+  lobbyRequirementBox: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D97706',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  lobbyRequirementText: {
+    color: '#FCD34D',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  lobbyStartActionBtn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  lobbyStartGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  lobbyStartActionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  lobbyStartActionBtnDisabled: {
+    backgroundColor: '#374151',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  lobbyStartActionTextDisabled: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  lobbyGuestWaitingBox: {
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#6366F1',
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  lobbyGuestWaitingText: {
+    color: '#A5B4FC',
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  lobbyCancelBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  lobbyCancelBtnText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  lobbyJoinedSummaryBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    width: '100%',
+  },
+  lobbySummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  lobbyLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+  },
+  lobbySummaryTitle: {
+    color: '#94A3B8',
+    fontSize: 11.5,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  lobbyConnectedPlayersList: {
+    gap: 8,
+  },
+  lobbyConnectedPlayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  lobbyConnectedAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  lobbyConnectedAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lobbyConnectedName: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  lobbyConnectedSub: {
+    color: '#64748B',
+    fontSize: 10.5,
+    fontWeight: '600',
+  },
+  lobbyOnlineBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  lobbyOnlineBadgeText: {
+    color: '#34D399',
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  lobbyActivityNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.3)',
+  },
+  lobbyConnectedNoticeSub: {
+    color: '#818CF8',
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  lobbyWaitingBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  lobbyWaitingBadgeText: {
+    fontSize: 13,
+  },
 
   // Game Arena Backdrops & Containers
   arenaBackdrop: {
@@ -2116,35 +4348,43 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   arenaContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
     borderRadius: 24,
     width: '100%',
     maxWidth: 420,
-    maxHeight: '90%',
-    padding: 18,
+    maxHeight: '94%',
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
   },
   arenaHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    paddingBottom: 12,
-    marginBottom: 12,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    paddingBottom: 10,
+    marginBottom: 8,
   },
   arenaTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#FFFFFF',
   },
   arenaExitBtn: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
   },
   arenaExitText: {
-    color: '#DC2626',
+    color: '#F87171',
     fontWeight: '800',
     fontSize: 12,
   },
@@ -2620,4 +4860,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
+
 });

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLanguage } from '../context/LanguageContext';
+import { T } from './TranslatedText';
 import { useToast } from './Toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -19,6 +20,7 @@ const CELL_SIZE = BOARD_SIZE / 15;
 const TOKEN_SIZE = Math.max(18, Math.round(CELL_SIZE * 0.88));
 
 const LUDO_BOARD_IMG = require('../../assets/icons/ludo_board.png');
+const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
 
 // 52-cell outer track starting at Red Start [13, 6]
 const COMMON_TRACK = [
@@ -87,20 +89,68 @@ const TOKEN_COLORS = {
 export default function LudoGame({
   playersCount = 2,
   currentUser,
+  gameMode = 'classic',
   betAmount = 100,
+  totalPot: propTotalPot,
+  playMode = 'online',
+  lobbyPlayers = [],
+  forfeitedUserIds = [],
+  socket,
+  roomCode,
   onWin,
   onLoss,
 }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
 
+  const isTurbo = gameMode === 'turbo';
+  const TURN_LIMIT = isTurbo ? 7 : 20;
+
+  // Forfeited players handling for multi-player matches
+  const forfeitedColors = (lobbyPlayers || [])
+    .filter((p) => forfeitedUserIds?.includes(String(p.userId)))
+    .map((p) => p.colorKey || (p.slot === 2 ? 'green' : p.slot === 3 ? 'yellow' : 'blue'));
+
+  // 1. Identify My Player & My Assigned Color from lobbyPlayers
+  const myPlayer =
+    (lobbyPlayers || []).find((p) => String(p.userId) === String(currentUser?._id)) ||
+    (lobbyPlayers || []).find((p) => p.slot === 1) || {
+      slot: 1,
+      colorKey: 'red',
+      color: '#DC2626',
+      name: currentUser?.name || t('You'),
+      avatar: currentUser?.avatar,
+    };
+
+  const myColor = myPlayer.colorKey || (myPlayer.slot === 2 ? 'green' : myPlayer.slot === 3 ? 'yellow' : myPlayer.slot === 4 ? 'blue' : 'red');
+  const isMultiplayer = playMode === 'local' && !!socket;
+
+  // 2. Extract Real Player Details from lobbyPlayers
+  const player1 = (lobbyPlayers || []).find((p) => p.slot === 1) || {
+    name: currentUser?.name || t('You'),
+    avatar: currentUser?.avatar,
+  };
+  const player2 = (lobbyPlayers || []).find((p) => p.slot === 2);
+  const player3 = (lobbyPlayers || []).find((p) => p.slot === 3);
+  const player4 = (lobbyPlayers || []).find((p) => p.slot === 4);
+
+  // 2-player mode opponent (the other player)
+  const opponentPlayer = (lobbyPlayers || []).find((p) => p.slot !== myPlayer.slot) ||
+    (myPlayer.slot === 1 ? player2 : player1);
+
+  const opponentColor = opponentPlayer?.colorKey || (myColor === 'red' ? 'green' : 'red');
+  const opponentName = isMultiplayer
+    ? (opponentPlayer?.name || (myColor === 'red' ? t('Player 2') : t('Player 1')))
+    : t('Opponent (AI)');
+  const opponentAvatar = opponentPlayer?.avatar;
+
   // Players setup: 2 Players (Red vs Green) or 4 Players (Red, Green, Yellow, Blue)
   const activePlayers = playersCount === 4
     ? ['red', 'green', 'yellow', 'blue']
     : ['red', 'green'];
 
-  // 2 Tokens per player for crisp, dynamic mobile gameplay
-  const TOKENS_PER_PLAYER = 2;
+  // 4 Tokens per player for authentic standard Ludo
+  const TOKENS_PER_PLAYER = 4;
 
   // Tokens state: [ { id: 0, player: 'red', pos: -1 }, ... ]
   const [tokens, setTokens] = useState(() => {
@@ -121,9 +171,97 @@ export default function LudoGame({
   const [matchOver, setMatchOver] = useState(false);
   const [eventNotice, setEventNotice] = useState('');
 
+  // AI Opponent Dice State
+  const [aiDiceValue, setAiDiceValue] = useState(6);
+  const [aiRolling, setAiRolling] = useState(false);
+  const [lastAiRoll, setLastAiRoll] = useState(null);
+
+  // Sync latest tokens in ref to avoid stale closures in timeouts
+  const tokensRef = useRef(tokens);
+  useEffect(() => {
+    tokensRef.current = tokens;
+  }, [tokens]);
+
+  // Turn Countdown Timer (7s for Turbo, 20s for Classic)
+  const [turnTimer, setTurnTimer] = useState(TURN_LIMIT);
+  const timerRef = useRef(null);
+  const handlePlayerRollDiceRef = useRef(null);
+
   // Animation values
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const diceRotateAnim = useRef(new Animated.Value(0)).current;
+  const aiDiceRotateAnim = useRef(new Animated.Value(0)).current;
+  const handAnim = useRef(new Animated.Value(0)).current;
+  const diceHighlightAnim = useRef(new Animated.Value(1)).current;
+
+  // Center board bet & pot indicator state (shows once at start, then auto-fades and never repeats)
+  const [showCenterMedallion, setShowCenterMedallion] = useState(true);
+  const medallionOpacity = useRef(new Animated.Value(0)).current;
+  const medallionScale = useRef(new Animated.Value(0.75)).current;
+
+  // Dismiss helper
+  const dismissCenterMedallion = () => {
+    if (showCenterMedallion) {
+      Animated.parallel([
+        Animated.timing(medallionOpacity, {
+          toValue: 0,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.timing(medallionScale, {
+          toValue: 0.85,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShowCenterMedallion(false);
+      });
+    }
+  };
+
+  // Show center bet & pot banner once at start for 3.5 seconds, then smoothly dissolve away
+  useEffect(() => {
+    // 1. Smooth bounce/scale in
+    Animated.parallel([
+      Animated.spring(medallionScale, {
+        toValue: 1,
+        friction: 5,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(medallionOpacity, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // 2. Auto-dismiss after 3.5 seconds so it disappears and never repeats
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(medallionOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(medallionScale, {
+          toValue: 0.85,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShowCenterMedallion(false);
+      });
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Dynamic stakes and total pot pool calculation
+  const readyPlayersCount =
+    (lobbyPlayers || []).filter((p) => p.status === 'ready').length || playersCount || 2;
+  const currentBet = Number(betAmount) || 100;
+  const totalPot = Number(propTotalPot) || currentBet * readyPlayersCount;
 
   // Pulse effect for moveable tokens
   useEffect(() => {
@@ -143,10 +281,57 @@ export default function LudoGame({
     ).start();
   }, [pulseAnim]);
 
-  // Dice roll shaker animation
+  // Hand pointing animation (moves towards dice)
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(handAnim, {
+          toValue: 6,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.timing(handAnim, {
+          toValue: -2,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [handAnim]);
+
+  // Active dice pulsing highlight animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(diceHighlightAnim, {
+          toValue: 1.1,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+        Animated.timing(diceHighlightAnim, {
+          toValue: 1.0,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [diceHighlightAnim]);
+
+  // Dice roll shaker animation for Player
   const animateDiceRoll = () => {
     diceRotateAnim.setValue(0);
     Animated.timing(diceRotateAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // Dice roll shaker animation for AI
+  const animateAiDiceRoll = () => {
+    dismissCenterMedallion();
+    aiDiceRotateAnim.setValue(0);
+    Animated.timing(aiDiceRotateAnim, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
@@ -182,16 +367,36 @@ export default function LudoGame({
     setCurrentTurn(nextPlayer);
   };
 
-  // Next player in sequence
+  // Next player in sequence (skips forfeited players)
   const getNextPlayer = (player) => {
-    const idx = activePlayers.indexOf(player);
-    return activePlayers[(idx + 1) % activePlayers.length];
+    let nextIdx = (activePlayers.indexOf(player) + 1) % activePlayers.length;
+    let nextP = activePlayers[nextIdx];
+    let attempts = 0;
+    while (forfeitedColors.includes(nextP) && attempts < activePlayers.length) {
+      nextIdx = (nextIdx + 1) % activePlayers.length;
+      nextP = activePlayers[nextIdx];
+      attempts++;
+    }
+    return nextP;
   };
 
+  // If active player forfeits mid-game during their turn, automatically pass to next player
+  useEffect(() => {
+    if (forfeitedColors.includes(currentTurn) && !matchOver) {
+      const nextP = getNextPlayer(currentTurn);
+      passTurn(nextP);
+    }
+  }, [forfeitedColors, currentTurn, matchOver]);
+
   // Handle Token Move
-  const executeTokenMove = (player, tokenId, dice) => {
+  const executeTokenMove = (player, tokenId, dice, isRemote = false) => {
     setWaitingForMove(false);
     setMovableTokenIds([]);
+
+    // Broadcast move to other devices in multiplayer
+    if (!isRemote && isMultiplayer && socket && roomCode) {
+      socket.emit('ludo_token_moved', { roomCode, player, tokenId, diceValue: dice });
+    }
 
     setTokens((prevTokens) => {
       let isCut = false;
@@ -244,7 +449,7 @@ export default function LudoGame({
       const playerHomeTokens = updated.filter((t) => t.player === player && t.pos === 56);
       if (playerHomeTokens.length === TOKENS_PER_PLAYER) {
         setMatchOver(true);
-        if (player === 'red') {
+        if (player === myColor) {
           setEventNotice('🏆 VICTORY! All tokens home!');
           setTimeout(() => onWin?.('Ludo'), 1000);
         } else {
@@ -256,39 +461,117 @@ export default function LudoGame({
 
       // Handle Bonus Rolls or Next Turn
       setTimeout(() => {
-        if (isCut) {
-          setEventNotice('⚔️ PK! Opponent token cut! Bonus Roll!');
-          showToast(t('PK! Opponent token cut! ⚔️'), 'success');
-          // Bonus roll for same player
-          if (player !== 'red') {
-            triggerAiTurn(player, updated);
-          }
-        } else if (reachedHome) {
-          setEventNotice('🌟 Token reached HOME! Bonus Roll!');
-          showToast(t('Token reached HOME! 🌟'), 'success');
-          if (player !== 'red') {
-            triggerAiTurn(player, updated);
-          }
-        } else if (dice === 6) {
-          setEventNotice('🎉 Rolled a 6! Roll Again 🎲');
-          showToast(t('Rolled a 6! Roll Again 🎲'), 'success');
-          if (player !== 'red') {
-            triggerAiTurn(player, updated);
+        if (isCut || reachedHome || dice === 6) {
+          // Bonus Turn: In single-player, trigger AI if not human
+          if (!isMultiplayer && player !== myColor) {
+            triggerAiTurn(player);
           }
         } else {
-          setEventNotice('');
           const nextP = getNextPlayer(player);
           passTurn(nextP);
         }
-      }, 500);
+      }, 550);
 
       return updated;
     });
   };
 
+  // Fair roll chance to prevent goti being stuck indefinitely in yard
+  const getAiRoll = (aiPlayer, currentTokens) => {
+    const inYardCount = currentTokens.filter(
+      (t) => t.player === aiPlayer && t.pos === -1
+    ).length;
+    // 35% chance to roll a 6 if all tokens are stuck in base yard
+    if (inYardCount === TOKENS_PER_PLAYER && Math.random() < 0.35) {
+      return 6;
+    }
+    return Math.floor(Math.random() * 6) + 1;
+  };
+
+  const getPlayerRoll = (currentTokens) => {
+    const inYardCount = currentTokens.filter(
+      (t) => t.player === myColor && t.pos === -1
+    ).length;
+    if (inYardCount === TOKENS_PER_PLAYER && Math.random() < 0.35) {
+      return 6;
+    }
+    return Math.floor(Math.random() * 6) + 1;
+  };
+
+  // Smart tactical AI token chooser
+  const selectBestAiToken = (aiPlayer, movables, diceVal, currentTokens) => {
+    // 1. Priority: Can AI cut an opponent token?
+    for (const tid of movables) {
+      const tok = currentTokens.find((t) => t.player === aiPlayer && t.id === tid);
+      if (!tok) continue;
+      const nextPos = tok.pos === -1 ? 0 : tok.pos + diceVal;
+      if (nextPos < 51) {
+        const path = PLAYER_PATHS[aiPlayer];
+        const [r, c] = path[nextPos];
+        const coordKey = `${r},${c}`;
+        if (!SAFE_SQUARES.has(coordKey)) {
+          const victim = currentTokens.find(
+            (o) =>
+              o.player !== aiPlayer &&
+              o.pos >= 0 &&
+              o.pos < 51 &&
+              PLAYER_PATHS[o.player][o.pos][0] === r &&
+              PLAYER_PATHS[o.player][o.pos][1] === c
+          );
+          if (victim) return tid;
+        }
+      }
+    }
+
+    // 2. Priority: Can reach home?
+    for (const tid of movables) {
+      const tok = currentTokens.find((t) => t.player === aiPlayer && t.id === tid);
+      if (tok && tok.pos >= 0 && tok.pos + diceVal === 56) {
+        return tid;
+      }
+    }
+
+    // 3. Priority: If rolled a 6 and tokens remain in yard, unlock a new token
+    if (diceVal === 6) {
+      const yardToken = movables.find((tid) => {
+        const tok = currentTokens.find((t) => t.player === aiPlayer && t.id === tid);
+        return tok && tok.pos === -1;
+      });
+      if (yardToken !== undefined) {
+        const onBoard = currentTokens.filter(
+          (t) => t.player === aiPlayer && t.pos >= 0 && t.pos < 56
+        ).length;
+        if (onBoard < 2) {
+          return yardToken;
+        }
+      }
+    }
+
+    // 4. Default: Advance furthest token closest to home
+    let bestTid = movables[0];
+    let maxPos = -2;
+    for (const tid of movables) {
+      const tok = currentTokens.find((t) => t.player === aiPlayer && t.id === tid);
+      if (tok && tok.pos > maxPos) {
+        maxPos = tok.pos;
+        bestTid = tid;
+      }
+    }
+    return bestTid;
+  };
+
   // Player rolls dice
   const handlePlayerRollDice = () => {
-    if (currentTurn !== 'red' || diceRolling || waitingForMove || matchOver) return;
+    if (currentTurn !== myColor || diceRolling || waitingForMove || matchOver) return;
+
+    // Dismiss center bets display immediately on first roll
+    dismissCenterMedallion();
+
+    // Immediately stop the reverse countdown when clicked
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
 
     setDiceRolling(true);
     animateDiceRoll();
@@ -299,92 +582,162 @@ export default function LudoGame({
       rollCount++;
       if (rollCount > 7) {
         clearInterval(interval);
-        const finalVal = Math.floor(Math.random() * 6) + 1;
+        const currentTokens = tokensRef.current;
+        const finalVal = getPlayerRoll(currentTokens);
         setDiceValue(finalVal);
         setDiceRolling(false);
 
+        // Broadcast roll to other devices in multiplayer
+        if (isMultiplayer && socket && roomCode) {
+          socket.emit('ludo_dice_rolled', { roomCode, player: myColor, diceValue: finalVal });
+        }
+
         // Check movable tokens
-        const movables = getMovableTokens('red', finalVal, tokens);
+        const movables = getMovableTokens(myColor, finalVal, currentTokens);
         if (movables.length === 0) {
-          setEventNotice(t('No valid moves'));
           setTimeout(() => {
-            const nextP = getNextPlayer('red');
+            const nextP = getNextPlayer(myColor);
             passTurn(nextP);
-          }, 800);
+            if (isMultiplayer && socket && roomCode) {
+              socket.emit('ludo_turn_passed', { roomCode, nextPlayer: nextP });
+            }
+          }, 700);
         } else if (movables.length === 1) {
           // Auto move single option
           setTimeout(() => {
-            executeTokenMove('red', movables[0], finalVal);
+            executeTokenMove(myColor, movables[0], finalVal);
           }, 350);
         } else {
           // Prompt user to choose token
           setWaitingForMove(true);
           setMovableTokenIds(movables);
-          setEventNotice(t('Tap glowing token to move'));
         }
       }
     }, 60);
   };
 
-  // AI Opponent Turn Logic
-  const triggerAiTurn = (aiPlayer, currentTokens) => {
-    if (matchOver) return;
+  // Keep ref up to date for timer auto-roll
+  handlePlayerRollDiceRef.current = handlePlayerRollDice;
 
-    setDiceRolling(true);
-    animateDiceRoll();
+  // Reverse Countdown Timer for Player Turn (7s Turbo, 20s Classic)
+  useEffect(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
 
-    setTimeout(() => {
-      const finalVal = Math.floor(Math.random() * 6) + 1;
-      setDiceValue(finalVal);
-      setDiceRolling(false);
-
-      const movables = getMovableTokens(aiPlayer, finalVal, currentTokens);
-      if (movables.length === 0) {
-        setTimeout(() => {
-          const nextP = getNextPlayer(aiPlayer);
-          passTurn(nextP);
-        }, 800);
-      } else {
-        // AI Strategy: Prioritize Cut > Home > Open 6 > Advance
-        let bestId = movables[0];
-
-        // Check if any can cut an opponent
-        for (const tid of movables) {
-          const tok = currentTokens.find((t) => t.player === aiPlayer && t.id === tid);
-          const nextPos = tok.pos === -1 ? 0 : tok.pos + finalVal;
-          if (nextPos < 51) {
-            const path = PLAYER_PATHS[aiPlayer];
-            const [r, c] = path[nextPos];
-            const coordKey = `${r},${c}`;
-            if (!SAFE_SQUARES.has(coordKey)) {
-              const victim = currentTokens.find(
-                (o) => o.player !== aiPlayer && o.pos >= 0 && o.pos < 51 &&
-                PLAYER_PATHS[o.player][o.pos][0] === r && PLAYER_PATHS[o.player][o.pos][1] === c
-              );
-              if (victim) {
-                bestId = tid;
-                break;
-              }
-            }
+    if (currentTurn === myColor && !diceRolling && !waitingForMove && !matchOver) {
+      setTurnTimer(TURN_LIMIT);
+      timerRef.current = setInterval(() => {
+        setTurnTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+            // Auto roll dice on timeout if user didn't click
+            handlePlayerRollDiceRef.current?.();
+            return 0;
           }
-        }
+          return prev - 1;
+        });
+      }, 1000);
+    }
 
-        setTimeout(() => {
-          executeTokenMove(aiPlayer, bestId, finalVal);
-        }, 600);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
-    }, 900);
+    };
+  }, [currentTurn, myColor, diceRolling, waitingForMove, matchOver]);
+
+  // Real-time socket sync for multiplayer lobby match
+  useEffect(() => {
+    if (!isMultiplayer || !socket) return;
+
+    const handleRemoteDiceRolled = ({ player, diceValue: remoteVal }) => {
+      if (player !== myColor) {
+        animateAiDiceRoll();
+        setAiDiceValue(remoteVal);
+        const currentToks = tokensRef.current;
+        const movables = getMovableTokens(player, remoteVal, currentToks);
+        if (movables.length === 0) {
+          setTimeout(() => {
+            const nextP = getNextPlayer(player);
+            passTurn(nextP);
+          }, 800);
+        }
+      }
+    };
+
+    const handleRemoteTokenMoved = ({ player, tokenId, diceValue: remoteVal }) => {
+      if (player !== myColor) {
+        executeTokenMove(player, tokenId, remoteVal, true);
+      }
+    };
+
+    const handleRemoteTurnPassed = ({ nextPlayer }) => {
+      passTurn(nextPlayer);
+    };
+
+    socket.on('ludo_dice_rolled', handleRemoteDiceRolled);
+    socket.on('ludo_token_moved', handleRemoteTokenMoved);
+    socket.on('ludo_turn_passed', handleRemoteTurnPassed);
+
+    return () => {
+      socket.off('ludo_dice_rolled', handleRemoteDiceRolled);
+      socket.off('ludo_token_moved', handleRemoteTokenMoved);
+      socket.off('ludo_turn_passed', handleRemoteTurnPassed);
+    };
+  }, [isMultiplayer, socket, myColor]);
+
+  // AI Opponent Turn Logic (Only for Single-player offline mode!)
+  const triggerAiTurn = (aiPlayer) => {
+    if (matchOver || isMultiplayer) return;
+
+    setAiRolling(true);
+    animateAiDiceRoll();
+
+    let rollCount = 0;
+    const interval = setInterval(() => {
+      setAiDiceValue(Math.floor(Math.random() * 6) + 1);
+      rollCount++;
+      if (rollCount > 7) {
+        clearInterval(interval);
+        const currentTokens = tokensRef.current;
+        const finalVal = getAiRoll(aiPlayer, currentTokens);
+        setAiDiceValue(finalVal);
+        setLastAiRoll(finalVal);
+        setAiRolling(false);
+
+        const movables = getMovableTokens(aiPlayer, finalVal, currentTokens);
+        if (movables.length === 0) {
+          setTimeout(() => {
+            if (!matchOver) {
+              const nextP = getNextPlayer(aiPlayer);
+              passTurn(nextP);
+            }
+          }, 800);
+        } else {
+          const bestId = selectBestAiToken(aiPlayer, movables, finalVal, currentTokens);
+          setTimeout(() => {
+            if (!matchOver) {
+              executeTokenMove(aiPlayer, bestId, finalVal);
+            }
+          }, 600);
+        }
+      }
+    }, 60);
   };
 
-  // Trigger AI when it's not human's turn
+  // Trigger AI when it's not human's turn ONLY in single-player offline mode
   useEffect(() => {
-    if (currentTurn !== 'red' && !matchOver) {
+    if (!isMultiplayer && currentTurn !== myColor && !matchOver) {
       const timer = setTimeout(() => {
-        triggerAiTurn(currentTurn, tokens);
-      }, 700);
+        triggerAiTurn(currentTurn);
+      }, 750);
       return () => clearTimeout(timer);
     }
-  }, [currentTurn, matchOver]);
+  }, [isMultiplayer, currentTurn, myColor, matchOver]);
 
   // Compute token position on the board
   const getTokenCoords = (tok) => {
@@ -401,15 +754,29 @@ export default function LudoGame({
     const target = path[tok.pos] || path[path.length - 1];
     const [r, c] = target;
 
-    // Slight offset if both tokens share the square
-    const otherSame = tokens.find(
-      (o) => o.player === tok.player && o.id !== tok.id && o.pos === tok.pos
+    // Slight offset if multiple tokens share the square
+    const sameSquareTokens = tokens.filter(
+      (o) => o.player === tok.player && o.pos === tok.pos
     );
-    const offset = otherSame && tok.id === 1 ? 4 : 0;
+    let offsetTop = 0;
+    let offsetLeft = 0;
+    if (sameSquareTokens.length > 1) {
+      const idx = sameSquareTokens.findIndex((o) => o.id === tok.id);
+      const offsets = [
+        [-3, -3],
+        [3, 3],
+        [-3, 3],
+        [3, -3],
+      ];
+      if (idx >= 0 && idx < offsets.length) {
+        offsetTop = offsets[idx][0];
+        offsetLeft = offsets[idx][1];
+      }
+    }
 
     return {
-      top: r * CELL_SIZE + (CELL_SIZE - TOKEN_SIZE) / 2 + offset,
-      left: c * CELL_SIZE + (CELL_SIZE - TOKEN_SIZE) / 2 + offset,
+      top: r * CELL_SIZE + (CELL_SIZE - TOKEN_SIZE) / 2 + offsetTop,
+      left: c * CELL_SIZE + (CELL_SIZE - TOKEN_SIZE) / 2 + offsetLeft,
     };
   };
 
@@ -422,27 +789,148 @@ export default function LudoGame({
     outputRange: ['0deg', '360deg'],
   });
 
+  const aiDiceSpin = aiDiceRotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   return (
     <View style={styles.container}>
-      {/* 1. TOP OPPONENT HUD (Green Player) */}
-      <View style={[styles.playerHud, currentTurn === 'green' && styles.playerHudActive]}>
-        <View style={styles.playerInfoRow}>
-          <View style={[styles.playerBadge, { backgroundColor: '#10B981' }]}>
-            <Text style={styles.playerBadgeText}>🟢</Text>
+      {/* 1. TOP OPPONENT(S) HUD */}
+      {activePlayers.length === 4 ? (
+        <View style={styles.multiOpponentsContainer}>
+          {activePlayers
+            .filter((p) => p !== myColor)
+            .map((p) => {
+              const pSlotPlayer = p === 'red' ? player1 : p === 'green' ? player2 : p === 'yellow' ? player3 : player4;
+              const pColor = TOKEN_COLORS[p].primary;
+              const pEmoji = p === 'red' ? '🔴' : p === 'green' ? '🟢' : p === 'yellow' ? '🟡' : '🔵';
+              const pName =
+                pSlotPlayer?.name ||
+                (p === 'red' ? t('Red') : p === 'green' ? t('Green') : p === 'yellow' ? t('Yellow') : t('Blue'));
+              const pAvatar = pSlotPlayer?.avatar;
+              const pCount = tokens.filter((t) => t.player === p && t.pos === 56).length;
+              const isTurn = currentTurn === p;
+              const isForfeited = forfeitedColors.includes(p);
+
+              return (
+                <View
+                  key={p}
+                  style={[
+                    styles.multiOpponentCard,
+                    isTurn && styles.multiOpponentCardActive,
+                    isForfeited && { opacity: 0.45 },
+                  ]}
+                >
+                  {pAvatar ? (
+                    <Image source={{ uri: pAvatar }} style={styles.miniAvatarImg} />
+                  ) : (
+                    <View style={[styles.miniBadge, { backgroundColor: pColor }]}>
+                      <Text style={styles.miniBadgeText}>{pEmoji}</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.miniName} numberOfLines={1}>
+                      {pName}
+                    </Text>
+                    <Text style={[styles.miniHomeText, isForfeited && { color: '#EF4444' }]}>
+                      {isForfeited ? t('Left') : `${pCount}/${TOKENS_PER_PLAYER}`}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+        </View>
+      ) : (
+        <View style={[styles.playerHud, currentTurn === opponentColor && styles.playerHudActive, forfeitedColors.includes(opponentColor) && { opacity: 0.45 }]}>
+          <View style={styles.playerInfoRow}>
+            {opponentAvatar ? (
+              <Image source={{ uri: opponentAvatar }} style={styles.playerAvatarImg} />
+            ) : (
+              <View style={[styles.playerBadge, { backgroundColor: TOKEN_COLORS[opponentColor]?.primary || '#10B981' }]}>
+                <Text style={styles.playerBadgeText}>
+                  {opponentColor === 'red' ? '🔴' : opponentColor === 'green' ? '🟢' : opponentColor === 'yellow' ? '🟡' : '🔵'}
+                </Text>
+              </View>
+            )}
+            <View>
+              <Text style={styles.playerName}>{opponentName}</Text>
+              <Text style={[styles.tokensHomeText, forfeitedColors.includes(opponentColor) && { color: '#EF4444' }]}>
+                {forfeitedColors.includes(opponentColor) ? t('Left Match') : `${t('Tokens Home')}: ${tokens.filter((t) => t.player === opponentColor && t.pos === 56).length}/${TOKENS_PER_PLAYER}`}
+              </Text>
+            </View>
           </View>
+
+          {/* Opponent 3D Interactive Dice */}
+          <View style={styles.diceSection}>
+            <View style={styles.diceRowContainer}>
+              {currentTurn === opponentColor && !matchOver && (
+                <Animated.View
+                  style={[
+                    styles.pointingHandWrapper,
+                    { transform: [{ translateX: handAnim }] },
+                  ]}
+                >
+                  <Text style={styles.pointingHandText}>👉</Text>
+                </Animated.View>
+              )}
+              <Animated.View
+                style={[
+                  currentTurn === opponentColor &&
+                    !matchOver && { transform: [{ scale: diceHighlightAnim }] },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.diceButton,
+                    currentTurn === opponentColor && styles.diceButtonActive,
+                    { borderColor: currentTurn === opponentColor ? (TOKEN_COLORS[opponentColor]?.primary || '#10B981') : '#334155' },
+                  ]}
+                >
+                  <Animated.View style={{ transform: [{ rotate: aiDiceSpin }] }}>
+                    <View style={styles.diceFace}>
+                      <Text style={[styles.diceEmoji, { color: TOKEN_COLORS[opponentColor]?.primary || '#10B981' }]}>
+                        {aiDiceValue === 1 ? '⚀' :
+                         aiDiceValue === 2 ? '⚁' :
+                         aiDiceValue === 3 ? '⚂' :
+                         aiDiceValue === 4 ? '⚃' :
+                         aiDiceValue === 5 ? '⚄' : '⚅'}
+                      </Text>
+                    </View>
+                  </Animated.View>
+                  <Text style={styles.diceValueText}>{aiDiceValue}</Text>
+                </View>
+              </Animated.View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* MATCH STAKES & WINNER POT STRIP */}
+      <View style={styles.stakesStrip}>
+        <View style={styles.stakesStripItem}>
+          <Image source={GOLD_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
           <View>
-            <Text style={styles.playerName}>{t('Opponent (AI)')}</Text>
-            <Text style={styles.tokensHomeText}>
-              {t('Tokens Home')}: {greenHomeCount}/{TOKENS_PER_PLAYER}
-            </Text>
+            <Text style={styles.stakesStripLabel}><T>Bets / Player</T></Text>
+            <Text style={styles.stakesStripVal}>{currentBet} <T>Coins</T></Text>
           </View>
         </View>
 
-        {currentTurn === 'green' && (
-          <View style={styles.turnIndicatorBubble}>
-            <Text style={styles.turnIndicatorText}>{t("Opponent's Turn")}</Text>
+        <View style={styles.stakesStripDivider} />
+
+        <View style={styles.stakesStripItem}>
+          <Text style={styles.stakesTrophyEmoji}>🏆</Text>
+          <View>
+            <Text style={styles.stakesStripLabel}><T>Winner Takes Pot</T></Text>
+            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Coins</T></Text>
           </View>
-        )}
+        </View>
+
+        <View style={styles.stakesStripDivider} />
+
+        <View style={styles.stakesDeductedBadge}>
+          <Text style={styles.stakesDeductedBadgeText}>🔒 <T>Deducted</T></Text>
+        </View>
       </View>
 
       {/* 2. THE AUTHENTIC 15x15 LUDO BOARD */}
@@ -453,13 +941,60 @@ export default function LudoGame({
           resizeMode="contain"
         />
 
+        {/* 🌟 LUXURY 3D CENTER MEDALLION: BETS & POT (Shows once at start, then auto-hides) 🌟 */}
+        {showCenterMedallion && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.centerMedallionContainer,
+              {
+                top: 6 * CELL_SIZE + 2,
+                left: 6 * CELL_SIZE + 2,
+                width: 3 * CELL_SIZE - 4,
+                height: 3 * CELL_SIZE - 4,
+                opacity: medallionOpacity,
+                transform: [{ scale: medallionScale }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={['#1E1B4B', '#0F172A', '#090D16']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.centerMedallionGradient}
+            >
+              {/* Header: BETS */}
+              <View style={styles.centerMedallionHeader}>
+                <Text style={styles.centerMedallionTitle}><T>BETS</T></Text>
+              </View>
+
+              {/* Coins Graphic & Amount */}
+              <View style={styles.centerMedallionRow}>
+                <Image
+                  source={GOLD_COIN_IMG}
+                  style={styles.centerCoinImg}
+                  resizeMode="contain"
+                />
+                <Text style={styles.centerBetAmountText}>{currentBet}</Text>
+              </View>
+
+              {/* Total Pot Badge */}
+              <View style={styles.centerPotPill}>
+                <Text style={styles.centerPotPillText}>
+                  <T>POT</T>: {totalPot}
+                </Text>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        )}
+
         {/* 3D Dynamic Tokens Layer */}
         {tokens.map((tok) => {
           const coords = getTokenCoords(tok);
           const isMovable =
-            currentTurn === 'red' &&
+            currentTurn === myColor &&
             waitingForMove &&
-            tok.player === 'red' &&
+            tok.player === myColor &&
             movableTokenIds.includes(tok.id);
 
           const tokenColor = TOKEN_COLORS[tok.player];
@@ -479,7 +1014,7 @@ export default function LudoGame({
               <TouchableOpacity
                 activeOpacity={0.8}
                 disabled={!isMovable}
-                onPress={() => executeTokenMove('red', tok.id, diceValue)}
+                onPress={() => executeTokenMove(myColor, tok.id, diceValue)}
                 style={[
                   styles.tokenPawn,
                   {
@@ -496,9 +1031,9 @@ export default function LudoGame({
                     { backgroundColor: tokenColor.secondary },
                   ]}
                 >
-                  <Text style={styles.tokenPawnSymbol}>
-                    {tok.pos === 56 ? '★' : tok.id + 1}
-                  </Text>
+                  {tok.pos === 56 && (
+                    <Text style={styles.tokenPawnSymbol}>★</Text>
+                  )}
                 </View>
               </TouchableOpacity>
             </Animated.View>
@@ -506,55 +1041,96 @@ export default function LudoGame({
         })}
       </View>
 
-      {/* 3. CENTER STATUS & EVENT NOTICE BANNER */}
-      {!!eventNotice && (
-        <View style={styles.noticeBanner}>
-          <Text style={styles.noticeBannerText}>{eventNotice}</Text>
-        </View>
-      )}
-
-      {/* 4. BOTTOM PLAYER HUD (Red Player / You) + 3D Interactive Dice */}
-      <View style={[styles.playerHud, currentTurn === 'red' && styles.playerHudActive]}>
+      {/* 3. BOTTOM PLAYER HUD (My Player) + 3D Interactive Dice */}
+      <View style={[styles.playerHud, currentTurn === myColor && styles.playerHudActive]}>
         <View style={styles.playerInfoRow}>
-          <View style={[styles.playerBadge, { backgroundColor: '#DC2626' }]}>
-            <Text style={styles.playerBadgeText}>🔴</Text>
-          </View>
+          {myPlayer?.avatar ? (
+            <Image source={{ uri: myPlayer.avatar }} style={styles.playerAvatarImg} />
+          ) : (
+            <View style={[styles.playerBadge, { backgroundColor: TOKEN_COLORS[myColor]?.primary || '#DC2626' }]}>
+              <Text style={styles.playerBadgeText}>
+                {myColor === 'red' ? '🔴' : myColor === 'green' ? '🟢' : myColor === 'yellow' ? '🟡' : '🔵'}
+              </Text>
+            </View>
+          )}
           <View>
-            <Text style={styles.playerName}>{t('You')}</Text>
+            <Text style={styles.playerName}>{myPlayer?.name || t('You')}</Text>
             <Text style={styles.tokensHomeText}>
-              {t('Tokens Home')}: {redHomeCount}/{TOKENS_PER_PLAYER}
+              {t('Tokens Home')}: {tokens.filter((t) => t.player === myColor && t.pos === 56).length}/{TOKENS_PER_PLAYER}
             </Text>
           </View>
         </View>
 
-        {/* Dice & Roll Button */}
+        {/* Dice & Roll Section with Pointing Hand and 20s Countdown */}
         <View style={styles.diceSection}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            disabled={currentTurn !== 'red' || diceRolling || waitingForMove || matchOver}
-            onPress={handlePlayerRollDice}
-            style={[
-              styles.diceButton,
-              currentTurn === 'red' && !waitingForMove && styles.diceButtonActive,
-            ]}
-          >
-            <Animated.View style={{ transform: [{ rotate: diceSpin }] }}>
-              <View style={styles.diceFace}>
-                <Text style={styles.diceEmoji}>
-                  {diceValue === 1 ? '⚀' :
-                   diceValue === 2 ? '⚁' :
-                   diceValue === 3 ? '⚂' :
-                   diceValue === 4 ? '⚃' :
-                   diceValue === 5 ? '⚄' : '⚅'}
+          <View style={styles.diceRowContainer}>
+            {/* Pointing Hand pointing at player's dice */}
+            {currentTurn === myColor && !waitingForMove && !diceRolling && !matchOver && (
+              <Animated.View
+                style={[
+                  styles.pointingHandWrapper,
+                  { transform: [{ translateX: handAnim }] },
+                ]}
+              >
+                <Text style={styles.pointingHandText}>👉</Text>
+              </Animated.View>
+            )}
+
+            {/* Glowing / Pulsing Highlighted Active Dice */}
+            <Animated.View
+              style={[
+                currentTurn === myColor &&
+                  !waitingForMove &&
+                  !diceRolling &&
+                  !matchOver && {
+                    transform: [{ scale: diceHighlightAnim }],
+                  },
+              ]}
+            >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={currentTurn !== myColor || diceRolling || waitingForMove || matchOver}
+                onPress={handlePlayerRollDice}
+                style={[
+                  styles.diceButton,
+                  currentTurn === myColor && !waitingForMove && styles.diceButtonActive,
+                  { borderColor: currentTurn === myColor ? (TOKEN_COLORS[myColor]?.primary || '#DC2626') : '#334155' },
+                ]}
+              >
+                <Animated.View style={{ transform: [{ rotate: diceSpin }] }}>
+                  <View style={styles.diceFace}>
+                    <Text style={[styles.diceEmoji, { color: TOKEN_COLORS[myColor]?.primary || '#DC2626' }]}>
+                      {diceValue === 1 ? '⚀' :
+                       diceValue === 2 ? '⚁' :
+                       diceValue === 3 ? '⚂' :
+                       diceValue === 4 ? '⚃' :
+                       diceValue === 5 ? '⚄' : '⚅'}
+                    </Text>
+                  </View>
+                </Animated.View>
+                <Text style={styles.diceValueText}>{diceValue}</Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* 20s Reverse Countdown Badge */}
+            {currentTurn === myColor && !waitingForMove && !diceRolling && !matchOver && (
+              <View
+                style={[
+                  styles.timerBadge,
+                  turnTimer <= 5 && styles.timerBadgeUrgent,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.timerBadgeText,
+                    turnTimer <= 5 && styles.timerBadgeTextUrgent,
+                  ]}
+                >
+                  {turnTimer}s
                 </Text>
               </View>
-            </Animated.View>
-            <Text style={styles.diceValueText}>{diceValue}</Text>
-          </TouchableOpacity>
-
-          {currentTurn === 'red' && !waitingForMove && !diceRolling && !matchOver && (
-            <Text style={styles.rollPromptText}>{t('Roll Dice')}</Text>
-          )}
+            )}
+          </View>
         </View>
       </View>
     </View>
@@ -566,6 +1142,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+  },
+  multiOpponentsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: BOARD_SIZE,
+    gap: 8,
+    marginVertical: 8,
+  },
+  multiOpponentCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+  },
+  multiOpponentCardActive: {
+    borderColor: '#00E676',
+    backgroundColor: '#0F172A',
+    elevation: 3,
+  },
+  miniBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniBadgeText: {
+    fontSize: 12,
+  },
+  miniName: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  miniHomeText: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '600',
   },
   playerHud: {
     flexDirection: 'row',
@@ -602,6 +1223,20 @@ const styles = StyleSheet.create({
   },
   playerBadgeText: {
     fontSize: 16,
+  },
+  playerAvatarImg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  miniAvatarImg: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
   },
   playerName: {
     color: '#FFFFFF',
@@ -690,6 +1325,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  diceRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pointingHandWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pointingHandText: {
+    fontSize: 22,
+  },
+  timerBadge: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#60A5FA',
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerBadgeUrgent: {
+    backgroundColor: '#DC2626',
+    borderColor: '#EF4444',
+  },
+  timerBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  timerBadgeTextUrgent: {
+    color: '#FEF08A',
+  },
   diceButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -727,5 +1397,139 @@ const styles = StyleSheet.create({
     color: '#00E676',
     fontWeight: '800',
     marginTop: 2,
+  },
+  // Match Stakes Strip above Board
+  stakesStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E1E2D',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 8,
+    width: BOARD_SIZE,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  stakesStripItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stakesStripCoin: {
+    width: 20,
+    height: 20,
+  },
+  stakesTrophyEmoji: {
+    fontSize: 18,
+  },
+  stakesStripLabel: {
+    fontSize: 9,
+    color: '#94A3B8',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  stakesStripVal: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FDE68A',
+  },
+  stakesStripPotVal: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#34D399',
+  },
+  stakesStripDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  stakesDeductedBadge: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.4)',
+  },
+  stakesDeductedBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#FBBF24',
+  },
+
+  // 🌟 Luxury 3D Center Medallion: BETS & POT 🌟
+  centerMedallionContainer: {
+    position: 'absolute',
+    borderRadius: 12,
+    overflow: 'hidden',
+    zIndex: 15,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  centerMedallionGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 3,
+  },
+  centerMedallionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 1,
+  },
+  centerMedallionTitle: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#FDE68A',
+    letterSpacing: 0.8,
+    textShadowColor: 'rgba(245, 158, 11, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  centerMedallionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginVertical: 1,
+  },
+  centerCoinImg: {
+    width: 14,
+    height: 14,
+  },
+  centerBetAmountText: {
+    fontSize: 12.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  centerPotPill: {
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginTop: 1,
+  },
+  centerPotPillText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#34D399',
   },
 });
