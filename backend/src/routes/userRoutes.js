@@ -14,6 +14,7 @@ const {
   deductGameBet,
   awardGameWin,
   forfeitGame,
+  refundGameBet,
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -22,6 +23,7 @@ router.post('/game-chest/claim', protect, claimGameChest);
 router.post('/game/deduct-bet', protect, deductGameBet);
 router.post('/game/award-win', protect, awardGameWin);
 router.post('/game/forfeit', protect, forfeitGame);
+router.post('/game/refund-bet', protect, refundGameBet);
 router.get('/blocked/list', protect, getBlockedUsers);
 router.get('/following/rooms', protect, getFollowingRooms);
 router.get('/recent-rooms', protect, getRecentRooms);

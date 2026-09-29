@@ -474,3 +474,34 @@ exports.forfeitGame = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Refund bet when user exits before game actually started (e.g. Time Bomb 'waiting' phase)
+// @route   POST /api/users/game/refund-bet
+exports.refundGameBet = async (req, res) => {
+  try {
+    const { betAmount = 100, gameName = 'Game', reason = 'game_not_started' } = req.body;
+    const bet = Math.max(1, Number(betAmount) || 100);
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Only refund if reason is game_not_started to prevent abuse
+    if (reason !== 'game_not_started') {
+      return res.status(400).json({ success: false, message: 'Invalid refund reason.' });
+    }
+
+    user.gameCoins = (user.gameCoins || 0) + bet;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `${bet} Game Coins refunded. Game was not started.`,
+      gameCoins: user.gameCoins,
+      refundedAmount: bet,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

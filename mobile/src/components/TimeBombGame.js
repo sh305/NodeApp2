@@ -1,9 +1,11 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Vibration, Platform } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Vibration, Platform, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
+
+const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ARENA_WIDTH = Math.min(SCREEN_WIDTH - 24, 400);
@@ -47,7 +49,19 @@ function PlayerSeat({ player, isHolder, isEliminated, isMe, passCount }) {
         colors={isEliminated ? ['#1F2937','#111827'] : isHolder ? ['#7F1D1D','#991B1B','#7F1D1D'] : isMe ? ['#1E1B4B','#312E81','#1E1B4B'] : ['#1E1E2D','#252535','#1E1E2D']}
         style={styles.playerSeatInner}
       >
-        <Text style={styles.avatarEmoji}>{isEliminated ? '💀' : isHolder ? '😱' : player.avatar || '😐'}</Text>
+        {isEliminated ? (
+          <Text style={styles.avatarEmoji}>{'💀'}</Text>
+        ) : isHolder ? (
+          <Text style={styles.avatarEmoji}>{'😱'}</Text>
+        ) : player.avatar && (player.avatar.startsWith('http') || player.avatar.startsWith('/')) ? (
+          <Image
+            source={{ uri: player.avatar }}
+            style={styles.avatarImage}
+            defaultSource={require('../../assets/icons/gold_coin.png')}
+          />
+        ) : (
+          <Text style={styles.avatarEmoji}>{player.avatar || '😐'}</Text>
+        )}
         <Text style={styles.playerName} numberOfLines={1}>{isMe && !isEliminated ? (player.name + ' (Me)') : player.name}</Text>
         {isEliminated ? <Text style={styles.eliminatedBadge}>OUT</Text> : <Text style={styles.passCountText}>{passCount} passes</Text>}
       </LinearGradient>
@@ -55,7 +69,7 @@ function PlayerSeat({ player, isHolder, isEliminated, isMe, passCount }) {
   );
 }
 
-export default function TimeBombGame({ playersCount = 2, currentUser, betAmount = 100, totalPot: propTotalPot, playMode = 'online', lobbyPlayers = [], socket, roomCode, onWin, onLoss }) {
+export default function TimeBombGame({ playersCount = 2, currentUser, betAmount = 100, totalPot: propTotalPot, playMode = 'online', lobbyPlayers = [], socket, roomCode, onWin, onLoss, onPhaseChange, gameMode = 'classic' }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
   const PLAYER_AVATARS = ['😎','🤖','👻','🦊'];
@@ -90,6 +104,8 @@ export default function TimeBombGame({ playersCount = 2, currentUser, betAmount 
   useEffect(() => { holderSlotRef.current  = holderSlot;      }, [holderSlot]);
   useEffect(() => { eliminatedRef.current  = eliminatedSlots; }, [eliminatedSlots]);
   useEffect(() => { phaseRef.current       = phase;           }, [phase]);
+  // Notify parent whenever phase changes so it knows if game actually started
+  useEffect(() => { onPhaseChange?.(phase); }, [phase]);
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const bombScale = useRef(new Animated.Value(1)).current;
   const glowAnim  = useRef(new Animated.Value(0)).current;
@@ -97,7 +113,8 @@ export default function TimeBombGame({ playersCount = 2, currentUser, betAmount 
   const stopGlow  = () => { glowLoopRef.current?.stop(); glowAnim.setValue(0); };
   const triggerShake = () => { Animated.sequence([Animated.timing(shakeAnim,{toValue:9,duration:55,useNativeDriver:true}),Animated.timing(shakeAnim,{toValue:-9,duration:55,useNativeDriver:true}),Animated.timing(shakeAnim,{toValue:6,duration:55,useNativeDriver:true}),Animated.timing(shakeAnim,{toValue:-6,duration:55,useNativeDriver:true}),Animated.timing(shakeAnim,{toValue:0,duration:55,useNativeDriver:true})]).start(); };
   const triggerExplosion = () => { Vibration.vibrate(Platform.OS === 'android' ? [0,180,80,400] : 500); Animated.sequence([Animated.timing(bombScale,{toValue:2.4,duration:160,useNativeDriver:true}),Animated.timing(bombScale,{toValue:0,duration:120,useNativeDriver:true})]).start(); };
-  useEffect(() => { if (phase !== 'playing') return; const iv = setInterval(() => setBombTick((n) => n + 1), 1100); return () => clearInterval(iv); }, [phase]);
+  const isTurbo = gameMode === 'turbo';
+  useEffect(() => { if (phase !== 'playing') return; const iv = setInterval(() => setBombTick((n) => n + 1), isTurbo ? 700 : 1100); return () => clearInterval(iv); }, [phase, isTurbo]);
   useEffect(() => { if (phase === 'playing' && bombTick % 3 === 0) triggerShake(); }, [bombTick]);
   useEffect(() => {
     if (!isMultiplayer || !socket) return;
@@ -108,9 +125,12 @@ export default function TimeBombGame({ playersCount = 2, currentUser, betAmount 
   }, [isMultiplayer, socket]);
   const scheduleHiddenBomb = useCallback(() => {
     clearTimeout(hiddenTimerRef.current);
-    const delay = Math.floor(Math.random() * 12000) + 8000;
+    // Turbo: 5-9s, Classic: 8-20s
+    const delay = isTurbo
+      ? Math.floor(Math.random() * 4000) + 5000
+      : Math.floor(Math.random() * 12000) + 8000;
     hiddenTimerRef.current = setTimeout(() => { if (phaseRef.current !== 'playing' || matchOverRef.current) return; handleExplosion(holderSlotRef.current, true); }, delay);
-  }, []);
+  }, [isTurbo]);
   const startGame = useCallback(() => {
     if (phaseRef.current === 'playing') return;
     matchOverRef.current = false;
@@ -140,14 +160,17 @@ export default function TimeBombGame({ playersCount = 2, currentUser, betAmount 
   }, [holderSlot, myPlayer, playersList, isMultiplayer, socket, roomCode, t]);
   useEffect(() => {
     if (phase !== 'playing' || isMultiplayer) return; if (holderSlot === myPlayer.slot) return;
-    const delay = Math.floor(Math.random() * 1300) + 900;
+    // Turbo: AI passes in 400-900ms, Classic: 900-2200ms
+    const delay = isTurbo
+      ? Math.floor(Math.random() * 500) + 400
+      : Math.floor(Math.random() * 1300) + 900;
     const timeout = setTimeout(() => {
       if (phaseRef.current !== 'playing') return;
       const active = playersList.filter((p) => !eliminatedRef.current.includes(p.slot)); const idx = active.findIndex((p) => p.slot === holderSlotRef.current); if (idx < 0 || active.length < 2) return;
       const nextSlot = active[(idx + 1) % active.length].slot; setPassCounts((prev) => ({ ...prev, [holderSlotRef.current]: (prev[holderSlotRef.current] || 0) + 1 })); setHolderSlot(nextSlot); triggerShake(); setStatusMsg(t('Bomb passed!'));
     }, delay);
     return () => clearTimeout(timeout);
-  }, [holderSlot, phase, eliminatedSlots]);
+  }, [holderSlot, phase, eliminatedSlots, isTurbo]);
   useEffect(() => () => { clearTimeout(hiddenTimerRef.current); glowLoopRef.current?.stop(); }, []);
   const getPositionStyle = (idx, count) => {
     if (count === 2) return idx === 0 ? { bottom: 0, left: '50%', transform: [{ translateX: -52 }] } : { top: 0, left: '50%', transform: [{ translateX: -52 }] };
@@ -159,9 +182,12 @@ export default function TimeBombGame({ playersCount = 2, currentUser, betAmount 
   const gameOver = phase === 'gameover';
   return (
     <LinearGradient colors={['#060610','#0F0F1A','#130018']} style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{'💣'} <T>Time Bomb Pass</T></Text>
-        <View style={styles.potBadge}><Text style={styles.potText}>{'🪙'} {totalPot}</Text></View>
+      {/* Pot badge row — header is shown by GamingView above */}
+      <View style={styles.potRow}>
+        <View style={styles.potBadge}>
+          <Image source={GREEN_COIN_IMG} style={styles.potCoinImg} />
+          <Text style={styles.potText}>{totalPot}</Text>
+        </View>
       </View>
       {phase === 'playing' && (<View style={styles.roundBadge}><Text style={styles.roundText}><T>Round</T> {roundNum}  •  {actualCount - eliminatedSlots.length} <T>Alive</T></Text></View>)}
       {!!statusMsg && (<View style={styles.statusWrap}><Text style={styles.statusText}>{statusMsg}</Text></View>)}
@@ -227,10 +253,10 @@ export default function TimeBombGame({ playersCount = 2, currentUser, betAmount 
 
 const styles = StyleSheet.create({
   root:           { flex: 1, backgroundColor: '#060610' },
-  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
-  headerTitle:    { fontSize: 20, fontWeight: '900', color: '#F9FAFB', letterSpacing: 0.5 },
-  potBadge:       { backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#F59E0B' },
-  potText:        { color: '#F59E0B', fontWeight: '800', fontSize: 14 },
+  potRow:         { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  potBadge:       { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16,185,129,0.15)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#10B981', gap: 6 },
+  potCoinImg:     { width: 18, height: 18 },
+  potText:        { color: '#10B981', fontWeight: '800', fontSize: 14 },
   roundBadge:     { alignSelf: 'center', backgroundColor: 'rgba(99,102,241,0.12)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(99,102,241,0.32)', marginBottom: 2 },
   roundText:      { color: '#A5B4FC', fontSize: 12, fontWeight: '700' },
   statusWrap:     { alignSelf: 'center', marginVertical: 5, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 5, maxWidth: ARENA_WIDTH - 32 },
@@ -254,6 +280,7 @@ const styles = StyleSheet.create({
   playerPosition:  { position: 'absolute', width: 104 },
   playerSeat: { width: 104, borderRadius: 14, borderWidth: 2, overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 }, android: { elevation: 5 } }) },
   playerSeatInner: { padding: 8, alignItems: 'center' },
+  avatarImage:     { width: 36, height: 36, borderRadius: 18, marginBottom: 4 },
   holderBomb:      { position: 'absolute', top: -10, right: -6, zIndex: 10, backgroundColor: '#060610', borderRadius: 12, padding: 2 },
   avatarEmoji:     { fontSize: 28, marginBottom: 4 },
   playerName:      { color: '#E5E7EB', fontSize: 11, fontWeight: '700', textAlign: 'center', maxWidth: 85 },

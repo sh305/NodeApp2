@@ -106,6 +106,8 @@ export default function GamingView({
   const [gameResult, setGameResult] = useState(null);
   const [quitConfirmModalVisible, setQuitConfirmModalVisible] = useState(false);
   const [dominoOpponentCount, setDominoOpponentCount] = useState(4);
+  // Tracks TimeBombGame internal phase so we know if game actually started
+  const [arenaGamePhase, setArenaGamePhase] = useState('waiting');
 
   // Interactive Ludo State
   const [ludoTurn, setLudoTurn] = useState('player'); // 'player' or 'opponent'
@@ -1113,13 +1115,39 @@ export default function GamingView({
     );
   };
 
-  // Arena Exit Handler: Warns if game is in progress
-  const handleExitArenaPress = () => {
+  // Arena Exit Handler: If TimeBomb is still in 'waiting' phase, refund coins & exit free.
+  // If game is already in progress, show quit confirmation (coins forfeited).
+  const handleExitArenaPress = async () => {
     if (gameResult) {
+      setArenaGamePhase('waiting');
       setActiveGameArena(null);
-    } else {
-      setQuitConfirmModalVisible(true);
+      return;
     }
+    // Time Bomb special case: game not yet started → free exit with refund
+    if (activeGameArena === 'time_bomb' && arenaGamePhase === 'waiting') {
+      // Refund the deducted bet back to user since game never started
+      const bet = matchBetRef.current || matchBet || selectedGame?.bet || 100;
+      try {
+        const res = await api.post('/users/game/refund-bet', {
+          betAmount: bet,
+          gameName: selectedGame?.name || 'Time Bomb',
+          reason: 'game_not_started',
+        });
+        if (res.data?.success) {
+          setGameCoins(res.data.gameCoins);
+        } else {
+          setGameCoins((prev) => prev + bet);
+        }
+      } catch (e) {
+        // Refund locally if API fails
+        setGameCoins((prev) => prev + bet);
+      }
+      showToast(t('Game cancelled. Coins refunded!'), 'info');
+      setArenaGamePhase('waiting');
+      setActiveGameArena(null);
+      return;
+    }
+    setQuitConfirmModalVisible(true);
   };
 
   // Confirm Quit Mid-Game: Forfeits the bet coins
@@ -1145,6 +1173,7 @@ export default function GamingView({
       // Handled silently
     }
     fetchChestStatus();
+    setArenaGamePhase('waiting');
     setActiveGameArena(null);
     showToast(
       `${t('Match forfeited!')} -${bet} ${t('Game Coins deducted.')}`,
@@ -1881,62 +1910,82 @@ export default function GamingView({
         {/* ================= 4.3D TIME BOMB TAB ================= */}
         {activeGameTab === 'Time Bomb' && (
           <View style={styles.gameTabContainer}>
-            <Text style={styles.sectionHeader}>{t('Time Bomb Pass')}</Text>
-            <Text style={styles.betSubLimit}><T>Pass the bomb before it blows! Last survivor wins the pot.</T></Text>
-
-            {/* 2 Player Mode */}
-            <TouchableOpacity
-              activeOpacity={0.88}
-              style={[styles.mainModeCard, { borderColor: '#EF4444', backgroundColor: '#150005' }]}
-              onPress={() => openGameSetup('time_bomb', 'Time Bomb', 'classic', ludoBetAmount, 2)}
-            >
-              <LinearGradient colors={['#450a0a', '#7f1d1d', '#1a0000']} style={[styles.modeCardVisual, { paddingVertical: 14 }]}>
-                <View style={styles.pkBattleRow}>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 36 }}>{'💣'}</Text>
-                    <Text style={[styles.carromPieceLabel, { color: '#FCA5A5' }]}>Player 1</Text>
-                  </View>
-                  <View style={[styles.pkBadge, { backgroundColor: '#EF4444' }]}>
-                    <Text style={styles.pkText}>PASS</Text>
-                  </View>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 36 }}>{'🤲'}</Text>
-                    <Text style={[styles.carromPieceLabel, { color: '#FCA5A5' }]}>Player 2</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-              <View style={[styles.woodModeBtnWrap, { backgroundColor: '#EF4444' }]}>
-                <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('1 ON 1 Duel')}</Text>
+            {/* Time Bomb Banner */}
+            <View style={[styles.gameBannerWrap, { backgroundColor: '#150005', borderColor: '#EF4444' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 24 }}>💣</Text>
+                <Text style={[styles.dominoesTitle, { color: '#F87171', textShadowColor: '#DC2626', textShadowRadius: 10 }]}>
+                  Time Bomb Pass
+                </Text>
               </View>
-            </TouchableOpacity>
-
-            {/* 3 Player Mode */}
-            <TouchableOpacity
-              activeOpacity={0.88}
-              style={[styles.mainModeCard, { borderColor: '#F59E0B', backgroundColor: '#150a00', marginTop: 8 }]}
-              onPress={() => openGameSetup('time_bomb', 'Time Bomb', 'classic', ludoBetAmount, 3)}
-            >
-              <LinearGradient colors={['#451a03', '#92400e', '#1a0a00']} style={[styles.modeCardVisual, { paddingVertical: 14 }]}>
-                <View style={styles.pkBattleRow}>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 28 }}>{'😎'}</Text>
-                    <Text style={[styles.carromPieceLabel, { color: '#FCD34D' }]}>P1</Text>
-                  </View>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 36 }}>{'💣'}</Text>
-                  </View>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 28 }}>{'🤖'}</Text>
-                    <Text style={[styles.carromPieceLabel, { color: '#FCD34D' }]}>P2+P3</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-              <View style={[styles.woodModeBtnWrap, { backgroundColor: '#F59E0B' }]}>
-                <Text style={[styles.woodModeBtnText, { color: '#000000', fontWeight: '900' }]}>{t('3 Player Bomb')}</Text>
+              <View style={styles.betPill}>
+                <Text style={styles.betLabel}><T>BETS</T></Text>
+                <Image source={GREEN_COIN_IMG} style={{ width: 18, height: 18 }} resizeMode="contain" />
+                <Text style={styles.betAmount}>{ludoBetAmount} <T>Coins</T></Text>
               </View>
-            </TouchableOpacity>
+              <Text style={styles.betSubLimit}><T>Pass the bomb before it blows! Last survivor wins the pot.</T></Text>
+            </View>
 
-            {/* 4 Player Mode */}
+            {/* Mode Cards Row: 1 ON 1 Classic + 1 ON 1 Turbo side by side */}
+            <View style={styles.mainModesRow}>
+              {/* Card 1: 1 ON 1 Classic */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[styles.mainModeCard, { borderColor: '#EF4444', backgroundColor: '#150005' }]}
+                onPress={() => openGameSetup('time_bomb', 'Time Bomb', 'classic', ludoBetAmount, 2)}
+              >
+                <LinearGradient colors={['#7F1D1D', '#450A0A', '#150005']} style={styles.modeCardVisual}>
+                  <View style={styles.pkBattleRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <Text style={{ fontSize: 30 }}>{'💣'}</Text>
+                      <Text style={[styles.carromPieceLabel, { color: '#FCA5A5', marginTop: 3 }]}>Player 1</Text>
+                    </View>
+                    <View style={[styles.pkBadge, { backgroundColor: '#EF4444' }]}>
+                      <Text style={styles.pkText}>PK</Text>
+                    </View>
+                    <View style={{ alignItems: 'center' }}>
+                      <Text style={{ fontSize: 30 }}>{'🤲'}</Text>
+                      <Text style={[styles.carromPieceLabel, { color: '#FCA5A5', marginTop: 3 }]}>Player 2</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#EF4444' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>{t('1 ON 1 Classic')}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Card 2: 1 ON 1 Turbo ⚡ */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[styles.mainModeCard, { borderColor: '#F59E0B', backgroundColor: '#1F0F00' }]}
+                onPress={() => openGameSetup('time_bomb', 'Time Bomb', 'turbo', ludoBetAmount, 2)}
+              >
+                <LinearGradient colors={['#78350F', '#451A03', '#1F0F00']} style={styles.modeCardVisual}>
+                  <View style={styles.pkBattleRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#1C1C1E', borderWidth: 2, borderColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 20 }}>{'💣'}</Text>
+                      </View>
+                      <Text style={[styles.carromPieceLabel, { color: '#FCD34D', marginTop: 3 }]}>Blitz</Text>
+                    </View>
+                    <View style={[styles.pkBadge, { backgroundColor: '#F59E0B', minWidth: 32, paddingHorizontal: 4 }]}>
+                      <Text style={[styles.pkText, { fontSize: 13, color: '#000000' }]}>⚡</Text>
+                    </View>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#1C1C1E', borderWidth: 2, borderColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 20 }}>{'🤲'}</Text>
+                      </View>
+                      <Text style={[styles.carromPieceLabel, { color: '#FCD34D', marginTop: 3 }]}>Fast</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <View style={[styles.woodModeBtnWrap, { backgroundColor: '#F59E0B' }]}>
+                  <Text style={[styles.woodModeBtnText, { color: '#000000', fontWeight: '900' }]}>{t('1 ON 1 Turbo')}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* 4 Player Chaos - full width */}
             <TouchableOpacity
               activeOpacity={0.88}
               style={[styles.mainModeCard, { width: '100%', marginTop: 8, borderColor: '#8B5CF6', backgroundColor: '#0d0015' }]}
@@ -3126,9 +3175,11 @@ export default function GamingView({
                   betAmount={matchBet}
                   totalPot={matchTotalPot}
                   playMode={playMode}
+                  gameMode={selectedGame?.mode || 'classic'}
                   lobbyPlayers={lobbyPlayers}
                   socket={socketRef.current}
                   roomCode={lobbyRoomCode}
+                  onPhaseChange={(phase) => setArenaGamePhase(phase)}
                   onWin={(game) => handleGameWin(game || 'Time Bomb')}
                   onLoss={(game) => handleGameLoss(game || 'Time Bomb')}
                 />
