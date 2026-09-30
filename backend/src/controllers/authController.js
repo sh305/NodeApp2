@@ -489,7 +489,7 @@ exports.facebookLogin = async (req, res) => {
   }
 };
 
-// @desc    Get Current User Profiless
+// @desc    Get Current User Profiles data
 // @route   GET /api/auth/me
 exports.getMe = async (req, res) => {
   try {
