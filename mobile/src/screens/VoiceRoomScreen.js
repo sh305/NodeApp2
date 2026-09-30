@@ -80,6 +80,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   // Modals state
   const [selectedSeatUser, setSelectedSeatUser] = useState(null);
   const [isHostActive, setIsHostActive] = useState(true);
+  const [isHostMuted, setIsHostMuted] = useState(false);
   const [giftModalVisible, setGiftModalVisible] = useState(false);
   const [kickModalVisible, setKickModalVisible] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -101,6 +102,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }
         if (res.data.room.isHostActive !== undefined) {
           setIsHostActive(res.data.room.isHostActive);
+        }
+        if (res.data.room.isHostMuted !== undefined) {
+          setIsHostMuted(res.data.room.isHostMuted);
+          const roomOwnerId = res.data.room.owner?._id || res.data.room.owner;
+          if (currentUser?._id && roomOwnerId && String(currentUser._id) === String(roomOwnerId)) {
+            setIsMicMuted(res.data.room.isHostMuted);
+          }
         }
 
         const mySeat = res.data.room.seats.findIndex(
@@ -162,17 +170,32 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setRoom((prev) => (prev ? { ...prev, seats } : prev));
       const mySeat = seats.findIndex((s) => s.user && s.user._id === currentUser?._id);
       setMySeatIndex(mySeat !== -1 ? mySeat : null);
+      if (mySeat !== -1 && seats[mySeat]?.isMuted !== undefined) {
+        setIsMicMuted(Boolean(seats[mySeat].isMuted));
+      }
     });
 
     socket.on('host_status_updated', ({ isHostActive: hActive }) => {
       setIsHostActive(hActive);
     });
 
+    socket.on('host_mute_status_changed', ({ isHostMuted: hMuted }) => {
+      setIsHostMuted(hMuted);
+      if (isOwner) {
+        setIsMicMuted(hMuted);
+      }
+    });
+
     socket.on('seat_mute_status_changed', ({ seatIndex, isMuted }) => {
       setRoom((prev) => {
         if (!prev) return prev;
         const newSeats = [...prev.seats];
-        if (newSeats[seatIndex]) newSeats[seatIndex].isMuted = isMuted;
+        if (newSeats[seatIndex]) {
+          newSeats[seatIndex] = { ...newSeats[seatIndex], isMuted };
+          if (newSeats[seatIndex].user?._id === currentUser?._id) {
+            setIsMicMuted(isMuted);
+          }
+        }
         return { ...prev, seats: newSeats };
       });
     });
@@ -263,6 +286,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         userId: currentUser?._id,
       });
       setMySeatIndex(null);
+      setIsMicMuted(false);
       showToast(t('You left the mic seat 🪑'), 'info');
     }
     setSelectedSeatUser(null);
@@ -270,6 +294,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   const handleLeaveHosting = () => {
     setIsHostActive(false);
+    setIsMicMuted(false);
     socketRef.current?.emit('leave_host', {
       roomId,
       userId: currentUser?._id,
@@ -329,14 +354,37 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   };
 
   const handleToggleMic = () => {
-    if (mySeatIndex === null) return;
-    const nextState = !isMicMuted;
-    setIsMicMuted(nextState);
-    socketRef.current.emit('toggle_mic_mute', {
-      roomId,
-      seatIndex: mySeatIndex,
-      isMuted: nextState,
-    });
+    // Case 1: Sitting on a mic seat (Seat 1-8)
+    if (mySeatIndex !== null) {
+      const nextState = !isMicMuted;
+      setIsMicMuted(nextState);
+      socketRef.current?.emit('toggle_mic_mute', {
+        roomId,
+        seatIndex: mySeatIndex,
+        isMuted: nextState,
+        userId: currentUser?._id,
+      });
+      showToast(nextState ? t('Microphone Muted') : t('Microphone Unmuted'), 'info');
+      return;
+    }
+
+    // Case 2: Room Owner on the Host Seat
+    if (isOwner && isHostActive) {
+      const nextState = !isMicMuted;
+      setIsMicMuted(nextState);
+      setIsHostMuted(nextState);
+      socketRef.current?.emit('toggle_mic_mute', {
+        roomId,
+        isHost: true,
+        isMuted: nextState,
+        userId: currentUser?._id,
+      });
+      showToast(nextState ? t('Microphone Muted') : t('Microphone Unmuted'), 'info');
+      return;
+    }
+
+    // Case 3: Audience member not on any mic seat
+    showToast(t('Please take a mic seat first to speak'), 'info');
   };
 
   const handleCloseChatInput = () => {
@@ -640,6 +688,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             seats={room?.seats || []}
             owner={room?.owner}
             isHostActive={isHostActive}
+            isHostMuted={isHostMuted}
             onSeatPress={handleSeatPress}
             onHostPress={(hostUser) => {
               if (hostUser) setSelectedSeatUser(hostUser);
@@ -780,7 +829,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   isMicMuted && styles.bottomCircleBtnMuted,
                 ]}
                 activeOpacity={0.75}
-                onPress={mySeatIndex !== null ? handleToggleMic : undefined}
+                onPress={handleToggleMic}
               >
                 <Image
                   source={require('../../assets/icons/Mike.png')}

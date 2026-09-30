@@ -547,6 +547,9 @@ export const LanguageProvider = ({ children }) => {
       'Switch',
       'Leave Hosting',
       'Take Host',
+      'Please take a mic seat first to speak',
+      'Microphone Muted',
+      'Microphone Unmuted',
     ])
   );
 

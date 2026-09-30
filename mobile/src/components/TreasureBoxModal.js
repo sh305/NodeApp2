@@ -97,9 +97,9 @@ const BOX_LEVELS = [
   },
 ];
 
-// ── Animated shimmer progress bar ─────────────────────────────────────────
+// ── Animated shimmer progress bar with integrated key badge ──────────────────
 function ProgressBar({ current, target, accentColor }) {
-  const pct = Math.min(current / target, 1);
+  const pct = Math.min(Math.max(current / target, 0), 1);
   const shimmerAnim = useRef(new Animated.Value(-200)).current;
 
   useEffect(() => {
@@ -115,36 +115,86 @@ function ProgressBar({ current, target, accentColor }) {
   }, []);
 
   return (
-    <View style={pb.track}>
-      <View style={[pb.fill, { width: `${pct * 100}%`, backgroundColor: accentColor }]}>
-        <Animated.View
-          style={[pb.shimmer, { transform: [{ translateX: shimmerAnim }] }]}
-        />
+    <View style={pb.wrapper}>
+      <View style={pb.track}>
+        <View style={[pb.fill, { width: `${pct * 100}%`, backgroundColor: accentColor }]}>
+          <Animated.View
+            style={[pb.shimmer, { transform: [{ translateX: shimmerAnim }] }]}
+          />
+        </View>
+      </View>
+
+      {/* Floating Key Badge that stays strictly within the track boundaries */}
+      <View
+        style={[
+          pb.keyThumbWrap,
+          {
+            left: `${pct * 100}%`,
+            transform: [{ translateX: pct > 0.85 ? -22 : (pct < 0.1 ? 0 : -11) }],
+          },
+        ]}
+      >
+        <View style={pb.keyBadge}>
+          <Text style={pb.keyEmoji}>🔑</Text>
+        </View>
       </View>
     </View>
   );
 }
 
 const pb = StyleSheet.create({
+  wrapper: {
+    width: '100%',
+    height: 26,
+    justifyContent: 'center',
+    position: 'relative',
+  },
   track: {
     height: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 8,
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 7,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   fill: {
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 7,
     overflow: 'hidden',
+    position: 'relative',
   },
   shimmer: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     width: 60,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  keyThumbWrap: {
+    position: 'absolute',
+    top: 2,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  keyBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#F59E0B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  keyEmoji: {
+    fontSize: 12,
   },
 });
 
@@ -271,16 +321,11 @@ export default function TreasureBoxModal({
 
           {/* Progress Bar Section */}
           <View style={styles.progressSection}>
-            <View style={styles.keyIconRow}>
-              <Text style={styles.keyIcon}>🔑</Text>
-              <View style={{ flex: 1 }}>
-                <ProgressBar
-                  current={currentProgress}
-                  target={activeBox.requiredGold}
-                  accentColor={activeBox.borderColor}
-                />
-              </View>
-            </View>
+            <ProgressBar
+              current={currentProgress}
+              target={activeBox.requiredGold}
+              accentColor={activeBox.borderColor}
+            />
             <Text style={styles.progressLabel}>
               {currentProgress.toLocaleString()}/
               {activeBox.requiredGold.toLocaleString()}
@@ -466,14 +511,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 14,
     paddingBottom: 8,
-  },
-  keyIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  keyIcon: {
-    fontSize: 22,
   },
   progressLabel: {
     color: 'rgba(255,255,255,0.75)',

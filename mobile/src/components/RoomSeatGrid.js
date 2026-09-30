@@ -53,12 +53,14 @@ export default function RoomSeatGrid({
   seats = [],
   owner = null,
   isHostActive = true,
+  isHostMuted = false,
   onSeatPress,
   onHostPress,
   currentUserId,
   isOwner = false,
   onTreasureBoxPress,
   roomGoldContributed = 0,
+  isChestOpen = false,
 }) {
   const COLUMNS = 4;
   const GRID_H_PADDING = 12;
@@ -68,6 +70,8 @@ export default function RoomSeatGrid({
     { length: totalSeats },
     (_, i) => seats[i] || { seatIndex: i, user: null }
   );
+
+  const isChestUnlocked = Boolean(isChestOpen || (roomGoldContributed && roomGoldContributed >= 12000));
 
   return (
     <View style={styles.container}>
@@ -81,8 +85,12 @@ export default function RoomSeatGrid({
             onPress={onTreasureBoxPress}
           >
             <Image
-              source={require('../../assets/icons/silver_chest.png')}
-              style={styles.silverChestImg}
+              source={
+                isChestUnlocked
+                  ? require('../../assets/icons/golden_chest_open.png')
+                  : require('../../assets/icons/golden_chest_closed.png')
+              }
+              style={styles.goldenChestImg}
               resizeMode="contain"
             />
             {/* Progress bar directly under chest */}
@@ -143,10 +151,14 @@ export default function RoomSeatGrid({
                 </View>
               </LinearGradient>
 
-              {/* Host Green Mic Badge at bottom-right corner */}
+              {/* Host Green / Red Mic Badge at bottom-right corner */}
               {isHostActive && (
-                <View style={styles.hostMicBadge}>
-                  <Text style={styles.hostMicText}>🎙️</Text>
+                <View style={isHostMuted ? styles.hostMicBadgeMuted : styles.hostMicBadge}>
+                  <Image
+                    source={require('../../assets/icons/Mike.png')}
+                    style={styles.hostMicIcon}
+                    resizeMode="contain"
+                  />
                 </View>
               )}
             </View>
@@ -199,11 +211,13 @@ export default function RoomSeatGrid({
                     {seat.user.name}
                   </Text>
                   <Text style={styles.seatNumberText}>No.{seatNumber}</Text>
-                  {seat.isMuted && (
-                    <View style={styles.muteBadge}>
-                      <Text style={styles.muteText}>🔇</Text>
-                    </View>
-                  )}
+                  <View style={seat.isMuted ? styles.seatMicBadgeMuted : styles.seatMicBadge}>
+                    <Image
+                      source={require('../../assets/icons/Mike.png')}
+                      style={styles.seatMicIcon}
+                      resizeMode="contain"
+                    />
+                  </View>
                 </View>
               ) : (
                 /* ── Empty Seat: Vibrant Cyan / Sky-blue Glass Circle ── */
@@ -266,9 +280,9 @@ const styles = StyleSheet.create({
   treasureChestWrapper: {
     alignItems: 'center',
   },
-  silverChestImg: {
+  goldenChestImg: {
     width: 52,
-    height: 44,
+    height: 48,
   },
   chestProgressTrack: {
     height: 4,
@@ -360,8 +374,28 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 4,
   },
-  hostMicText: {
-    fontSize: 9,
+  hostMicBadgeMuted: {
+    position: 'absolute',
+    bottom: -1,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  hostMicIcon: {
+    width: 10,
+    height: 10,
+    tintColor: '#FFFFFF',
   },
   hostNameContainer: {
     flexDirection: 'row',
@@ -475,17 +509,37 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  muteBadge: {
+  seatMicBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#EF4444',
-    borderRadius: 9,
-    padding: 2,
+    top: 30,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
     borderWidth: 1.2,
     borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
   },
-  muteText: {
-    fontSize: 7,
+  seatMicBadgeMuted: {
+    position: 'absolute',
+    top: 30,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
+  },
+  seatMicIcon: {
+    width: 9,
+    height: 9,
+    tintColor: '#FFFFFF',
   },
 });

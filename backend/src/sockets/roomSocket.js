@@ -187,19 +187,41 @@ function initRoomSockets(io) {
       }
     });
 
-    // Toggle Mic Mute
-    socket.on('toggle_mic_mute', async ({ roomId, seatIndex, isMuted }) => {
+    // Toggle Mic Mute (Self Only)
+    socket.on('toggle_mic_mute', async ({ roomId, seatIndex, isMuted, isHost, userId }) => {
       try {
         const room = await Room.findById(roomId);
-        if (!room || !room.seats[seatIndex]) return;
+        if (!room) return;
 
-        room.seats[seatIndex].isMuted = isMuted;
-        await room.save();
+        // Case 1: Host toggling their own mic
+        if (isHost || (room.owner && room.owner.toString() === userId?.toString() && seatIndex === undefined)) {
+          if (room.owner && room.owner.toString() !== userId?.toString()) {
+            return socket.emit('error_message', { message: 'You can only toggle your own microphone' });
+          }
 
-        io.to(roomId).emit('seat_mute_status_changed', {
-          seatIndex,
-          isMuted,
-        });
+          room.isHostMuted = isMuted;
+          await room.save();
+          io.to(roomId).emit('host_mute_status_changed', {
+            isHostMuted: isMuted,
+          });
+          return;
+        }
+
+        // Case 2: Seat user toggling their own seat mic
+        if (seatIndex !== undefined && room.seats[seatIndex]) {
+          const targetSeat = room.seats[seatIndex];
+          if (targetSeat.user && targetSeat.user.toString() !== userId?.toString()) {
+            return socket.emit('error_message', { message: 'You can only toggle your own microphone' });
+          }
+
+          targetSeat.isMuted = isMuted;
+          await room.save();
+
+          io.to(roomId).emit('seat_mute_status_changed', {
+            seatIndex,
+            isMuted,
+          });
+        }
       } catch (err) {
         console.error('Socket toggle_mic_mute error:', err);
       }
