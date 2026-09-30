@@ -519,6 +519,21 @@ export const LanguageProvider = ({ children }) => {
       '3 Player Bomb',
       '4 Player Chaos',
       'Time Bomb Pass',
+      'Write a comment...',
+      'Say hi',
+      'Say something nice...',
+      'Send Photo',
+      'Permission to access photos is required!',
+      'Photo sent to room!',
+      'Failed to send photo',
+      'Sexual and violent contents are not allowed. All violators will be banned from the chatroom. Please respect each other and do not expose your personal info.',
+      'Emojis',
+      'Send Photo to Room',
+      'Add a caption... (optional)',
+      'Crop / Edit',
+      'Change Photo',
+      'Failed to open photo picker',
+      'Send',
     ])
   );
 

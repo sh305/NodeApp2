@@ -23,6 +23,7 @@ const io = new Server(server, {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
   },
+  maxHttpBufferSize: 1e7, // 10MB limit for image attachments
 });
 
 // Middleware

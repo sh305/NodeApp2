@@ -153,10 +153,11 @@ function initRoomSockets(io) {
     });
 
     // Send Live Chat Message
-    socket.on('send_chat_message', async ({ roomId, sender, message }) => {
+    socket.on('send_chat_message', async ({ roomId, sender, message, imageUrl }) => {
       io.to(roomId).emit('new_chat_message', {
         sender,
         message,
+        imageUrl,
         timestamp: new Date(),
       });
     });

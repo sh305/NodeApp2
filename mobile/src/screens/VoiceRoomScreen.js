@@ -13,9 +13,11 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import io from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { BASE_URL } from '../api/client';
@@ -25,8 +27,27 @@ import GiftBottomSheet from '../components/GiftBottomSheet';
 import KickModal from '../components/KickModal';
 import ReportModal from '../components/ReportModal';
 import TreasureBoxModal from '../components/TreasureBoxModal';
+import { useLanguage } from '../context/LanguageContext';
+import { T } from '../components/TranslatedText';
+import { useToast } from '../components/Toast';
+
+const VOICE_ROOM_EMOJIS = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+  '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😋', '😛', '😜',
+  '🤪', '😝', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😏',
+  '😒', '🙄', '😬', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🥵',
+  '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐', '❤️',
+  '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💔', '❣️', '💕',
+  '💞', '💓', '💗', '💖', '💘', '💝', '💋', '👍', '👎', '👏',
+  '🙌', '🤝', '👊', '🤞', '✌️', '🤟', '🤘', '👌', '👈', '👉',
+  '👆', '👇', '👋', '🤙', '🙏', '🎉', '🎊', '🎈', '🎂', '🎁',
+  '👑', '💎', '🌟', '✨', '🔥', '💥', '💯', '🎵', '🎶', '🎤',
+  '🎧', '🍿', '🌹', '🌺', '🌸', '💐', '🍀', '⚡', '🌈', '🧸'
+];
 
 export default function VoiceRoomScreen({ route, navigation, currentUser }) {
+  const { t } = useLanguage();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const { roomId, roomTitle } = route.params;
 
@@ -35,8 +56,26 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatInputActive, setIsChatInputActive] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [selectedImagePreview, setSelectedImagePreview] = useState(null);
+  const [selectedImageToSend, setSelectedImageToSend] = useState(null); // { uri, base64 }
+  const [imageCaption, setImageCaption] = useState('');
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [mySeatIndex, setMySeatIndex] = useState(null);
+
+  const isEmojiPickerOpenRef = useRef(false);
+  useEffect(() => {
+    isEmojiPickerOpenRef.current = isEmojiPickerOpen;
+  }, [isEmojiPickerOpen]);
+
+  useEffect(() => {
+    if (isChatInputActive && !isEmojiPickerOpen) {
+      const timer = setTimeout(() => {
+        chatInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isChatInputActive, isEmojiPickerOpen]);
 
   // Modals state
   const [selectedSeatUser, setSelectedSeatUser] = useState(null);
@@ -82,6 +121,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   useEffect(() => {
     fetchRoomDetails();
+
+    // Auto-close chat input card when system keyboard hides (unless emoji board is open)
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const sub = Keyboard.addListener(hideEvent, () => {
+      if (!isEmojiPickerOpenRef.current) {
+        setIsChatInputActive(false);
+      }
+    });
 
     api.post(`/users/recent-rooms/${roomId}`).catch(() => {});
     AsyncStorage.getItem('@recent_room_ids')
@@ -159,6 +206,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
     return () => {
       socket.disconnect();
+      sub.remove();
     };
   }, [roomId]);
 
@@ -245,14 +293,85 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     });
   };
 
+  const handleCloseChatInput = () => {
+    Keyboard.dismiss();
+    setIsEmojiPickerOpen(false);
+    setIsChatInputActive(false);
+  };
+
+  const handleToggleEmojiPicker = () => {
+    if (isEmojiPickerOpen) {
+      setIsEmojiPickerOpen(false);
+      isEmojiPickerOpenRef.current = false;
+      setTimeout(() => {
+        chatInputRef.current?.focus();
+      }, 60);
+    } else {
+      isEmojiPickerOpenRef.current = true;
+      setIsEmojiPickerOpen(true);
+      Keyboard.dismiss();
+    }
+  };
+
   const handleSendChat = () => {
     if (!chatInput.trim()) return;
-    socketRef.current.emit('send_chat_message', {
+    socketRef.current?.emit('send_chat_message', {
       roomId,
       sender: currentUser,
       message: chatInput.trim(),
     });
     setChatInput('');
+    handleCloseChatInput();
+  };
+
+  const handlePickImage = async (shouldCrop = false) => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showToast(t('Permission to access photos is required!'), 'info');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: shouldCrop,
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64Data = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+
+        setSelectedImageToSend({
+          uri: asset.uri,
+          base64: base64Data,
+        });
+        handleCloseChatInput();
+      }
+    } catch (err) {
+      console.error('Pick image error:', err);
+      showToast(t('Failed to open photo picker'), 'error');
+    }
+  };
+
+  const handleCropCurrentImage = async () => {
+    await handlePickImage(true);
+  };
+
+  const handleConfirmSendPhoto = () => {
+    if (!selectedImageToSend) return;
+    socketRef.current?.emit('send_chat_message', {
+      roomId,
+      sender: currentUser,
+      message: imageCaption.trim(),
+      imageUrl: selectedImageToSend.base64,
+    });
+    setSelectedImageToSend(null);
+    setImageCaption('');
+    showToast(t('Photo sent to room!'), 'success');
   };
 
   const handleSendGift = async (gift, quantity) => {
@@ -346,8 +465,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const BOX_THRESHOLDS = [12000, 42000, 92000, 172000, 272000];
   const currentBoxLevel = BOX_THRESHOLDS.findIndex((t) => roomGoldContributed < t) + 1 || 5;
 
-  const safeBottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 38 : 16);
-  const bottomBarHeight = safeBottomPadding + 40;
+  const safeBottomPadding = Math.max(insets.bottom + 10, Platform.OS === 'android' ? 44 : 24);
+  const bottomBarHeight = safeBottomPadding + 48;
 
   const bgUri =
     room?.backgroundImage ||
@@ -524,10 +643,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           style={[styles.bottomLeftChatSection, { bottom: bottomBarHeight + 4 }]}
           pointerEvents="box-none"
         >
-          {/* Rules / Safety Notice Bubble (exact matching Screenshot 2) */}
+          {/* Rules / Safety Notice Bubble (exact matching Screenshot) */}
           <View style={styles.noticeBubble}>
             <Text style={styles.noticeText}>
-              सेक्सुअल और हिंसक कंटेंट की अनुमति नहीं है। सभी उल्लंघन करने वालों को चैट रूम से बैन कर दिया जाएगा। कृपया एक दूसरे का सम्मान करें और अपनी पर्सनल जानकारी को उजागर न करें।
+              <T>Sexual and violent contents are not allowed. All violators will be banned from the chatroom. Please respect each other and do not expose your personal info.</T>
             </Text>
           </View>
 
@@ -550,7 +669,22 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   <Text style={styles.chatSenderName}>
                     Lv.{item.sender?.wealthLevel || 1} {item.sender?.name}:{' '}
                   </Text>
-                  <Text style={styles.chatMessageContent}>{item.message}</Text>
+                  {item.message ? (
+                    <Text style={styles.chatMessageContent}>{item.message}</Text>
+                  ) : null}
+                  {item.imageUrl ? (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => setSelectedImagePreview(item.imageUrl)}
+                      style={styles.chatImageWrap}
+                    >
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        style={styles.chatImage}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               )
             }
@@ -558,127 +692,321 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         </View>
 
         {/* ══ 5. FLOATING TRANSLUCENT BOTTOM CONTROL BAR ══ */}
-        <View style={[styles.floatingBottomBar, { paddingBottom: safeBottomPadding }]}>
-          {/* Comment button pill */}
-          <TouchableOpacity
-            style={styles.commentPill}
-            activeOpacity={0.8}
-            onPress={() => setIsChatInputActive(true)}
-          >
-            <Text
-              style={styles.commentPillText}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {chatInput ? chatInput : 'कमेंट लिखिए'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Quick Action Circle Icons */}
-          <View style={styles.bottomIconGroup}>
-            {/* Emoji */}
+        {!isChatInputActive && (
+          <View style={[styles.floatingBottomBar, { paddingBottom: safeBottomPadding }]}>
+            {/* Comment button pill */}
             <TouchableOpacity
-              style={styles.bottomCircleBtn}
-              activeOpacity={0.75}
-              onPress={() => {}}
+              style={styles.commentPill}
+              activeOpacity={0.8}
+              onPress={() => {
+                setIsChatInputActive(true);
+                setIsEmojiPickerOpen(false);
+              }}
             >
-              <Text style={styles.bottomEmoji}>😊</Text>
-              <View style={styles.redBadgeDot} />
-            </TouchableOpacity>
-
-            {/* Mic */}
-            <TouchableOpacity
-              style={[
-                styles.bottomCircleBtn,
-                isMicMuted && styles.bottomCircleBtnMuted,
-              ]}
-              activeOpacity={0.75}
-              onPress={mySeatIndex !== null ? handleToggleMic : undefined}
-            >
-              <Text style={styles.bottomEmoji}>
-                {isMicMuted ? '🔇' : '🎙️'}
+              <Text
+                style={styles.commentPillText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {chatInput ? chatInput : t('Write a comment...')}
               </Text>
             </TouchableOpacity>
 
-            {/* Menu / 4 dots */}
-            <TouchableOpacity
-              style={styles.bottomCircleBtn}
-              activeOpacity={0.75}
-              onPress={() => {}}
-            >
-              <Text style={styles.bottomEmoji}>⊞</Text>
-              <View style={styles.redBadgeDot} />
-            </TouchableOpacity>
-
-            {/* Chat */}
-            <TouchableOpacity
-              style={styles.bottomCircleBtn}
-              activeOpacity={0.75}
-              onPress={() => setIsChatInputActive(true)}
-            >
-              <Text style={styles.bottomEmoji}>💬</Text>
-            </TouchableOpacity>
-
-            {/* Game */}
-            <TouchableOpacity
-              style={styles.bottomCircleBtn}
-              activeOpacity={0.75}
-              onPress={() => {}}
-            >
-              <Text style={styles.bottomEmoji}>🎮</Text>
-            </TouchableOpacity>
-
-            {/* Gift Button (Large vibrant pink/rose highlighted) */}
-            <TouchableOpacity
-              style={styles.bottomGiftBtn}
-              activeOpacity={0.8}
-              onPress={() => setGiftModalVisible(true)}
-            >
-              <LinearGradient
-                colors={['#F43F5E', '#EC4899', '#FB7185']}
-                style={styles.bottomGiftGrad}
+            {/* Quick Action Circle Icons */}
+            <View style={styles.bottomIconGroup}>
+              {/* Emoji */}
+              <TouchableOpacity
+                style={styles.bottomCircleBtn}
+                activeOpacity={0.75}
+                onPress={() => {
+                  setIsChatInputActive(true);
+                  setIsEmojiPickerOpen(true);
+                }}
               >
-                <Text style={styles.bottomGiftEmoji}>🎁</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
+                <Text style={styles.bottomEmoji}>😊</Text>
+                <View style={styles.redBadgeDot} />
+              </TouchableOpacity>
 
-        {/* ══ 6. ACTIVE CHAT INPUT OVERLAY (when tapping comment) ══ */}
+              {/* Mic */}
+              <TouchableOpacity
+                style={[
+                  styles.bottomCircleBtn,
+                  isMicMuted && styles.bottomCircleBtnMuted,
+                ]}
+                activeOpacity={0.75}
+                onPress={mySeatIndex !== null ? handleToggleMic : undefined}
+              >
+                <Text style={styles.bottomEmoji}>
+                  {isMicMuted ? '🔇' : '🎙️'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Menu / 4 dots */}
+              <TouchableOpacity
+                style={styles.bottomCircleBtn}
+                activeOpacity={0.75}
+                onPress={() => {}}
+              >
+                <Text style={styles.bottomEmoji}>⊞</Text>
+                <View style={styles.redBadgeDot} />
+              </TouchableOpacity>
+
+              {/* Chat */}
+              <TouchableOpacity
+                style={styles.bottomCircleBtn}
+                activeOpacity={0.75}
+                onPress={() => {
+                  setIsChatInputActive(true);
+                  setIsEmojiPickerOpen(false);
+                }}
+              >
+                <Text style={styles.bottomEmoji}>💬</Text>
+              </TouchableOpacity>
+
+              {/* Game */}
+              <TouchableOpacity
+                style={styles.bottomCircleBtn}
+                activeOpacity={0.75}
+                onPress={() => {}}
+              >
+                <Text style={styles.bottomEmoji}>🎮</Text>
+              </TouchableOpacity>
+
+              {/* Gift Button (Large vibrant pink/rose highlighted) */}
+              <TouchableOpacity
+                style={styles.bottomGiftBtn}
+                activeOpacity={0.8}
+                onPress={() => setGiftModalVisible(true)}
+              >
+                <LinearGradient
+                  colors={['#F43F5E', '#EC4899', '#FB7185']}
+                  style={styles.bottomGiftGrad}
+                >
+                  <Text style={styles.bottomGiftEmoji}>🎁</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ══ 6. ACTIVE CHAT INPUT OVERLAY (White Card above keyboard matching screenshot) ══ */}
         {isChatInputActive && (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={[styles.chatInputOverlay, { bottom: safeBottomPadding + 4 }]}
-          >
-            <TextInput
-              ref={chatInputRef}
-              style={styles.chatActiveInput}
-              placeholder="Say something nice..."
-              placeholderTextColor="rgba(255,255,255,0.6)"
-              value={chatInput}
-              onChangeText={setChatInput}
-              autoFocus
-              onSubmitEditing={() => {
-                handleSendChat();
-                setIsChatInputActive(false);
-              }}
+          <View style={styles.chatInputModalContainer} pointerEvents="box-none">
+            {/* Transparent touch-to-dismiss backdrop above card */}
+            <TouchableOpacity
+              style={styles.chatModalBackdrop}
+              activeOpacity={1}
+              onPress={handleCloseChatInput}
             />
-            <TouchableOpacity
-              style={styles.chatActiveSendBtn}
-              onPress={() => {
-                handleSendChat();
-                setIsChatInputActive(false);
-              }}
+
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={styles.chatKeyboardCardWrapper}
             >
-              <Text style={styles.chatActiveSendText}>➤</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.chatActiveCloseBtn}
-              onPress={() => setIsChatInputActive(false)}
-            >
-              <Text style={styles.chatActiveCloseText}>✕</Text>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
+              <View
+                style={[
+                  styles.chatWhiteCard,
+                  {
+                    paddingBottom: isEmojiPickerOpen
+                      ? 10
+                      : (Platform.OS === 'android' ? 20 : Math.max(insets.bottom, 16)),
+                  },
+                ]}
+              >
+                {/* Row 1: Quick Action Tools (Photo gallery button only, T and AI removed as requested) */}
+                <View style={styles.chatToolsRow}>
+                  <TouchableOpacity
+                    style={styles.chatToolBtn}
+                    activeOpacity={0.75}
+                    onPress={() => handlePickImage(false)}
+                  >
+                    <Text style={styles.chatToolPhotoIcon}>🖼️</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Row 2: Message Input Bar */}
+                <View style={styles.chatInputRow}>
+                  {/* Emoji / Keyboard toggle button */}
+                  <TouchableOpacity
+                    style={styles.chatEmojiToggleBtn}
+                    activeOpacity={0.7}
+                    onPress={handleToggleEmojiPicker}
+                  >
+                    <Text style={styles.chatEmojiToggleIcon}>
+                      {isEmojiPickerOpen ? '⌨️' : '😊'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Rounded pill input field */}
+                  <View style={styles.chatTextInputCapsule}>
+                    <TextInput
+                      ref={chatInputRef}
+                      style={styles.chatTextInput}
+                      placeholder={t('Say hi')}
+                      placeholderTextColor="#9CA3AF"
+                      value={chatInput}
+                      onChangeText={setChatInput}
+                      autoFocus={!isEmojiPickerOpen}
+                      returnKeyType="send"
+                      onSubmitEditing={handleSendChat}
+                    />
+                  </View>
+
+                  {/* Circular Send Button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.chatSendCircleBtn,
+                      chatInput.trim().length > 0 && styles.chatSendCircleBtnActive,
+                    ]}
+                    activeOpacity={0.8}
+                    onPress={handleSendChat}
+                  >
+                    <Text
+                      style={[
+                        styles.chatSendCircleIcon,
+                        chatInput.trim().length > 0 && styles.chatSendCircleIconActive,
+                      ]}
+                    >
+                      ➤
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Bottom White Spacer so keyboard NEVER touches the buttons */}
+                {!isEmojiPickerOpen && <View style={styles.chatBottomSpacer} />}
+
+                {/* Emoji Picker Board */}
+                {isEmojiPickerOpen && (
+                  <View style={styles.emojiPickerContainer}>
+                    <View style={styles.emojiPickerHeader}>
+                      <Text style={styles.emojiPickerTitle}>{t('Emojis')}</Text>
+                      <TouchableOpacity
+                        style={styles.emojiBackspaceBtn}
+                        onPress={() => setChatInput((prev) => prev.slice(0, -2))}
+                      >
+                        <Text style={styles.emojiBackspaceIcon}>⌫</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView
+                      style={styles.emojiGridScroll}
+                      contentContainerStyle={styles.emojiGridContent}
+                      keyboardShouldPersistTaps="always"
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {VOICE_ROOM_EMOJIS.map((emoji, index) => (
+                        <TouchableOpacity
+                          key={`emoji_${index}`}
+                          style={styles.emojiItemBtn}
+                          activeOpacity={0.6}
+                          onPress={() => setChatInput((prev) => prev + emoji)}
+                        >
+                          <Text style={styles.emojiItemText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        )}
+
+        {/* Fullscreen Photo Preview Modal */}
+        {selectedImagePreview && (
+          <Modal visible={!!selectedImagePreview} transparent animationType="fade">
+            <View style={styles.imagePreviewModalBg}>
+              <TouchableOpacity
+                style={[styles.imagePreviewCloseBtn, { top: Math.max(20, insets.top + 10) }]}
+                onPress={() => setSelectedImagePreview(null)}
+              >
+                <Text style={styles.imagePreviewCloseText}>✕</Text>
+              </TouchableOpacity>
+              <Image
+                source={{ uri: selectedImagePreview }}
+                style={styles.imagePreviewLarge}
+                resizeMode="contain"
+              />
+            </View>
+          </Modal>
+        )}
+
+        {/* ══ PHOTO SEND CONFIRMATION MODAL (Clear Preview with Send, Cancel, and Crop options) ══ */}
+        {selectedImageToSend && (
+          <Modal visible={!!selectedImageToSend} transparent animationType="slide">
+            <View style={styles.sendPhotoModalOverlay}>
+              <View style={styles.sendPhotoModalCard}>
+                {/* Header */}
+                <View style={styles.sendPhotoHeader}>
+                  <Text style={styles.sendPhotoTitle}><T>Send Photo to Room</T></Text>
+                  <TouchableOpacity
+                    style={styles.sendPhotoCloseBtn}
+                    onPress={() => {
+                      setSelectedImageToSend(null);
+                      setImageCaption('');
+                    }}
+                  >
+                    <Text style={styles.sendPhotoCloseIcon}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Image Preview Box */}
+                <View style={styles.sendPhotoPreviewContainer}>
+                  <Image
+                    source={{ uri: selectedImageToSend.uri }}
+                    style={styles.sendPhotoImage}
+                    resizeMode="contain"
+                  />
+                  {/* Crop / Edit Quick Action Pill */}
+                  <TouchableOpacity
+                    style={styles.sendPhotoCropPill}
+                    activeOpacity={0.8}
+                    onPress={handleCropCurrentImage}
+                  >
+                    <Text style={styles.sendPhotoCropText}>✂️ <T>Crop / Edit</T></Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Caption / Message Input */}
+                <View style={styles.sendPhotoCaptionBox}>
+                  <TextInput
+                    style={styles.sendPhotoCaptionInput}
+                    placeholder={t('Add a caption... (optional)')}
+                    placeholderTextColor="#9CA3AF"
+                    value={imageCaption}
+                    onChangeText={setImageCaption}
+                    maxLength={120}
+                  />
+                </View>
+
+                {/* Action Buttons: Cancel and Send */}
+                <View style={styles.sendPhotoActionsRow}>
+                  <TouchableOpacity
+                    style={styles.sendPhotoCancelBtn}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      setSelectedImageToSend(null);
+                      setImageCaption('');
+                    }}
+                  >
+                    <Text style={styles.sendPhotoCancelText}><T>Cancel</T></Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.sendPhotoConfirmBtn}
+                    activeOpacity={0.8}
+                    onPress={handleConfirmSendPhoto}
+                  >
+                    <LinearGradient
+                      colors={['#6366F1', '#4F46E5']}
+                      style={styles.sendPhotoConfirmGrad}
+                    >
+                      <Text style={styles.sendPhotoConfirmText}>➤ <T>Send Photo</T></Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         )}
       </ImageBackground>
 
@@ -1252,36 +1580,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingTop: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    backgroundColor: 'rgba(15, 15, 26, 0.85)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     zIndex: 30,
   },
   commentPill: {
     flex: 1,
-    height: 34,
+    height: 36,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    borderRadius: 17,
-    paddingHorizontal: 10,
+    borderRadius: 18,
+    paddingHorizontal: 12,
     justifyContent: 'center',
-    marginRight: 6,
+    marginRight: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.32)',
   },
   commentPillText: {
-    color: 'rgba(255, 255, 255, 0.88)',
-    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
     fontWeight: '600',
   },
   bottomIconGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   bottomCircleBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1294,7 +1624,7 @@ const styles = StyleSheet.create({
     borderColor: '#EF4444',
   },
   bottomEmoji: {
-    fontSize: 14,
+    fontSize: 15,
   },
   redBadgeDot: {
     position: 'absolute',
@@ -1308,9 +1638,9 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
   bottomGiftBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     shadowColor: '#F43F5E',
     shadowOpacity: 0.7,
     shadowRadius: 6,
@@ -1319,64 +1649,203 @@ const styles = StyleSheet.create({
   bottomGiftGrad: {
     width: '100%',
     height: '100%',
-    borderRadius: 18,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
   bottomGiftEmoji: {
-    fontSize: 18,
+    fontSize: 19,
   },
 
-  /* ── 6. Active Chat Input Overlay ── */
-  chatInputOverlay: {
-    position: 'absolute',
-    left: 10,
-    right: 10,
+  /* ── 6. Active Chat Input Overlay (White card matching screenshot) ── */
+  chatInputModalContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    justifyContent: 'flex-end',
+  },
+  chatModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  chatKeyboardCardWrapper: {
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
+  chatWhiteCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 16,
+  },
+  chatToolsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E1E2E',
-    borderRadius: 24,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    zIndex: 50,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    shadowColor: '#000',
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  chatActiveInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 13,
-    paddingVertical: 6,
     paddingHorizontal: 4,
+    marginBottom: 8,
   },
-  chatActiveSendBtn: {
-    backgroundColor: '#6366F1',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  chatToolBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 6,
   },
-  chatActiveSendText: {
-    color: '#FFFFFF',
+  chatToolPhotoIcon: {
+    fontSize: 20,
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 2,
+    marginBottom: 6,
+  },
+  chatBottomSpacer: {
+    height: 20,
+    width: '100%',
+  },
+  chatEmojiToggleBtn: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatEmojiToggleIcon: {
+    fontSize: 24,
+  },
+  chatTextInputCapsule: {
+    flex: 1,
+    height: 42,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 21,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  chatTextInput: {
+    color: '#111827',
     fontSize: 14,
-    fontWeight: '800',
+    paddingVertical: 0,
   },
-  chatActiveCloseBtn: {
-    padding: 6,
-    marginLeft: 4,
+  chatSendCircleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chatActiveCloseText: {
+  chatSendCircleBtnActive: {
+    backgroundColor: '#6366F1',
+    shadowColor: '#6366F1',
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  chatSendCircleIcon: {
     color: '#9CA3AF',
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: 2,
+  },
+  chatSendCircleIconActive: {
+    color: '#FFFFFF',
+  },
+
+  /* ── Emoji Picker Board ── */
+  emojiPickerContainer: {
+    height: 250,
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 8,
+  },
+  emojiPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    marginBottom: 6,
+  },
+  emojiPickerTitle: {
+    color: '#4B5563',
+    fontSize: 12,
     fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  emojiBackspaceBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+  },
+  emojiBackspaceIcon: {
+    fontSize: 18,
+    color: '#4B5563',
+  },
+  emojiGridScroll: {
+    flex: 1,
+  },
+  emojiGridContent: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingBottom: 20,
+  },
+  emojiItemBtn: {
+    width: '10%',
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiItemText: {
+    fontSize: 22,
+  },
+
+  /* ── Image in Chat & Fullscreen Preview ── */
+  chatImageWrap: {
+    marginTop: 4,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  chatImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 10,
+  },
+  imagePreviewModalBg: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePreviewCloseBtn: {
+    position: 'absolute',
+    right: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+  },
+  imagePreviewCloseText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  imagePreviewLarge: {
+    width: '92%',
+    height: '75%',
   },
 
   /* ── User Interaction Modal ── */
@@ -1448,5 +1917,124 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  /* ── Photo Send Confirmation Modal ── */
+  sendPhotoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  sendPhotoModalCard: {
+    backgroundColor: '#1E1E2E',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 16,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  sendPhotoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sendPhotoTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sendPhotoCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendPhotoCloseIcon: {
+    color: '#9CA3AF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  sendPhotoPreviewContainer: {
+    width: '100%',
+    height: 240,
+    backgroundColor: '#0F0F1A',
+    borderRadius: 14,
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  sendPhotoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sendPhotoCropPill: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  sendPhotoCropText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sendPhotoCaptionBox: {
+    backgroundColor: '#2A2A3E',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  sendPhotoCaptionInput: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    paddingVertical: 6,
+  },
+  sendPhotoActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sendPhotoCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#2A2A3E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendPhotoCancelText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sendPhotoConfirmBtn: {
+    flex: 2,
+    height: 44,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  sendPhotoConfirmGrad: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendPhotoConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
