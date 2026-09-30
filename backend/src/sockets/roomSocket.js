@@ -69,6 +69,16 @@ function initRoomSockets(io) {
           return socket.emit('error_message', { message: 'Seat already occupied' });
         }
 
+        // CONDITION: A user cannot be in 2 places!
+        // If the user is the room owner and currently active on the Host seat, they CANNOT sit on a mic seat!
+        const isOwner = room.owner && room.owner.toString() === userId.toString();
+        const isHostActive = room.isHostActive !== false;
+        if (isOwner && isHostActive) {
+          return socket.emit('error_message', {
+            message: 'You are currently on the Host seat. Please step down from Host seat first.',
+          });
+        }
+
         // Remove user from any other seat in same room
         room.seats.forEach((s) => {
           if (s.user && s.user.toString() === userId) {
@@ -119,19 +129,62 @@ function initRoomSockets(io) {
     });
 
     // Leave Host Seat (Step down from Hosting)
-    socket.on('leave_host', ({ roomId, userId }) => {
-      io.to(roomId).emit('host_status_updated', {
-        isHostActive: false,
-        userId,
-      });
+    socket.on('leave_host', async ({ roomId, userId }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (room) {
+          room.isHostActive = false;
+          await room.save();
+        }
+        io.to(roomId).emit('host_status_updated', {
+          isHostActive: false,
+          userId,
+        });
+      } catch (err) {
+        console.error('Socket leave_host error:', err);
+      }
     });
 
     // Take Host Seat
-    socket.on('take_host', ({ roomId, userId }) => {
-      io.to(roomId).emit('host_status_updated', {
-        isHostActive: true,
-        userId,
-      });
+    socket.on('take_host', async ({ roomId, userId }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return;
+
+        // Condition 1: Only the room owner can take Host seat
+        if (room.owner.toString() !== userId.toString()) {
+          return socket.emit('error_message', {
+            message: 'Only the room owner can take the Host seat',
+          });
+        }
+
+        // Condition 2: If the user is currently sitting on any mic seat, vacate that seat!
+        let seatRemoved = false;
+        room.seats.forEach((s) => {
+          if (s.user && s.user.toString() === userId.toString()) {
+            s.user = null;
+            seatRemoved = true;
+          }
+        });
+
+        room.isHostActive = true;
+        await room.save();
+
+        if (seatRemoved) {
+          const updatedRoom = await Room.findById(roomId)
+            .populate('seats.user', 'name avatar wealthLevel activeFrame');
+          io.to(roomId).emit('seats_updated', {
+            seats: updatedRoom.seats,
+          });
+        }
+
+        io.to(roomId).emit('host_status_updated', {
+          isHostActive: true,
+          userId,
+        });
+      } catch (err) {
+        console.error('Socket take_host error:', err);
+      }
     });
 
     // Toggle Mic Mute

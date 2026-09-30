@@ -534,6 +534,19 @@ export const LanguageProvider = ({ children }) => {
       'Change Photo',
       'Failed to open photo picker',
       'Send',
+      'You are already on the Host seat! Step down from hosting first.',
+      'You are currently on the Host seat. Please step down from Host seat first.',
+      'Only the room owner can take the Host seat.',
+      'Take Host Seat 👑',
+      'You took the Host seat 👑',
+      'You stepped down from the Host seat 👑',
+      'You left the mic seat 🪑',
+      'Seat already occupied',
+      'Change Seat',
+      'Do you want to switch to this seat?',
+      'Switch',
+      'Leave Hosting',
+      'Take Host',
     ])
   );
 

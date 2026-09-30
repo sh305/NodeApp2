@@ -99,6 +99,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         if (res.data.room.goldContributed !== undefined) {
           setRoomGoldContributed(res.data.room.goldContributed);
         }
+        if (res.data.room.isHostActive !== undefined) {
+          setIsHostActive(res.data.room.isHostActive);
+        }
 
         const mySeat = res.data.room.seats.findIndex(
           (s) => s.user && s.user._id === currentUser?._id
@@ -147,6 +150,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     socket.emit('join_room', {
       roomId,
       userId: currentUser?._id,
+    });
+
+    socket.on('error_message', ({ message }) => {
+      if (message) {
+        showToast(t(message), 'error');
+      }
     });
 
     socket.on('seats_updated', ({ seats }) => {
@@ -214,13 +223,22 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     if (seat.user) {
       setSelectedSeatUser({ ...seat.user, seatIndex: index });
     } else {
+      // Condition: A user cannot be in 2 places! If active on Host seat, cannot take a mic seat
+      if (isOwner && isHostActive) {
+        showToast(
+          t('You are already on the Host seat! Step down from hosting first.'),
+          'info'
+        );
+        return;
+      }
+
       if (mySeatIndex !== null) {
-        Alert.alert('Change Seat', 'Do you want to switch to this seat?', [
-          { text: 'Cancel' },
+        Alert.alert(t('Change Seat'), t('Do you want to switch to this seat?'), [
+          { text: t('Cancel') },
           {
-            text: 'Switch',
+            text: t('Switch'),
             onPress: () => {
-              socketRef.current.emit('take_seat', {
+              socketRef.current?.emit('take_seat', {
                 roomId,
                 seatIndex: index,
                 userId: currentUser?._id,
@@ -229,7 +247,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           },
         ]);
       } else {
-        socketRef.current.emit('take_seat', {
+        socketRef.current?.emit('take_seat', {
           roomId,
           seatIndex: index,
           userId: currentUser?._id,
@@ -240,45 +258,73 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   const handleLeaveSeat = () => {
     if (mySeatIndex !== null) {
-      socketRef.current.emit('leave_seat', {
+      socketRef.current?.emit('leave_seat', {
         roomId,
         userId: currentUser?._id,
       });
       setMySeatIndex(null);
+      showToast(t('You left the mic seat 🪑'), 'info');
     }
+    setSelectedSeatUser(null);
   };
 
   const handleLeaveHosting = () => {
     setIsHostActive(false);
-    socketRef.current.emit('leave_host', {
+    socketRef.current?.emit('leave_host', {
       roomId,
       userId: currentUser?._id,
     });
-    Alert.alert('Leave Hosting 👑', 'Aap host seat se step down ho gaye hain.');
+    showToast(t('You stepped down from the Host seat 👑'), 'info');
     setSelectedSeatUser(null);
   };
 
   const handleTakeHost = () => {
     if (!isOwner) {
-      Alert.alert('Host Only', 'Sirf Room Owner hi Host ban sakte hain.');
+      showToast(t('Only the room owner can take the Host seat.'), 'info');
       return;
     }
+
+    // Condition: If user is on a mic seat, confirm switching to Host seat
+    if (mySeatIndex !== null) {
+      Alert.alert(
+        t('Take Host Seat 👑'),
+        t('You are currently on a seat. Do you want to leave your seat and take the Host seat?'),
+        [
+          { text: t('Cancel') },
+          {
+            text: t('Take Host'),
+            onPress: () => {
+              socketRef.current?.emit('take_host', {
+                roomId,
+                userId: currentUser?._id,
+              });
+              setIsHostActive(true);
+              setMySeatIndex(null);
+              showToast(t('You took the Host seat 👑'), 'success');
+              setSelectedSeatUser(null);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     setIsHostActive(true);
-    socketRef.current.emit('take_host', {
+    socketRef.current?.emit('take_host', {
       roomId,
       userId: currentUser?._id,
     });
-    Alert.alert('Host Active 👑', 'Aap Host seat par baith gaye hain.');
+    showToast(t('You took the Host seat 👑'), 'success');
     setSelectedSeatUser(null);
   };
 
   const handleRemoveUserFromSeat = () => {
     if (!selectedSeatUser) return;
-    socketRef.current.emit('leave_seat', {
+    socketRef.current?.emit('leave_seat', {
       roomId,
       userId: selectedSeatUser._id,
     });
-    Alert.alert('Seat Removed 🪑', `${selectedSeatUser.name} ko seat se hata diya gaya.`);
+    showToast(t('User was removed from seat 🪑'), 'info');
     setSelectedSeatUser(null);
   };
 
@@ -736,18 +782,27 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 activeOpacity={0.75}
                 onPress={mySeatIndex !== null ? handleToggleMic : undefined}
               >
-                <Text style={styles.bottomEmoji}>
-                  {isMicMuted ? '🔇' : '🎙️'}
-                </Text>
+                <Image
+                  source={require('../../assets/icons/Mike.png')}
+                  style={[
+                    styles.bottomIconImg,
+                    { tintColor: isMicMuted ? '#EF4444' : '#FFFFFF' },
+                  ]}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
 
-              {/* Menu / 4 dots */}
+              {/* Menu / DailyHunt */}
               <TouchableOpacity
                 style={styles.bottomCircleBtn}
                 activeOpacity={0.75}
                 onPress={() => {}}
               >
-                <Text style={styles.bottomEmoji}>⊞</Text>
+                <Image
+                  source={require('../../assets/icons/DailyHunt.png')}
+                  style={styles.bottomIconImg}
+                  resizeMode="contain"
+                />
                 <View style={styles.redBadgeDot} />
               </TouchableOpacity>
 
@@ -769,7 +824,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 activeOpacity={0.75}
                 onPress={() => {}}
               >
-                <Text style={styles.bottomEmoji}>🎮</Text>
+                <Image
+                  source={require('../../assets/icons/Game.png')}
+                  style={styles.bottomIconImg}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
 
               {/* Gift Button (Large vibrant pink/rose highlighted) */}
@@ -809,7 +868,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   {
                     paddingBottom: isEmojiPickerOpen
                       ? 10
-                      : (Platform.OS === 'android' ? 20 : Math.max(insets.bottom, 16)),
+                      : (Platform.OS === 'android' ? 14 : Math.max(insets.bottom, 14)),
                   },
                 ]}
               >
@@ -1067,11 +1126,6 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   (selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) &&
                     isHostActive &&
                     isOwner
-                )}
-                {Boolean(
-                  (selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) &&
-                    isHostActive &&
-                    isOwner
                 ) && (
                   <TouchableOpacity
                     style={[
@@ -1085,7 +1139,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                     onPress={handleLeaveHosting}
                   >
                     <Text style={styles.actionEmoji}>👑</Text>
-                    <Text style={[styles.actionLabel, { color: '#F59E0B' }]}>Leave Hosting</Text>
+                    <Text style={[styles.actionLabel, { color: '#F59E0B' }]}>
+                      <T>Leave Hosting</T>
+                    </Text>
                   </TouchableOpacity>
                 )}
 
@@ -1107,7 +1163,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                     onPress={handleTakeHost}
                   >
                     <Text style={styles.actionEmoji}>👑</Text>
-                    <Text style={[styles.actionLabel, { color: '#10B981' }]}>Take Host</Text>
+                    <Text style={[styles.actionLabel, { color: '#10B981' }]}>
+                      <T>Take Host</T>
+                    </Text>
                   </TouchableOpacity>
                 )}
 
@@ -1128,7 +1186,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                     }}
                   >
                     <Text style={styles.actionEmoji}>🚪</Text>
-                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Leave Seat</Text>
+                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>
+                      <T>Leave Seat</T>
+                    </Text>
                   </TouchableOpacity>
                 )}
 
@@ -1146,7 +1206,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                     onPress={handleRemoveUserFromSeat}
                   >
                     <Text style={styles.actionEmoji}>🪑</Text>
-                    <Text style={[styles.actionLabel, { color: '#F43F5E' }]}>Remove Seat</Text>
+                    <Text style={[styles.actionLabel, { color: '#F43F5E' }]}>
+                      <T>Remove Seat</T>
+                    </Text>
                   </TouchableOpacity>
                 )}
 
@@ -1626,6 +1688,10 @@ const styles = StyleSheet.create({
   bottomEmoji: {
     fontSize: 15,
   },
+  bottomIconImg: {
+    width: 20,
+    height: 20,
+  },
   redBadgeDot: {
     position: 'absolute',
     top: 2,
@@ -1709,7 +1775,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   chatBottomSpacer: {
-    height: 20,
+    height: 12,
     width: '100%',
   },
   chatEmojiToggleBtn: {

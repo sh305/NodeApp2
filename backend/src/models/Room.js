@@ -101,6 +101,11 @@ const roomSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Host seat active status
+    isHostActive: {
+      type: Boolean,
+      default: true,
+    },
     // Dynamically initialized seats
     seats: [seatSchema],
     // Kicked users list (3days vs permanent)
