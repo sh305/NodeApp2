@@ -10,8 +10,6 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AvatarWithFrame from './AvatarWithFrame';
-import StylishSofaIcon from './StylishSofaIcon';
-import RoyalHostSofaIcon from './RoyalHostSofaIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -21,7 +19,11 @@ function PulseRing({ active }) {
   const opacity = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      scale.setValue(1);
+      opacity.setValue(0);
+      return;
+    }
     const loop = Animated.loop(
       Animated.parallel([
         Animated.sequence([
@@ -121,17 +123,22 @@ export default function RoomSeatGrid({
             onPress={() => onHostPress && onHostPress({ ...owner, isHostSeat: true })}
           >
             <View style={styles.hostGlowRing}>
-              <PulseRing active={isHostActive} />
+              <PulseRing active={Boolean(isHostActive && !isHostMuted)} />
 
               <LinearGradient
                 colors={
-                  isHostActive
+                  isHostActive && !isHostMuted
                     ? ['#FDE047', '#F59E0B', '#D97706']
+                    : isHostActive && isHostMuted
+                    ? ['rgba(156, 163, 175, 0.4)', 'rgba(107, 114, 128, 0.3)']
                     : ['rgba(139,92,246,0.5)', 'rgba(99,102,241,0.4)']
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.hostGradientBorder}
+                style={[
+                  styles.hostGradientBorder,
+                  isHostActive && isHostMuted && { shadowOpacity: 0.1 },
+                ]}
               >
                 <View style={styles.hostInnerCircle}>
                   {isHostActive ? (
@@ -145,7 +152,11 @@ export default function RoomSeatGrid({
                     />
                   ) : (
                     <View style={styles.vacantHostBox}>
-                      <RoyalHostSofaIcon width={32} height={32} />
+                      <Image
+                        source={require('../../assets/icons/SofaSeat.png')}
+                        style={styles.vacantHostSofaImg}
+                        resizeMode="contain"
+                      />
                     </View>
                   )}
                 </View>
@@ -201,7 +212,7 @@ export default function RoomSeatGrid({
               {isOccupied ? (
                 /* ── Occupied Seat ── */
                 <View style={styles.occupiedWrapper}>
-                  {isMe && <View style={styles.mySeatGlow} />}
+                  {Boolean(isMe && !seat.isMuted) && <View style={styles.mySeatGlow} />}
                   <AvatarWithFrame
                     avatarUri={seat.user.avatar}
                     level={seat.user.wealthLevel || 1}
@@ -235,9 +246,22 @@ export default function RoomSeatGrid({
                     >
                       <View style={styles.seatInner}>
                         {isLocked ? (
-                          <Text style={styles.lockedIcon}>🔒</Text>
+                          <View style={styles.lockedSeatWrap}>
+                            <Image
+                              source={require('../../assets/icons/SofaSeat.png')}
+                              style={[styles.sofaSeatImg, styles.lockedSofaSeat]}
+                              resizeMode="contain"
+                            />
+                            <View style={styles.lockBadge}>
+                              <Text style={styles.lockedIcon}>🔒</Text>
+                            </View>
+                          </View>
                         ) : (
-                          <StylishSofaIcon width={24} height={24} color="#FFFFFF" tint="#E0F2FE" />
+                          <Image
+                            source={require('../../assets/icons/SofaSeat.png')}
+                            style={styles.sofaSeatImg}
+                            resizeMode="contain"
+                          />
                         )}
                       </View>
                     </LinearGradient>
@@ -468,8 +492,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
+  sofaSeatImg: {
+    width: 32,
+    height: 32,
+  },
+  vacantHostSofaImg: {
+    width: 36,
+    height: 36,
+  },
+  lockedSeatWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockedSofaSeat: {
+    opacity: 0.45,
+  },
+  lockBadge: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   lockedIcon: {
-    fontSize: 18,
+    fontSize: 16,
   },
   seatNumberText: {
     color: '#FFFFFF',

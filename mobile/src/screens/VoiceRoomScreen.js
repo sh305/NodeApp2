@@ -14,6 +14,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Share,
+  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -62,6 +65,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [imageCaption, setImageCaption] = useState('');
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [mySeatIndex, setMySeatIndex] = useState(null);
+  const [androidKeyboardOffset, setAndroidKeyboardOffset] = useState(0);
+  const cardRef = useRef(null);
 
   const isEmojiPickerOpenRef = useRef(false);
   useEffect(() => {
@@ -133,9 +138,34 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   useEffect(() => {
     fetchRoomDetails();
 
-    // Auto-close chat input card when system keyboard hides (unless emoji board is open)
+    // Auto-close chat input card and adjust offset for real Android devices in Expo Go
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const sub = Keyboard.addListener(hideEvent, () => {
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      if (Platform.OS === 'android') {
+        const kbTop = e?.endCoordinates?.screenY || 0;
+        requestAnimationFrame(() => {
+          cardRef.current?.measureInWindow((x, y, width, height) => {
+            if (height > 0 && kbTop > 0) {
+              const cardBottom = y + height;
+              const overlap = cardBottom - kbTop;
+              // If keyboard is covering the card, offset by exact overlap + breathing space
+              if (overlap > 15) {
+                setAndroidKeyboardOffset(overlap + 14);
+              } else {
+                setAndroidKeyboardOffset(0);
+              }
+            }
+          });
+        });
+      }
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      if (Platform.OS === 'android') {
+        setAndroidKeyboardOffset(0);
+      }
       if (!isEmojiPickerOpenRef.current) {
         setIsChatInputActive(false);
       }
@@ -237,8 +267,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     });
 
     return () => {
+      showSub.remove();
+      hideSub.remove();
       socket.disconnect();
-      sub.remove();
     };
   }, [roomId]);
 
@@ -351,6 +382,16 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     });
     showToast(t('User was removed from seat 🪑'), 'info');
     setSelectedSeatUser(null);
+  };
+
+  const handleShareRoom = async () => {
+    try {
+      await Share.share({
+        message: `Join my live voice room "${roomTitle || 'Voice Room'}" on YoYo! Room ID: ${room?.roomId || roomId?.slice(-6) || '8181956'}`,
+      });
+    } catch (e) {
+      // User dismissed
+    }
   };
 
   const handleToggleMic = () => {
@@ -648,9 +689,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             <TouchableOpacity
               style={styles.headerActionCircle}
               activeOpacity={0.75}
-              onPress={() => {}}
+              onPress={handleShareRoom}
             >
-              <Text style={styles.headerCircleEmoji}>↗</Text>
+              <Image
+                source={require('../../assets/icons/Share.png')}
+                style={styles.headerShareIcon}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
 
             {/* Close */}
@@ -909,15 +954,20 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
             <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={styles.chatKeyboardCardWrapper}
+              style={[
+                styles.chatKeyboardCardWrapper,
+                Platform.OS === 'android' && { paddingBottom: androidKeyboardOffset },
+              ]}
             >
               <View
+                ref={cardRef}
+                collapsable={false}
                 style={[
                   styles.chatWhiteCard,
                   {
                     paddingBottom: isEmojiPickerOpen
                       ? 10
-                      : (Platform.OS === 'android' ? 14 : Math.max(insets.bottom, 14)),
+                      : (Platform.OS === 'android' ? (androidKeyboardOffset > 0 ? 8 : 14) : Math.max(insets.bottom, 14)),
                   },
                 ]}
               >
@@ -1254,7 +1304,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                     ]}
                     onPress={handleRemoveUserFromSeat}
                   >
-                    <Text style={styles.actionEmoji}>🪑</Text>
+                    <Image
+                      source={require('../../assets/icons/SofaSeat.png')}
+                      style={{ width: 22, height: 22, marginBottom: 4 }}
+                      resizeMode="contain"
+                    />
                     <Text style={[styles.actionLabel, { color: '#F43F5E' }]}>
                       <T>Remove Seat</T>
                     </Text>
@@ -1477,6 +1531,10 @@ const styles = StyleSheet.create({
   headerCircleEmoji: {
     fontSize: 14,
     color: '#FFFFFF',
+  },
+  headerShareIcon: {
+    width: 18,
+    height: 18,
   },
   headerCloseCircle: {
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
