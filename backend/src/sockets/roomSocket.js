@@ -242,6 +242,20 @@ function initRoomSockets(io) {
       io.to(roomId).emit('gift_received_animation', giftData);
     });
 
+    // Real-time Voice Room Animated Emoji Reaction
+    socket.on('send_room_emoji', ({ roomId, userId, userName, userAvatar, seatIndex, isHost, emoji, emojiData }) => {
+      io.to(roomId).emit('room_emoji_received', {
+        userId,
+        userName,
+        userAvatar,
+        seatIndex,
+        isHost,
+        emoji,
+        emojiData,
+        timestamp: Date.now(),
+      });
+    });
+
     // Realtime Kick Notification (Forces target user out of room)
     socket.on('notify_user_kicked', ({ roomId, targetUserId, kickType, message }) => {
       io.to(roomId).emit('user_kicked_from_room', {

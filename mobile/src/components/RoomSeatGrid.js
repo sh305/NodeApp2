@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AvatarWithFrame from './AvatarWithFrame';
+import AnimatedSeatEmoji from './AnimatedSeatEmoji';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +64,9 @@ export default function RoomSeatGrid({
   onTreasureBoxPress,
   roomGoldContributed = 0,
   isChestOpen = false,
+  activeHostEmoji = null,
+  activeSeatEmojis = {},
+  onEmojiComplete = null,
 }) {
   const COLUMNS = 4;
   const GRID_H_PADDING = 12;
@@ -159,6 +163,18 @@ export default function RoomSeatGrid({
                       />
                     </View>
                   )}
+
+                  {/* Animated Reaction Emoji directly inside Host Avatar Profile circle */}
+                  {activeHostEmoji && (
+                    <AnimatedSeatEmoji
+                      key={`host_emoji_${activeHostEmoji.id || activeHostEmoji.timestamp}`}
+                      emoji={activeHostEmoji.emoji}
+                      emojiData={activeHostEmoji.emojiData}
+                      isHost={true}
+                      size={53}
+                      onComplete={() => onEmojiComplete && onEmojiComplete('host')}
+                    />
+                  )}
                 </View>
               </LinearGradient>
 
@@ -217,7 +233,10 @@ export default function RoomSeatGrid({
                     avatarUri={seat.user.avatar}
                     level={seat.user.wealthLevel || 1}
                     size={46}
+                    activeEmoji={activeSeatEmojis && activeSeatEmojis[index]}
+                    onEmojiComplete={() => onEmojiComplete && onEmojiComplete(index)}
                   />
+
                   <Text style={styles.userName} numberOfLines={1}>
                     {seat.user.name}
                   </Text>

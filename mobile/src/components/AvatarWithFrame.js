@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
+import AnimatedSeatEmoji from './AnimatedSeatEmoji';
 
 export default function AvatarWithFrame({
   avatarUri,
@@ -7,6 +8,8 @@ export default function AvatarWithFrame({
   size = 54,
   frameName = '',
   showLevelBadge = true,
+  activeEmoji = null,
+  onEmojiComplete = null,
 }) {
   // Determine frame border gradient color based on user wealth level
   const getFrameBorderColor = (lvl) => {
@@ -50,6 +53,17 @@ export default function AvatarWithFrame({
             },
           ]}
         />
+
+        {/* Animated Emoji directly inside Avatar Profile */}
+        {activeEmoji && (
+          <AnimatedSeatEmoji
+            key={`avatar_emoji_${activeEmoji.id || activeEmoji.timestamp}`}
+            emoji={activeEmoji.emoji}
+            emojiData={activeEmoji.emojiData}
+            size={size}
+            onComplete={onEmojiComplete}
+          />
+        )}
       </View>
 
       {/* Level Badge Pill */}

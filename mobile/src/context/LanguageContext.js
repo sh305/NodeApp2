@@ -61,6 +61,11 @@ export const LanguageProvider = ({ children }) => {
   const knownPhrases = useRef(
     new Set([
       'Voice Chat, Play Games, Make Friends',
+      'Sexual and violent contents are not allowed. All violators will be banned. Please report and do not expose personal info.',
+      'Classic',
+      'VIP',
+      'CP',
+      'Games',
       'Sign in with Google / Gmail',
       'Instant 6-Digit Email OTP',
       'Sign in with Phone Number',
@@ -217,6 +222,11 @@ export const LanguageProvider = ({ children }) => {
       'Main Wallet Coins:',
       '(Use Game Coins to play games)',
       'Game Store coming soon! 🏪',
+      'Coming Soon',
+      'VIP Emojis',
+      'CP Emojis',
+      'Games Emojis',
+      'GAMES Emojis',
       'Opponent reached home! Better luck next time.',
       'Opponent finished their cards! Better luck next time.',
       'Drew a card from deck!',

@@ -30,6 +30,7 @@ import GiftBottomSheet from '../components/GiftBottomSheet';
 import KickModal from '../components/KickModal';
 import ReportModal from '../components/ReportModal';
 import TreasureBoxModal from '../components/TreasureBoxModal';
+import VoiceRoomEmojiModal from '../components/VoiceRoomEmojiModal';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
@@ -92,6 +93,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [giftBanner, setGiftBanner] = useState(null);
   const [treasureBoxVisible, setTreasureBoxVisible] = useState(false);
   const [roomGoldContributed, setRoomGoldContributed] = useState(0);
+  const [roomEmojiModalVisible, setRoomEmojiModalVisible] = useState(false);
+  const [activeHostEmoji, setActiveHostEmoji] = useState(null);
+  const [activeSeatEmojis, setActiveSeatEmojis] = useState({});
+
+  const roomOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
+  const currentUserIdStr = currentUser?._id ? currentUser._id.toString() : '';
+  const isOwner = Boolean(roomOwnerId && currentUserIdStr && roomOwnerId === currentUserIdStr);
 
   const socketRef = useRef(null);
   const chatInputRef = useRef(null);
@@ -254,6 +262,57 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setGiftBanner(giftData);
       setTimeout(() => setGiftBanner(null), 4000);
       fetchRoomDetails();
+    });
+
+    socket.on('room_emoji_received', (data) => {
+      if (!data) return;
+      const dataUserId = data.userId ? String(data.userId) : '';
+
+      setRoom((currentRoom) => {
+        const roomOwnerId = currentRoom?.owner?._id
+          ? String(currentRoom.owner._id)
+          : (currentRoom?.owner ? String(currentRoom.owner) : '');
+        const isTargetHost = Boolean(data.isHost || (roomOwnerId && dataUserId && roomOwnerId === dataUserId));
+
+        if (isTargetHost) {
+          setActiveHostEmoji({
+            id: data.timestamp || Date.now(),
+            emoji: data.emoji,
+            emojiData: data.emojiData,
+          });
+        }
+
+        let targetSeatIndex = data.seatIndex;
+        if (targetSeatIndex === null || targetSeatIndex === undefined || targetSeatIndex === -1) {
+          if (currentRoom?.seats) {
+            const foundIdx = currentRoom.seats.findIndex((s) => s.user && String(s.user._id) === dataUserId);
+            if (foundIdx !== -1) targetSeatIndex = foundIdx;
+          }
+        }
+
+        if (targetSeatIndex !== null && targetSeatIndex !== undefined && targetSeatIndex !== -1) {
+          setActiveSeatEmojis((prev) => ({
+            ...prev,
+            [targetSeatIndex]: {
+              id: data.timestamp || Date.now(),
+              emoji: data.emoji,
+              emojiData: data.emojiData,
+            },
+          }));
+        }
+
+        return currentRoom;
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          system: true,
+          isEmojiReaction: true,
+          text: `✨ ${data.userName || 'User'} reacted ${data.emoji}`,
+          _reactionId: `react_${data.timestamp}_${data.userId}`,
+        },
+      ]);
     });
 
     socket.on('user_kicked_from_room', ({ targetUserId, kickType, message }) => {
@@ -509,6 +568,77 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     showToast(t('Photo sent to room!'), 'success');
   };
 
+  const handleSendRoomEmoji = (emojiItem) => {
+    setRoomEmojiModalVisible(false);
+
+    const diceVal = emojiItem.isDice ? Math.floor(Math.random() * 6) + 1 : undefined;
+
+    // Detect if current user is host or on a seat
+    const rOwnerId = room?.owner?._id ? String(room.owner._id) : (room?.owner ? String(room.owner) : '');
+    const cUserId = currentUser?._id ? String(currentUser._id) : '';
+    const userIsHost = Boolean(isOwner || (rOwnerId && cUserId && rOwnerId === cUserId));
+
+    let mySeatIdx = mySeatIndex;
+    if (mySeatIdx === null || mySeatIdx === undefined || mySeatIdx < 0) {
+      if (room?.seats) {
+        const found = room.seats.findIndex((s) => s.user && String(s.user._id) === cUserId);
+        if (found !== -1) mySeatIdx = found;
+      }
+    }
+
+    const reactionId = Date.now();
+    const payloadEmojiData = { ...emojiItem, diceValue: diceVal };
+
+    // 1. INSTANT LOCAL VISUAL TRIGGER: Show emoji immediately on user's profile avatar
+    if (userIsHost) {
+      setActiveHostEmoji({
+        id: reactionId,
+        emoji: emojiItem.emoji,
+        emojiData: payloadEmojiData,
+      });
+    } else if (mySeatIdx !== null && mySeatIdx !== undefined && mySeatIdx >= 0) {
+      setActiveSeatEmojis((prev) => ({
+        ...prev,
+        [mySeatIdx]: {
+          id: reactionId,
+          emoji: emojiItem.emoji,
+          emojiData: payloadEmojiData,
+        },
+      }));
+    } else {
+      // If user is audience, show on host avatar or room
+      setActiveHostEmoji({
+        id: reactionId,
+        emoji: emojiItem.emoji,
+        emojiData: payloadEmojiData,
+      });
+    }
+
+    // 2. Broadcast via socket to everyone in the room
+    socketRef.current?.emit('send_room_emoji', {
+      roomId,
+      userId: currentUser?._id,
+      userName: currentUser?.name || 'User',
+      userAvatar: currentUser?.avatar,
+      seatIndex: mySeatIdx,
+      isHost: userIsHost,
+      emoji: emojiItem.emoji,
+      emojiData: payloadEmojiData,
+    });
+  };
+
+  const handleEmojiComplete = (target) => {
+    if (target === 'host') {
+      setActiveHostEmoji(null);
+    } else {
+      setActiveSeatEmojis((prev) => {
+        const next = { ...prev };
+        delete next[target];
+        return next;
+      });
+    }
+  };
+
   const handleSendGift = async (gift, quantity) => {
     try {
       const res = await api.post('/gifts/send', {
@@ -588,9 +718,6 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     setSelectedSeatUser(null);
   };
 
-  const roomOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
-  const currentUserIdStr = currentUser?._id ? currentUser._id.toString() : '';
-  const isOwner = Boolean(roomOwnerId && currentUserIdStr && roomOwnerId === currentUserIdStr);
   const selectedUserIdStr = selectedSeatUser?._id ? selectedSeatUser._id.toString() : '';
   const isSelf = Boolean(selectedUserIdStr && currentUserIdStr && selectedUserIdStr === currentUserIdStr);
 
@@ -742,6 +869,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             isOwner={isOwner}
             onTreasureBoxPress={() => setTreasureBoxVisible(true)}
             roomGoldContributed={roomGoldContributed}
+            activeHostEmoji={activeHostEmoji}
+            activeSeatEmojis={activeSeatEmojis}
+            onEmojiComplete={handleEmojiComplete}
           />
         </ScrollView>
 
@@ -858,10 +988,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               <TouchableOpacity
                 style={styles.bottomCircleBtn}
                 activeOpacity={0.75}
-                onPress={() => {
-                  setIsChatInputActive(true);
-                  setIsEmojiPickerOpen(true);
-                }}
+                onPress={() => setRoomEmojiModalVisible(true)}
               >
                 <Text style={styles.bottomEmoji}>😊</Text>
                 <View style={styles.redBadgeDot} />
@@ -1377,6 +1504,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         onClose={() => setReportModalVisible(false)}
         onSubmitReport={handleSubmitReport}
         targetUserName={selectedSeatUser?.name}
+      />
+
+      {/* ══ VOICE ROOM EMOJI REACTION MODAL ══ */}
+      <VoiceRoomEmojiModal
+        visible={roomEmojiModalVisible}
+        onClose={() => setRoomEmojiModalVisible(false)}
+        onSelectEmoji={handleSendRoomEmoji}
       />
     </View>
   );
