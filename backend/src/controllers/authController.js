@@ -11,7 +11,7 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Send Real SMS OTP to User's Mobiles
+// @desc    Send Real SMS OTP to User's Mobiles Data
 // @route   POST /api/auth/send-whatsapp-otp & /api/auth/send-sms-otp
 exports.sendWhatsAppOtp = async (req, res) => {
   try {
