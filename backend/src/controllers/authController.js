@@ -446,7 +446,7 @@ exports.googleLogin = async (req, res) => {
   }
 };
 
-// @desc    Facebook OAuth Sign-Ins
+// @desc    Facebook OAuth Sign-In
 // @route   POST /api/auth/facebook-login
 exports.facebookLogin = async (req, res) => {
   try {
