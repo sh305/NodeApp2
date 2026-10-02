@@ -39,6 +39,48 @@ export const NOTO_EMOJIS = {
   clap_hands: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44f/512.gif',
   hundred_pts: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif',
   biceps_flex: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4aa/512.gif',
+
+  // VIP Animated Emojis (Google Noto Animated 512.gif)
+  vip_lion: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f981/512.gif',
+  vip_wolf: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f43a/512.gif',
+  vip_panda: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f43c/512.gif',
+  vip_unicorn: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f984/512.gif',
+  vip_dragon: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f409/512.gif',
+  vip_hairy: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fac8/512.gif',
+  vip_dancer: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f483/512.gif',
+  vip_phoenix: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f426_200d_1f525/512.gif',
+
+  // Cat Animated Emojis (Google Noto Animated 512.gif)
+  cat_smile: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63a/512.gif',
+  cat_joy: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f639/512.gif',
+  cat_heart_eyes: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63b/512.gif',
+  cat_smirk: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63c/512.gif',
+  cat_kissing: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63d/512.gif',
+  cat_scream: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f640/512.gif',
+  cat_crying: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63f/512.gif',
+  cat_pouting: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63e/512.gif',
+};
+
+// Official Google Noto Lottie Vector Animation URLs
+export const NOTO_LOTTIE_URLS = {
+  vip_lion: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f981/lottie.json',
+  vip_wolf: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f43a/lottie.json',
+  vip_panda: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f43c/lottie.json',
+  vip_unicorn: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f984/lottie.json',
+  vip_dragon: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f409/lottie.json',
+  vip_hairy: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fac8/lottie.json',
+  vip_dancer: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f483/lottie.json',
+  vip_phoenix: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f426_200d_1f525/lottie.json',
+
+  // Cat Lottie Vector Animations
+  cat_smile: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63a/lottie.json',
+  cat_joy: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f639/lottie.json',
+  cat_heart_eyes: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63b/lottie.json',
+  cat_smirk: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63c/lottie.json',
+  cat_kissing: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63d/lottie.json',
+  cat_scream: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f640/lottie.json',
+  cat_crying: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63f/lottie.json',
+  cat_pouting: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63e/lottie.json',
 };
 
 export const getIconScoutGif = (id, emoji) => {
@@ -77,6 +119,26 @@ export const getIconScoutGif = (id, emoji) => {
   if (emoji === '👏') return NOTO_EMOJIS.clap_hands;
   if (emoji === '💯') return NOTO_EMOJIS.hundred_pts;
   if (emoji === '💪') return NOTO_EMOJIS.biceps_flex;
+
+  // VIP animals & figures
+  if (emoji === '🦁') return NOTO_EMOJIS.vip_lion;
+  if (emoji === '🐺') return NOTO_EMOJIS.vip_wolf;
+  if (emoji === '🐼') return NOTO_EMOJIS.vip_panda;
+  if (emoji === '🦄') return NOTO_EMOJIS.vip_unicorn;
+  if (emoji === '🐉') return NOTO_EMOJIS.vip_dragon;
+  if (emoji === '🫈') return NOTO_EMOJIS.vip_hairy;
+  if (emoji === '💃') return NOTO_EMOJIS.vip_dancer;
+  if (emoji === '🐦‍🔥') return NOTO_EMOJIS.vip_phoenix;
+
+  // Cat Animated Emojis
+  if (emoji === '😺') return NOTO_EMOJIS.cat_smile;
+  if (emoji === '😹') return NOTO_EMOJIS.cat_joy;
+  if (emoji === '😻') return NOTO_EMOJIS.cat_heart_eyes;
+  if (emoji === '😼') return NOTO_EMOJIS.cat_smirk;
+  if (emoji === '😽') return NOTO_EMOJIS.cat_kissing;
+  if (emoji === '🙀') return NOTO_EMOJIS.cat_scream;
+  if (emoji === '😿') return NOTO_EMOJIS.cat_crying;
+  if (emoji === '😾') return NOTO_EMOJIS.cat_pouting;
 
   return null;
 };

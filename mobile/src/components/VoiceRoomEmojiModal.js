@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { T } from './TranslatedText';
 import { useLanguage } from '../context/LanguageContext';
 import VipLionSticker from './VipLionSticker';
+import CpCoupleSticker from './CpCoupleSticker';
 import { getIconScoutGif } from '../constants/iconScoutEmojis';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -75,23 +76,226 @@ const EMOJI_CATEGORIES = [
   },
   {
     id: 'vip',
-    icon: '👑',
+    icon: '🦁',
     badge: 'VIP',
     badgeColors: ['#F59E0B', '#D97706'],
-    pages: [],
+    pages: [
+      // Page 1: Official VIP Animated Emojis (Google Noto Animated)
+      [
+        {
+          id: 'vip_lion',
+          emoji: '🦁',
+          label: 'Lion',
+          isVip: true,
+          category: 'vip',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f981/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f981/512.gif',
+        },
+        {
+          id: 'vip_wolf',
+          emoji: '🐺',
+          label: 'Wolf',
+          isVip: true,
+          category: 'vip',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f43a/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f43a/512.gif',
+        },
+        {
+          id: 'vip_panda',
+          emoji: '🐼',
+          label: 'Panda',
+          isVip: true,
+          category: 'vip',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f43c/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f43c/512.gif',
+        },
+        {
+          id: 'vip_unicorn',
+          emoji: '🦄',
+          label: 'Unicorn',
+          isVip: true,
+          category: 'vip',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f984/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f984/512.gif',
+        },
+        {
+          id: 'vip_dragon',
+          emoji: '🐉',
+          label: 'Dragon',
+          isVip: true,
+          category: 'vip',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f409/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f409/512.gif',
+        },
+        {
+          id: 'vip_hairy',
+          emoji: '🫈',
+          label: 'Hairy Creature',
+          isVip: true,
+          category: 'vip',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fac8/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fac8/512.gif',
+        },
+        {
+          id: 'vip_dancer',
+          emoji: '💃',
+          label: 'Dancer',
+          isVip: true,
+          category: 'vip',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f483/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f483/512.gif',
+        },
+        {
+          id: 'vip_phoenix',
+          emoji: '🐦‍🔥',
+          label: 'Phoenix',
+          isVip: true,
+          category: 'vip',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f426_200d_1f525/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f426_200d_1f525/512.gif',
+        },
+      ],
+
+    ],
   },
   {
     id: 'cp',
     icon: '💖',
     badge: 'CP',
     badgeColors: ['#EC4899', '#DB2777'],
-    pages: [],
+    pages: [
+      [
+        {
+          id: 'cp_kiss',
+          emoji: '👩‍❤️‍💋‍👨',
+          label: 'Couple Kiss',
+          isCp: true,
+          category: 'cp',
+        },
+        {
+          id: 'cp_hug',
+          emoji: '👩‍❤️‍👨',
+          label: 'Warm Hug',
+          isCp: true,
+          category: 'cp',
+        },
+        {
+          id: 'cp_propose',
+          emoji: '💍',
+          label: 'Proposal',
+          isCp: true,
+          category: 'cp',
+        },
+        {
+          id: 'cp_dance',
+          emoji: '💃',
+          label: 'Couple Dance',
+          isCp: true,
+          category: 'cp',
+        },
+        {
+          id: 'cp_holding_hands',
+          emoji: '👫',
+          label: 'Holding Hands',
+          isCp: true,
+          category: 'cp',
+        },
+        {
+          id: 'cp_heart_lock',
+          emoji: '🔐',
+          label: 'Love Lock',
+          isCp: true,
+          category: 'cp',
+        },
+        {
+          id: 'cp_wedding',
+          emoji: '👰',
+          label: 'Wedding',
+          isCp: true,
+          category: 'cp',
+        },
+        {
+          id: 'cp_shy_love',
+          emoji: '💓',
+          label: 'Shy Love',
+          isCp: true,
+          category: 'cp',
+        },
+      ],
+    ],
   },
   {
-    id: 'games',
-    icon: '🍒',
+    id: 'cat',
+    icon: '🐱',
     badge: null,
-    pages: [],
+    pages: [
+      [
+        {
+          id: 'cat_smile',
+          emoji: '😺',
+          label: 'Smiling Cat',
+          category: 'cat',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63a/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63a/512.gif',
+        },
+        {
+          id: 'cat_joy',
+          emoji: '😹',
+          label: 'Joy Cat',
+          category: 'cat',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f639/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f639/512.gif',
+        },
+        {
+          id: 'cat_heart_eyes',
+          emoji: '😻',
+          label: 'Heart Eyes Cat',
+          category: 'cat',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63b/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63b/512.gif',
+        },
+        {
+          id: 'cat_smirk',
+          emoji: '😼',
+          label: 'Smirk Cat',
+          category: 'cat',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63c/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63c/512.gif',
+        },
+        {
+          id: 'cat_kissing',
+          emoji: '😽',
+          label: 'Kissing Cat',
+          category: 'cat',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63d/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63d/512.gif',
+        },
+        {
+          id: 'cat_scream',
+          emoji: '🙀',
+          label: 'Scream Cat',
+          category: 'cat',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f640/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f640/512.gif',
+        },
+        {
+          id: 'cat_crying',
+          emoji: '😿',
+          label: 'Crying Cat',
+          category: 'cat',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63f/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63f/512.gif',
+        },
+        {
+          id: 'cat_pouting',
+          emoji: '😾',
+          label: 'Pouting Cat',
+          category: 'cat',
+          lottieUrl: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63e/lottie.json',
+          iconScoutGif: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f63e/512.gif',
+        },
+      ],
+    ],
   },
 ];
 
@@ -116,7 +320,7 @@ export default function VoiceRoomEmojiModal({
       currentPageEmojis.forEach((item) => {
         const itemGif = item.iconScoutGif || getIconScoutGif(item.id, item.emoji);
         if (itemGif) {
-          Image.prefetch(itemGif).catch(() => {});
+          Image.prefetch(itemGif).catch(() => { });
         }
       });
     }
@@ -233,6 +437,7 @@ export default function VoiceRoomEmojiModal({
                   <View style={styles.gridRow}>
                     {pageEmojis.slice(0, 4).map((emojiItem) => {
                       const itemGif = emojiItem.iconScoutGif || getIconScoutGif(emojiItem.id, emojiItem.emoji);
+                      const isCpItem = emojiItem.category === 'cp' || emojiItem.id?.startsWith('cp_');
                       return (
                         <TouchableOpacity
                           key={emojiItem.id}
@@ -241,8 +446,8 @@ export default function VoiceRoomEmojiModal({
                           onPress={() => handleEmojiPress(emojiItem)}
                         >
                           <View style={styles.emojiVisualWrap}>
-                            {emojiItem.id?.startsWith('lion_') ? (
-                              <VipLionSticker id={emojiItem.id} size={52} />
+                            {isCpItem ? (
+                              <CpCoupleSticker id={emojiItem.id} size={50} />
                             ) : itemGif ? (
                               <>
                                 <Text style={[styles.emojiChar, { position: 'absolute', opacity: 0.35 }]}>
@@ -254,6 +459,8 @@ export default function VoiceRoomEmojiModal({
                                   resizeMode="contain"
                                 />
                               </>
+                            ) : emojiItem.id?.startsWith('lion_') ? (
+                              <VipLionSticker id={emojiItem.id} size={52} />
                             ) : (
                               <>
                                 <Text style={styles.emojiChar}>{emojiItem.emoji}</Text>
@@ -261,6 +468,16 @@ export default function VoiceRoomEmojiModal({
                                   <Text style={styles.subEmojiChar}>{emojiItem.subEmoji}</Text>
                                 )}
                               </>
+                            )}
+                            {emojiItem.isVip && (
+                              <View style={styles.vipTagWrap}>
+                                <Text style={styles.vipTagText}>VIP</Text>
+                              </View>
+                            )}
+                            {emojiItem.isCp && (
+                              <View style={styles.cpTagWrap}>
+                                <Text style={styles.cpTagText}>CP</Text>
+                              </View>
                             )}
                           </View>
                         </TouchableOpacity>
@@ -271,6 +488,7 @@ export default function VoiceRoomEmojiModal({
                   <View style={styles.gridRow}>
                     {pageEmojis.slice(4, 8).map((emojiItem) => {
                       const itemGif = emojiItem.iconScoutGif || getIconScoutGif(emojiItem.id, emojiItem.emoji);
+                      const isCpItem = emojiItem.category === 'cp' || emojiItem.id?.startsWith('cp_');
                       return (
                         <TouchableOpacity
                           key={emojiItem.id}
@@ -279,8 +497,8 @@ export default function VoiceRoomEmojiModal({
                           onPress={() => handleEmojiPress(emojiItem)}
                         >
                           <View style={styles.emojiVisualWrap}>
-                            {emojiItem.id?.startsWith('lion_') ? (
-                              <VipLionSticker id={emojiItem.id} size={52} />
+                            {isCpItem ? (
+                              <CpCoupleSticker id={emojiItem.id} size={50} />
                             ) : itemGif ? (
                               <>
                                 <Text style={[styles.emojiChar, { position: 'absolute', opacity: 0.35 }]}>
@@ -292,6 +510,8 @@ export default function VoiceRoomEmojiModal({
                                   resizeMode="contain"
                                 />
                               </>
+                            ) : emojiItem.id?.startsWith('lion_') ? (
+                              <VipLionSticker id={emojiItem.id} size={52} />
                             ) : (
                               <>
                                 <Text style={styles.emojiChar}>{emojiItem.emoji}</Text>
@@ -299,6 +519,16 @@ export default function VoiceRoomEmojiModal({
                                   <Text style={styles.subEmojiChar}>{emojiItem.subEmoji}</Text>
                                 )}
                               </>
+                            )}
+                            {emojiItem.isVip && (
+                              <View style={styles.vipTagWrap}>
+                                <Text style={styles.vipTagText}>VIP</Text>
+                              </View>
+                            )}
+                            {emojiItem.isCp && (
+                              <View style={styles.cpTagWrap}>
+                                <Text style={styles.cpTagText}>CP</Text>
+                              </View>
                             )}
                           </View>
                         </TouchableOpacity>
@@ -469,6 +699,20 @@ const styles = StyleSheet.create({
   },
   vipTagText: {
     color: '#000',
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  cpTagWrap: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#EC4899',
+    borderRadius: 4,
+    paddingHorizontal: 3,
+    paddingVertical: 0.5,
+  },
+  cpTagText: {
+    color: '#FFFFFF',
     fontSize: 8,
     fontWeight: '900',
   },

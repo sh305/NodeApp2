@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import VipLionSticker from './VipLionSticker';
+import CpCoupleSticker from './CpCoupleSticker';
 import { getIconScoutGif } from '../constants/iconScoutEmojis';
 
 // Precise action mapper for every emoji
@@ -519,6 +520,7 @@ export default function AnimatedSeatEmoji({
   const emojiId = emojiData?.id || '';
   const action = getEmojiAction(emoji, emojiId);
   const isVipLion = emojiData?.category === 'vip';
+  const isCpCouple = emojiData?.category === 'cp' || emojiId?.startsWith('cp_');
   const gifUrl = emojiData?.iconScoutGif || getIconScoutGif(emojiId, emoji);
 
   // Core Animated Values
@@ -551,9 +553,9 @@ export default function AnimatedSeatEmoji({
     let particleLoop = null;
     let customTimer = null;
 
-    if (gifUrl) {
-      // ══ Google Noto Animated Emoji ══
-      // The GIF/WebP is already a handcrafted 60fps moving animation.
+    if (isCpCouple || gifUrl) {
+      // ══ Google Noto Animated Emoji / CP Couple Animation ══
+      // The GIF/Sticker is already a handcrafted 60fps moving animation.
       // We run a gentle, silky-smooth float wave with useNativeDriver
       // without aggressive 100ms jitter or rapid rotation loops that cause frame drops!
       loopAnim = Animated.loop(
@@ -860,7 +862,9 @@ export default function AnimatedSeatEmoji({
             },
           ]}
         >
-          {gifUrl ? (
+          {isCpCouple ? (
+            <CpCoupleSticker id={emojiData?.id || emojiId} size={Math.round(size * 1.15)} />
+          ) : gifUrl ? (
             <Image
               source={{ uri: gifUrl }}
               style={{ width: Math.round(size * 1.1), height: Math.round(size * 1.1) }}
