@@ -11,6 +11,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import VipLionSticker from './VipLionSticker';
 import CpCoupleSticker from './CpCoupleSticker';
 import { getIconScoutGif } from '../constants/iconScoutEmojis';
+import { getCoupleEmojiSource } from '../constants/coupleEmojis';
+import { getSealEmojiSource } from '../constants/sealsEmojis';
 
 // Precise action mapper for every emoji
 const getEmojiAction = (emoji, id) => {
@@ -521,6 +523,7 @@ export default function AnimatedSeatEmoji({
   const action = getEmojiAction(emoji, emojiId);
   const isVipLion = emojiData?.category === 'vip';
   const isCpCouple = emojiData?.category === 'cp' || emojiId?.startsWith('cp_');
+  const localAnimatedGif = emojiData?.localGif || getCoupleEmojiSource(emojiId) || getSealEmojiSource(emojiId);
   const gifUrl = emojiData?.iconScoutGif || getIconScoutGif(emojiId, emoji);
 
   // Core Animated Values
@@ -553,8 +556,8 @@ export default function AnimatedSeatEmoji({
     let particleLoop = null;
     let customTimer = null;
 
-    if (isCpCouple || gifUrl) {
-      // ══ Google Noto Animated Emoji / CP Couple Animation ══
+    if (localAnimatedGif || isCpCouple || gifUrl) {
+      // ══ Google Noto Animated Emoji / CP Couple / Seals Animation ══
       // The GIF/Sticker is already a handcrafted 60fps moving animation.
       // We run a gentle, silky-smooth float wave with useNativeDriver
       // without aggressive 100ms jitter or rapid rotation loops that cause frame drops!
@@ -856,13 +859,19 @@ export default function AnimatedSeatEmoji({
                 { translateY: moveY },
                 { translateX: moveX },
                 { scale: mainScale },
-                ...(gifUrl ? [] : [{ rotate: rotation }]),
+                ...(localAnimatedGif || gifUrl ? [] : [{ rotate: rotation }]),
               ],
               opacity: mainOpacity,
             },
           ]}
         >
-          {isCpCouple ? (
+          {localAnimatedGif ? (
+            <Image
+              source={localAnimatedGif}
+              style={{ width: Math.round(size * 1.3), height: Math.round(size * 1.3) }}
+              resizeMode="contain"
+            />
+          ) : isCpCouple ? (
             <CpCoupleSticker id={emojiData?.id || emojiId} size={Math.round(size * 1.15)} />
           ) : gifUrl ? (
             <Image
@@ -881,7 +890,7 @@ export default function AnimatedSeatEmoji({
       )}
 
       {/* ══ ACTION PARTICLES (Tears, Hearts, Steam) ══ */}
-      {!gifUrl && action === 'laugh' && (
+      {!localAnimatedGif && !gifUrl && action === 'laugh' && (
         <>
           <Animated.Text style={[styles.laughTearLeft, { transform: [{ translateY: particleY }, { scale: particleScale }], opacity: particleOpacity }]}>💧</Animated.Text>
           <Animated.Text style={[styles.laughTearRight, { transform: [{ translateY: particleY }, { scale: particleScale }], opacity: particleOpacity }]}>💧</Animated.Text>

@@ -10,6 +10,7 @@ import {
   Animated,
   Platform,
   Image,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +19,8 @@ import { useLanguage } from '../context/LanguageContext';
 import VipLionSticker from './VipLionSticker';
 import CpCoupleSticker from './CpCoupleSticker';
 import { getIconScoutGif } from '../constants/iconScoutEmojis';
+import { COUPLE_EMOJIS, getCoupleEmojiSource } from '../constants/coupleEmojis';
+import { SEALS_EMOJIS_PAGES, getSealEmojiSource } from '../constants/sealsEmojis';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -164,64 +167,7 @@ const EMOJI_CATEGORIES = [
     badge: 'CP',
     badgeColors: ['#EC4899', '#DB2777'],
     pages: [
-      [
-        {
-          id: 'cp_kiss',
-          emoji: '👩‍❤️‍💋‍👨',
-          label: 'Couple Kiss',
-          isCp: true,
-          category: 'cp',
-        },
-        {
-          id: 'cp_hug',
-          emoji: '👩‍❤️‍👨',
-          label: 'Warm Hug',
-          isCp: true,
-          category: 'cp',
-        },
-        {
-          id: 'cp_propose',
-          emoji: '💍',
-          label: 'Proposal',
-          isCp: true,
-          category: 'cp',
-        },
-        {
-          id: 'cp_dance',
-          emoji: '💃',
-          label: 'Couple Dance',
-          isCp: true,
-          category: 'cp',
-        },
-        {
-          id: 'cp_holding_hands',
-          emoji: '👫',
-          label: 'Holding Hands',
-          isCp: true,
-          category: 'cp',
-        },
-        {
-          id: 'cp_heart_lock',
-          emoji: '🔐',
-          label: 'Love Lock',
-          isCp: true,
-          category: 'cp',
-        },
-        {
-          id: 'cp_wedding',
-          emoji: '👰',
-          label: 'Wedding',
-          isCp: true,
-          category: 'cp',
-        },
-        {
-          id: 'cp_shy_love',
-          emoji: '💓',
-          label: 'Shy Love',
-          isCp: true,
-          category: 'cp',
-        },
-      ],
+      COUPLE_EMOJIS,
     ],
   },
   {
@@ -297,6 +243,12 @@ const EMOJI_CATEGORIES = [
       ],
     ],
   },
+  {
+    id: 'seals',
+    icon: '🦭',
+    badge: null,
+    pages: SEALS_EMOJIS_PAGES,
+  },
 ];
 
 export default function VoiceRoomEmojiModal({
@@ -319,7 +271,7 @@ export default function VoiceRoomEmojiModal({
       const currentPageEmojis = activeCategory.pages[activePageIndex] || activeCategory.pages[0] || [];
       currentPageEmojis.forEach((item) => {
         const itemGif = item.iconScoutGif || getIconScoutGif(item.id, item.emoji);
-        if (itemGif) {
+        if (itemGif && typeof itemGif === 'string') {
           Image.prefetch(itemGif).catch(() => { });
         }
       });
@@ -374,36 +326,42 @@ export default function VoiceRoomEmojiModal({
             <View style={styles.pullBar} />
           </View>
 
-          {/* ══ TOP CATEGORY TABS (Classic 😄, VIP 🦁, CP 🖐️, Games 🍒) ══ */}
-          <View style={styles.tabBar}>
-            {EMOJI_CATEGORIES.map((cat, index) => {
-              const isActive = index === activeCategoryIndex;
-              return (
-                <TouchableOpacity
-                  key={`cat_${cat.id}`}
-                  style={styles.tabBtn}
-                  activeOpacity={0.75}
-                  onPress={() => handleSwitchCategory(index)}
-                >
-                  <View style={styles.tabIconRow}>
-                    <Text style={styles.tabEmojiIcon}>{cat.icon}</Text>
-                    {cat.badge && (
-                      <LinearGradient
-                        colors={cat.badgeColors || ['#F59E0B', '#D97706']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.tabBadge}
-                      >
-                        <Text style={styles.tabBadgeText}>{cat.badge}</Text>
-                      </LinearGradient>
-                    )}
-                  </View>
+          {/* ══ TOP CATEGORY TABS (Classic 😄, VIP 🦁, CP 💖, Cat 🐱, Seals 🦭) ══ */}
+          <View style={styles.tabBarWrapper}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabBar}
+            >
+              {EMOJI_CATEGORIES.map((cat, index) => {
+                const isActive = index === activeCategoryIndex;
+                return (
+                  <TouchableOpacity
+                    key={`cat_${cat.id}`}
+                    style={styles.tabBtn}
+                    activeOpacity={0.75}
+                    onPress={() => handleSwitchCategory(index)}
+                  >
+                    <View style={styles.tabIconRow}>
+                      <Text style={styles.tabEmojiIcon}>{cat.icon}</Text>
+                      {cat.badge && (
+                        <LinearGradient
+                          colors={cat.badgeColors || ['#F59E0B', '#D97706']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.tabBadge}
+                        >
+                          <Text style={styles.tabBadgeText}>{cat.badge}</Text>
+                        </LinearGradient>
+                      )}
+                    </View>
 
-                  {/* Active Indicator Underline */}
-                  {isActive && <View style={styles.tabActiveIndicator} />}
-                </TouchableOpacity>
-              );
-            })}
+                    {/* Active Indicator Underline */}
+                    {isActive && <View style={styles.tabActiveIndicator} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           {/* ══ HORIZONTAL SWIPEABLE EMOJI PAGES (4×2 Grid, 8 per page) ══ */}
@@ -436,6 +394,7 @@ export default function VoiceRoomEmojiModal({
                 <View style={styles.pageGridWrap}>
                   <View style={styles.gridRow}>
                     {pageEmojis.slice(0, 4).map((emojiItem) => {
+                      const localGif = emojiItem.localGif || getCoupleEmojiSource(emojiItem.id) || getSealEmojiSource(emojiItem.id);
                       const itemGif = emojiItem.iconScoutGif || getIconScoutGif(emojiItem.id, emojiItem.emoji);
                       const isCpItem = emojiItem.category === 'cp' || emojiItem.id?.startsWith('cp_');
                       return (
@@ -446,7 +405,13 @@ export default function VoiceRoomEmojiModal({
                           onPress={() => handleEmojiPress(emojiItem)}
                         >
                           <View style={styles.emojiVisualWrap}>
-                            {isCpItem ? (
+                            {localGif ? (
+                              <Image
+                                source={localGif}
+                                style={{ width: 52, height: 52 }}
+                                resizeMode="contain"
+                              />
+                            ) : isCpItem ? (
                               <CpCoupleSticker id={emojiItem.id} size={50} />
                             ) : itemGif ? (
                               <>
@@ -487,6 +452,7 @@ export default function VoiceRoomEmojiModal({
 
                   <View style={styles.gridRow}>
                     {pageEmojis.slice(4, 8).map((emojiItem) => {
+                      const localGif = emojiItem.localGif || getCoupleEmojiSource(emojiItem.id) || getSealEmojiSource(emojiItem.id);
                       const itemGif = emojiItem.iconScoutGif || getIconScoutGif(emojiItem.id, emojiItem.emoji);
                       const isCpItem = emojiItem.category === 'cp' || emojiItem.id?.startsWith('cp_');
                       return (
@@ -497,7 +463,13 @@ export default function VoiceRoomEmojiModal({
                           onPress={() => handleEmojiPress(emojiItem)}
                         >
                           <View style={styles.emojiVisualWrap}>
-                            {isCpItem ? (
+                            {localGif ? (
+                              <Image
+                                source={localGif}
+                                style={{ width: 52, height: 52 }}
+                                resizeMode="contain"
+                              />
+                            ) : isCpItem ? (
                               <CpCoupleSticker id={emojiItem.id} size={50} />
                             ) : itemGif ? (
                               <>
@@ -534,7 +506,12 @@ export default function VoiceRoomEmojiModal({
                         </TouchableOpacity>
                       );
                     })}
+                    {/* Placeholder cells for row 2 to preserve clean 4-column layout */}
+                    {Array.from({ length: Math.max(0, 4 - pageEmojis.slice(4, 8).length) }).map((_, idx) => (
+                      <View key={`empty_cp_pad_${idx}`} style={styles.emojiCell} />
+                    ))}
                   </View>
+
                 </View>
               )}
             />
@@ -602,14 +579,16 @@ const styles = StyleSheet.create({
   },
 
   /* ── Tab Bar ── */
+  tabBarWrapper: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
   tabBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 4,
     paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   tabBtn: {
     paddingHorizontal: 14,
