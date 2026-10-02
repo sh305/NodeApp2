@@ -163,7 +163,8 @@ const EMOJI_CATEGORIES = [
   },
   {
     id: 'cp',
-    icon: '💖',
+    icon: '🐻‍❄️',
+    imageIcon: require('../../assets/icons/Couple emoji pack/10241-milkandmochalove.gif'),
     badge: 'CP',
     badgeColors: ['#EC4899', '#DB2777'],
     pages: [
@@ -343,7 +344,15 @@ export default function VoiceRoomEmojiModal({
                     onPress={() => handleSwitchCategory(index)}
                   >
                     <View style={styles.tabIconRow}>
-                      <Text style={styles.tabEmojiIcon}>{cat.icon}</Text>
+                      {cat.imageIcon ? (
+                        <Image
+                          source={cat.imageIcon}
+                          style={styles.tabImageIcon}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Text style={styles.tabEmojiIcon}>{cat.icon}</Text>
+                      )}
                       {cat.badge && (
                         <LinearGradient
                           colors={cat.badgeColors || ['#F59E0B', '#D97706']}
@@ -367,7 +376,15 @@ export default function VoiceRoomEmojiModal({
           {/* ══ HORIZONTAL SWIPEABLE EMOJI PAGES (4×2 Grid, 8 per page) ══ */}
           {activeCategory.pages.length === 0 ? (
             <View style={styles.emptyCategoryWrap}>
-              <Text style={styles.emptyCategoryIcon}>{activeCategory.icon}</Text>
+              {activeCategory.imageIcon ? (
+                <Image
+                  source={activeCategory.imageIcon}
+                  style={{ width: 44, height: 44 }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.emptyCategoryIcon}>{activeCategory.icon}</Text>
+              )}
               <Text style={styles.emptyCategoryTitle}>
                 <T>{activeCategory.id.toUpperCase() + ' Emojis'}</T>
               </Text>
@@ -602,6 +619,10 @@ const styles = StyleSheet.create({
   },
   tabEmojiIcon: {
     fontSize: 22,
+  },
+  tabImageIcon: {
+    width: 24,
+    height: 24,
   },
   tabBadge: {
     paddingHorizontal: 5,
