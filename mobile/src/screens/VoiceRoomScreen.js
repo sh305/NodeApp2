@@ -31,6 +31,7 @@ import KickModal from '../components/KickModal';
 import ReportModal from '../components/ReportModal';
 import TreasureBoxModal from '../components/TreasureBoxModal';
 import VoiceRoomEmojiModal from '../components/VoiceRoomEmojiModal';
+import VoiceRoomToolsModal from '../components/VoiceRoomToolsModal';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
@@ -94,6 +95,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [treasureBoxVisible, setTreasureBoxVisible] = useState(false);
   const [roomGoldContributed, setRoomGoldContributed] = useState(0);
   const [roomEmojiModalVisible, setRoomEmojiModalVisible] = useState(false);
+  const [roomToolsModalVisible, setRoomToolsModalVisible] = useState(false);
   const [activeHostEmoji, setActiveHostEmoji] = useState(null);
   const [activeSeatEmojis, setActiveSeatEmojis] = useState({});
 
@@ -1013,11 +1015,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 />
               </TouchableOpacity>
 
-              {/* Menu / DailyHunt */}
+              {/* Menu / DailyHunt / Room Tools */}
               <TouchableOpacity
                 style={styles.bottomCircleBtn}
                 activeOpacity={0.75}
-                onPress={() => {}}
+                onPress={() => setRoomToolsModalVisible(true)}
               >
                 <Image
                   source={require('../../assets/icons/DailyHunt.png')}
@@ -1511,6 +1513,15 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         visible={roomEmojiModalVisible}
         onClose={() => setRoomEmojiModalVisible(false)}
         onSelectEmoji={handleSendRoomEmoji}
+      />
+
+      {/* ══ VOICE ROOM TOOLS MODAL (Basic tools, Entertainment tools, Other tools) ══ */}
+      <VoiceRoomToolsModal
+        visible={roomToolsModalVisible}
+        onClose={() => setRoomToolsModalVisible(false)}
+        onSelectTool={(tool, toggledState) => {
+          console.log('Room tool selected:', tool.name, toggledState);
+        }}
       />
     </View>
   );
