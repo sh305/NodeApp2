@@ -57,7 +57,7 @@ function PlayerSeat({ player, isHolder, isEliminated, isMe, passCount }) {
           <Image
             source={{ uri: player.avatar }}
             style={styles.avatarImage}
-            defaultSource={require('../../assets/icons/gold_coin.png')}
+            defaultSource={require('../../assets/icons/green_coin.png')}
           />
         ) : (
           <Text style={styles.avatarEmoji}>{player.avatar || '😐'}</Text>

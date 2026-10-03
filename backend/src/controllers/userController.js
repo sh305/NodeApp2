@@ -487,8 +487,8 @@ exports.refundGameBet = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Only refund if reason is game_not_started to prevent abuse
-    if (reason !== 'game_not_started') {
+    // Only refund if reason is game_not_started, draw, or tie to prevent abuse
+    if (reason !== 'game_not_started' && reason !== 'draw' && reason !== 'tie') {
       return res.status(400).json({ success: false, message: 'Invalid refund reason.' });
     }
 
@@ -497,7 +497,7 @@ exports.refundGameBet = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `${bet} Game Coins refunded. Game was not started.`,
+      message: `${bet} Game Coins refunded. Reason: ${reason}.`,
       gameCoins: user.gameCoins,
       refundedAmount: bet,
     });

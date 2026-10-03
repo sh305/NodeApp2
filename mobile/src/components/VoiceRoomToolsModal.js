@@ -265,8 +265,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   toolIconImg: {
-    width: 38,
-    height: 38,
+    width: 42,
+    height: 42,
   },
   badgeDot: {
     position: 'absolute',

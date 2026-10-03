@@ -256,13 +256,14 @@ export default function CardClashGame({
   roomCode,
   onWin,
   onLoss,
+  onDraw,
 }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
 
   const isTurbo = gameMode === 'turbo';
-  const MAX_ROUNDS = isTurbo ? 1 : 3;
-  const TURN_LIMIT = isTurbo ? 7 : 18;
+  const MAX_ROUNDS = 1;
+  const TURN_LIMIT = 15;
 
   // Identify My Player
   const myPlayer =
@@ -328,6 +329,7 @@ export default function CardClashGame({
   const isRevealingRef = useRef(false);
   const activeSlotRef = useRef(1);
   const matchOverRef = useRef(false);
+  const isRoundResolvingRef = useRef(false);
   const revealedSlotsRef = useRef({});
   const playerCardsRef = useRef({});
 
@@ -395,22 +397,22 @@ export default function CardClashGame({
 
   // Handle timeout (auto draw)
   const handleTimeExpire = () => {
-    if (matchOver || isRevealing) return;
-    if (activeSlot === myPlayer.slot) {
+    if (matchOverRef.current || isRevealingRef.current || isRoundResolvingRef.current) return;
+    if (activeSlotRef.current === myPlayer.slot) {
       triggerDraw();
     }
   };
 
-  // AI Turn Trigger
+  // AI Turn Trigger - strictly protected against double AI draws
   useEffect(() => {
-    if (matchOver || isRevealing) return;
-    if (!isMultiplayer && activeSlot !== myPlayer.slot) {
+    if (matchOver || isRevealing || isRoundResolvingRef.current) return;
+    if (!isMultiplayer && activeSlot && activeSlot !== myPlayer.slot && !revealedSlots[activeSlot]) {
       const aiDelay = setTimeout(() => {
         aiPerformDraw();
-      }, 1100);
+      }, 1000);
       return () => clearTimeout(aiDelay);
     }
-  }, [activeSlot, isMultiplayer, matchOver, isRevealing]);
+  }, [activeSlot, isMultiplayer, matchOver, isRevealing, revealedSlots]);
 
   // Socket multiplayer listeners
   useEffect(() => {
@@ -433,24 +435,37 @@ export default function CardClashGame({
       if (data?.roundScores) setRoundScores(data.roundScores);
     };
 
+    const handleRemoteDraw = () => {
+      setMatchOver(true);
+      setRoundBanner(t('Match Draw! Bets Refunded 🤝'));
+      showToast(t('Match ended in a Draw! Bets refunded.'), 'info');
+      setTimeout(() => {
+        if (onDraw) onDraw('High Card Clash');
+        else if (onLoss) onLoss('High Card Clash');
+      }, 1800);
+    };
+
     socket.on('card_clash_reveal', handleRemoteReveal);
     socket.on('card_clash_turn_passed', handleRemoteTurnPassed);
     socket.on('card_clash_sync_round', handleRemoteSync);
+    socket.on('game_match_draw', handleRemoteDraw);
 
     return () => {
       socket.off('card_clash_reveal', handleRemoteReveal);
       socket.off('card_clash_turn_passed', handleRemoteTurnPassed);
       socket.off('card_clash_sync_round', handleRemoteSync);
+      socket.off('game_match_draw', handleRemoteDraw);
     };
   }, [socket, roomCode, playMode, myPlayer.slot]);
 
   // Draw card action
   const triggerDraw = () => {
-    if (isRevealingRef.current || matchOverRef.current) return;
+    if (isRevealingRef.current || matchOverRef.current || isRoundResolvingRef.current) return;
     if (activeSlotRef.current !== myPlayer.slot) {
       showToast(t('Wait for your turn!'), 'info');
       return;
     }
+    if (revealedSlotsRef.current[myPlayer.slot]) return;
 
     isRevealingRef.current = true;
     setIsRevealing(true);
@@ -469,12 +484,16 @@ export default function CardClashGame({
   };
 
   const aiPerformDraw = () => {
-    if (isRevealingRef.current || matchOverRef.current) return;
+    if (isRevealingRef.current || matchOverRef.current || isRoundResolvingRef.current) return;
+    const currentActive = activeSlotRef.current;
+    if (!currentActive || currentActive === myPlayer.slot) return;
+    if (revealedSlotsRef.current[currentActive]) return;
+
     isRevealingRef.current = true;
     setIsRevealing(true);
 
     const drawnCard = getRandomCard();
-    applyCardReveal(activeSlotRef.current, drawnCard, false);
+    applyCardReveal(currentActive, drawnCard, false);
   };
 
   const applyCardReveal = (slot, card, isMe) => {
@@ -508,9 +527,15 @@ export default function CardClashGame({
       // Check if all players have revealed their cards for this round
       const allRevealed = playersList.every((p) => revealedSlotsRef.current[p.slot]);
       if (allRevealed) {
+        // Lock turns immediately so AI cannot trigger again
+        isRoundResolvingRef.current = true;
+        activeSlotRef.current = 0;
+        setActiveSlot(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+
         setTimeout(() => {
           resolveRound({ ...playerCardsRef.current });
-        }, 600);
+        }, 500);
       } else {
         const nextSlot = (slot % actualPlayersCount) + 1;
         activeSlotRef.current = nextSlot;
@@ -540,19 +565,41 @@ export default function CardClashGame({
       }
     });
 
-    let bannerText = '';
-    const winningCard = cards[roundWinner];
     if (isTie) {
-      roundWinner = 'tie';
-      bannerText = t('Round Tied! Re-drawing...');
-    } else if (roundWinner === myPlayer.slot) {
-      bannerText = `${t('You won this Round!')} (${winningCard?.label}${winningCard?.suitSymbol})`;
-    } else {
-      const winnerName = playersList.find((p) => p.slot === roundWinner)?.name || `${t('Player')} ${roundWinner}`;
-      bannerText = `${winnerName} ${t('won this Round!')} (${winningCard?.label}${winningCard?.suitSymbol})`;
+      setRoundWinnerSlot('tie');
+      setRoundBanner(t('Cards Tied! Re-drawing...'));
+
+      bannerOpacity.setValue(0);
+      Animated.timing(bannerOpacity, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }).start();
+
+      setTimeout(() => {
+        revealedSlotsRef.current = {};
+        playerCardsRef.current = {};
+        isRoundResolvingRef.current = false;
+        setRevealedSlots({});
+        setPlayerCards({});
+        setRoundWinnerSlot(null);
+        setRoundBanner('');
+        activeSlotRef.current = 1;
+        setActiveSlot(1);
+      }, 1500);
+      return;
     }
 
+    // A player won with the higher card!
     setRoundWinnerSlot(roundWinner);
+    const winningCard = cards[roundWinner];
+    const isMeWinner = roundWinner === myPlayer.slot;
+    const winnerName = playersList.find((p) => p.slot === roundWinner)?.name || `${t('Player')} ${roundWinner}`;
+
+    const bannerText = isMeWinner
+      ? `${t('VICTORY!')} ${t('You won with higher card')} (${winningCard?.label}${winningCard?.suitSymbol})`
+      : `${winnerName} ${t('won with higher card')} (${winningCard?.label}${winningCard?.suitSymbol})`;
+
     setRoundBanner(bannerText);
 
     bannerOpacity.setValue(0);
@@ -562,52 +609,23 @@ export default function CardClashGame({
       useNativeDriver: true,
     }).start();
 
-    const nextScores = { ...roundScores };
-    if (roundWinner && roundWinner !== 'tie') {
-      nextScores[roundWinner] = (nextScores[roundWinner] || 0) + 1;
-    }
-    setRoundScores(nextScores);
+    // Lock match permanently so NO AI or player can ever draw again
+    setMatchOver(true);
+    matchOverRef.current = true;
+    isRoundResolvingRef.current = true;
+    activeSlotRef.current = 0;
+    setActiveSlot(0);
+    setMatchWinnerSlot(roundWinner);
+    setRoundScores({ [roundWinner]: 1 });
+    if (timerRef.current) clearInterval(timerRef.current);
 
-    // Check match completion
     setTimeout(() => {
-      const targetWins = Math.ceil(MAX_ROUNDS / 2);
-      const anyPlayerWonTarget = playersList.some((p) => (nextScores[p.slot] || 0) >= targetWins);
-      const isMatchDecided = isTurbo || anyPlayerWonTarget || currentRound >= MAX_ROUNDS;
-
-      if (isMatchDecided) {
-        let champion = playersList[0].slot;
-        let maxWins = -1;
-
-        playersList.forEach((p) => {
-          const w = nextScores[p.slot] || 0;
-          if (w > maxWins) {
-            maxWins = w;
-            champion = p.slot;
-          }
-        });
-
-        setMatchOver(true);
-        setMatchWinnerSlot(champion);
-
-        const isMeWinner = champion === myPlayer.slot;
-        if (isMeWinner) {
-          onWin && onWin('High Card Clash');
-        } else {
-          onLoss && onLoss('High Card Clash');
-        }
+      if (isMeWinner) {
+        onWin && onWin('High Card Clash');
       } else {
-        // Next round
-        revealedSlotsRef.current = {};
-        playerCardsRef.current = {};
-        setCurrentRound((r) => r + 1);
-        setRevealedSlots({});
-        setPlayerCards({});
-        setRoundWinnerSlot(null);
-        setRoundBanner('');
-        activeSlotRef.current = 1;
-        setActiveSlot(1);
+        onLoss && onLoss('High Card Clash');
       }
-    }, 2200);
+    }, 1200);
   };
 
   const totalPotValue = propTotalPot || betAmount * playersCount;
@@ -631,10 +649,10 @@ export default function CardClashGame({
         </View>
 
         <View style={styles.potPill}>
-          <Image source={GOLD_COIN_IMG} style={styles.coinIcon} resizeMode="contain" />
+          <Image source={GREEN_COIN_IMG} style={styles.coinIcon} resizeMode="contain" />
           <View>
             <Text style={styles.potLabel}><T>TOTAL POT</T></Text>
-            <Text style={styles.potValue}>{totalPotValue} <T>Coins</T></Text>
+            <Text style={styles.potValue}>{totalPotValue} <T>Game Coins</T></Text>
           </View>
         </View>
 
@@ -919,9 +937,9 @@ export default function CardClashGame({
 
             {/* Pot Prize Box */}
             <View style={styles.prizeBox}>
-              <Image source={GOLD_COIN_IMG} style={{ width: 28, height: 28 }} resizeMode="contain" />
+              <Image source={GREEN_COIN_IMG} style={{ width: 28, height: 28 }} resizeMode="contain" />
               <Text style={styles.prizeAmount}>
-                {matchWinnerSlot === myPlayer.slot ? `+${totalPotValue - betAmount}` : `-${betAmount}`} <T>Coins</T>
+                {matchWinnerSlot === myPlayer.slot ? `+${totalPotValue - betAmount}` : `-${betAmount}`} <T>Game Coins</T>
               </Text>
             </View>
 

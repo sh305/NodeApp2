@@ -54,7 +54,7 @@ const POCKETS = [
   { id: 'BR', x: BOARD_SIZE - FRAME_WIDTH - 14, y: BOARD_SIZE - FRAME_WIDTH - 14, name: 'Bottom-Right' },
 ];
 
-const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
+const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
 
 // Setup central coins (Classic 19-piece flower matching user's screenshot)
 const createInitialPucks = (isTurbo = false) => {
@@ -138,6 +138,7 @@ export default function CarromGame({
   roomCode,
   onWin,
   onLoss,
+  onDraw,
 }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
@@ -857,12 +858,23 @@ export default function CarromGame({
     // Check Match Win
     const allPocketed = updatedPucks.every((p) => p.pocketed);
     if (allPocketed) {
-      setMatchOver(true);
-      const isTeamA = myPlayer.slot === 1 || myPlayer.slot === 3;
-      const iWon =
-        actualPlayersCount === 4
-          ? scores.teamA >= scores.teamB
-          : (scores[myPlayer.slot] || 0) >= (scores[topOpponent.slot] || 0);
+      const myScore = actualPlayersCount === 4 ? scores.teamA : (scores[myPlayer.slot] || 0);
+      const oppScore = actualPlayersCount === 4 ? scores.teamB : (scores[topOpponent.slot] || 0);
+
+      if (myScore === oppScore) {
+        setEventNotice(t('Match Draw! Bets Refunded 🤝'));
+        showToast(t('Match ended in a Draw! Bets refunded.'), 'info');
+        if (isMultiplayer && socket && roomCode) {
+          socket.emit('tictactoe_match_draw', { roomCode });
+        }
+        setTimeout(() => {
+          if (onDraw) onDraw('Carrom Board');
+          else if (onLoss) onLoss('Carrom Board');
+        }, 1800);
+        return;
+      }
+
+      const iWon = myScore > oppScore;
 
       if (iWon) {
         setEventNotice(t('Victory! You Won the Carrom Match! 🏆'));
@@ -1100,10 +1112,10 @@ export default function CarromGame({
       {/* MATCH STAKES STRIP */}
       <View style={styles.stakesStrip}>
         <View style={styles.stakesStripItem}>
-          <Image source={GOLD_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
+          <Image source={GREEN_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
           <View>
             <Text style={styles.stakesStripLabel}><T>Bet</T></Text>
-            <Text style={styles.stakesStripVal}>{currentBet} <T>Coins</T></Text>
+            <Text style={styles.stakesStripVal}>{currentBet} <T>Game Coins</T></Text>
           </View>
         </View>
         <View style={styles.stakesStripDivider} />
@@ -1111,7 +1123,7 @@ export default function CarromGame({
           <Text style={styles.stakesTrophyEmoji}>🏆</Text>
           <View>
             <Text style={styles.stakesStripLabel}><T>Total Pot</T></Text>
-            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Coins</T></Text>
+            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Game Coins</T></Text>
           </View>
         </View>
         <View style={styles.stakesStripDivider} />

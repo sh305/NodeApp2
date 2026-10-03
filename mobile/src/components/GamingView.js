@@ -1084,16 +1084,27 @@ export default function GamingView({
           `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
           'success'
         );
-        return;
+      } else {
+        setGameCoins((prev) => prev + totalPot);
+        showToast(
+          `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
+          'success'
+        );
       }
     } catch (err) {
       setGameCoins((prev) => prev + totalPot);
+      showToast(
+        `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
+        'success'
+      );
     }
 
-    showToast(
-      `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
-      'success'
-    );
+    // Automatically close the game arena after victory celebration
+    setTimeout(() => {
+      setGameResult(null);
+      setArenaGamePhase('waiting');
+      setActiveGameArena(null);
+    }, 2200);
   };
 
   // Loss Handler: Confirms loss & logs deduction
@@ -1113,6 +1124,50 @@ export default function GamingView({
       `${t('Match lost!')} -${bet} ${t('Game Coins deducted.')}`,
       'error'
     );
+
+    // Automatically close the game arena after loss result
+    setTimeout(() => {
+      setGameResult(null);
+      setArenaGamePhase('waiting');
+      setActiveGameArena(null);
+    }, 2200);
+  };
+
+  // Draw / Tie Handler: Refunds coins, displays draw notice, and auto-closes arena after 2 seconds
+  const handleGameDraw = async (gameName) => {
+    setGameResult('draw');
+    const bet = matchBetRef.current || matchBet || selectedGame?.bet || ludoBetAmount || 100;
+
+    if (playMode === 'local' && socketRef.current && lobbyRoomCode) {
+      socketRef.current.emit('tictactoe_match_draw', {
+        roomCode: lobbyRoomCode,
+      });
+      fetchChestStatus?.();
+    } else {
+      try {
+        const res = await api.post('/users/game/refund-bet', {
+          betAmount: bet,
+          gameName: selectedGame?.name || gameName,
+          reason: 'draw',
+        });
+        if (res.data?.success) {
+          setGameCoins(res.data.gameCoins);
+        } else {
+          setGameCoins((prev) => prev + bet);
+        }
+      } catch (e) {
+        setGameCoins((prev) => prev + bet);
+      }
+    }
+
+    showToast(t('Match ended in a Draw! Bets refunded.'), 'info');
+
+    // Automatically close the game arena after 2 seconds!
+    setTimeout(() => {
+      setGameResult(null);
+      setArenaGamePhase('waiting');
+      setActiveGameArena(null);
+    }, 2000);
   };
 
   // Arena Exit Handler: If TimeBomb is still in 'waiting' phase, refund coins & exit free.
@@ -3028,6 +3083,8 @@ export default function GamingView({
                 {activeGameArena === 'tictactoe' && '❌⭕ Tic Tac Toe (Zero Kata)'}
                 {activeGameArena === 'carrom' && '🎯 Carrom Board Battle'}
                 {activeGameArena === 'time_bomb' && '💣 Time Bomb Pass'}
+                {activeGameArena === 'card_clash' && '🃏 High Card Clash'}
+                {activeGameArena === 'dice_battle' && '🎲 Dice Battle'}
               </Text>
               <TouchableOpacity
                 onPress={handleExitArenaPress}
@@ -3036,23 +3093,6 @@ export default function GamingView({
                 <Text style={styles.arenaExitText}>{t('Exit Game')}</Text>
               </TouchableOpacity>
             </View>
-
-            {/* Win / Loss Celebratory Banner */}
-            {gameResult && (
-              <View style={[styles.resultBanner, gameResult === 'won' ? styles.resultBannerWon : styles.resultBannerLost]}>
-                <Text style={[styles.resultBannerTitle, gameResult === 'lost' && { color: '#DC2626' }]}>
-                  {gameResult === 'won'
-                    ? `${t('VICTORY! 🏆')} +${Math.max(0, (matchTotalPotRef.current || matchTotalPot || ((matchBetRef.current || matchBet || 100) * (selectedPlayers || 2))) - (matchBetRef.current || matchBet || 100))} ${t('Game Coins!')} (${t('Total Pot')}: ${matchTotalPotRef.current || matchTotalPot || ((matchBetRef.current || matchBet || 100) * (selectedPlayers || 2))})`
-                    : `${t('DEFEAT 😢')} -${matchBetRef.current || matchBet || 100} ${t('Game Coins deducted.')}`}
-                </Text>
-                <TouchableOpacity
-                  style={[styles.resultPlayAgainBtn, gameResult === 'lost' && { backgroundColor: '#EF4444' }]}
-                  onPress={() => setActiveGameArena(null)}
-                >
-                  <Text style={styles.resultPlayAgainText}>{t('Done')}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
 
             {/* ARENA 1: AUTHENTIC 15x15 LUDO BOARD & ENGINE */}
             {activeGameArena === 'ludo' && (
@@ -3069,6 +3109,7 @@ export default function GamingView({
                 roomCode={lobbyRoomCode}
                 onWin={(game) => handleGameWin(game || 'Ludo')}
                 onLoss={(game) => handleGameLoss(game || 'Ludo')}
+                onDraw={(game) => handleGameDraw(game || 'Ludo')}
               />
             )}
 
@@ -3087,6 +3128,7 @@ export default function GamingView({
                 roomCode={lobbyRoomCode}
                 onWin={(game) => handleGameWin(game || 'Snake & Ladder')}
                 onLoss={(game) => handleGameLoss(game || 'Snake & Ladder')}
+                onDraw={(game) => handleGameDraw(game || 'Snake & Ladder')}
               />
             )}
 
@@ -3110,6 +3152,7 @@ export default function GamingView({
                   roomCode={lobbyRoomCode}
                   onWin={(game) => handleGameWin(game || 'Carrom Board')}
                   onLoss={(game) => handleGameLoss(game || 'Carrom Board')}
+                  onDraw={(game) => handleGameDraw(game || 'Carrom Board')}
                 />
               </ScrollView>
             )}
@@ -3134,6 +3177,7 @@ export default function GamingView({
                   roomCode={lobbyRoomCode}
                   onWin={(game) => handleGameWin(game || 'Dice Battle')}
                   onLoss={(game) => handleGameLoss(game || 'Dice Battle')}
+                  onDraw={(game) => handleGameDraw(game || 'Dice Battle')}
                 />
               </ScrollView>
             )}
@@ -3158,6 +3202,7 @@ export default function GamingView({
                   roomCode={lobbyRoomCode}
                   onWin={(game) => handleGameWin(game || 'High Card Clash')}
                   onLoss={(game) => handleGameLoss(game || 'High Card Clash')}
+                  onDraw={(game) => handleGameDraw(game || 'High Card Clash')}
                 />
               </ScrollView>
             )}
@@ -3182,6 +3227,7 @@ export default function GamingView({
                   onPhaseChange={(phase) => setArenaGamePhase(phase)}
                   onWin={(game) => handleGameWin(game || 'Time Bomb')}
                   onLoss={(game) => handleGameLoss(game || 'Time Bomb')}
+                  onDraw={(game) => handleGameDraw(game || 'Time Bomb')}
                 />
               </ScrollView>
             )}
@@ -3201,6 +3247,7 @@ export default function GamingView({
                 roomCode={lobbyRoomCode}
                 onWin={(game) => handleGameWin(game || 'Tic Tac Toe')}
                 onLoss={(game) => handleGameLoss(game || 'Tic Tac Toe')}
+                onDraw={(game) => handleGameDraw(game || 'Tic Tac Toe')}
               />
             )}
           </View>
@@ -4922,6 +4969,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#DCFCE7',
     borderWidth: 1.5,
     borderColor: '#00C853',
+  },
+  resultBannerDraw: {
+    backgroundColor: '#FEF9C3',
+    borderWidth: 1.5,
+    borderColor: '#EAB308',
   },
   resultBannerLost: {
     backgroundColor: '#FEF2F2',

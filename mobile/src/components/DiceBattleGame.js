@@ -220,13 +220,14 @@ export default function DiceBattleGame({
   roomCode,
   onWin,
   onLoss,
+  onDraw,
 }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
 
   const isTurbo = gameMode === 'turbo';
-  const MAX_ROUNDS = isTurbo ? 1 : 3;
-  const TURN_LIMIT = isTurbo ? 7 : 18;
+  const MAX_ROUNDS = 1;
+  const TURN_LIMIT = 15;
 
   // Determine players
   const myPlayer =
@@ -298,6 +299,7 @@ export default function DiceBattleGame({
   const isRollingRef = useRef(false);
   const activeSlotRef = useRef(1);
   const matchOverRef = useRef(false);
+  const isRoundResolvingRef = useRef(false);
   const hasRolledRef = useRef({});
   const roundRollsRef = useRef({});
 
@@ -366,23 +368,23 @@ export default function DiceBattleGame({
 
   // Handle timeout (auto roll if my turn, or pass)
   const handleTimeExpire = () => {
-    if (matchOver || isRolling) return;
-    if (activeSlot === myPlayer.slot) {
+    if (matchOverRef.current || isRollingRef.current || isRoundResolvingRef.current) return;
+    if (activeSlotRef.current === myPlayer.slot) {
       triggerRoll();
     }
   };
 
-  // AI Turn Trigger
+  // AI Turn Trigger - strictly protected against double AI rolls
   useEffect(() => {
-    if (matchOver || isRolling) return;
-    if (!isMultiplayer && activeSlot !== myPlayer.slot) {
+    if (matchOver || isRolling || isRoundResolvingRef.current) return;
+    if (!isMultiplayer && activeSlot && activeSlot !== myPlayer.slot && !hasRolledThisRound[activeSlot]) {
       // AI's turn
       const aiDelay = setTimeout(() => {
         aiPerformRoll();
-      }, 1200);
+      }, 1000);
       return () => clearTimeout(aiDelay);
     }
-  }, [activeSlot, isMultiplayer, matchOver, isRolling]);
+  }, [activeSlot, isMultiplayer, matchOver, isRolling, hasRolledThisRound]);
 
   // Socket multiplayer listeners
   useEffect(() => {
@@ -404,24 +406,37 @@ export default function DiceBattleGame({
       if (data?.roundScores) setRoundScores(data.roundScores);
     };
 
+    const handleRemoteDraw = () => {
+      setMatchOver(true);
+      setRoundBanner(t('Match Draw! Bets Refunded 🤝'));
+      showToast(t('Match ended in a Draw! Bets refunded.'), 'info');
+      setTimeout(() => {
+        if (onDraw) onDraw('Dice Battle');
+        else if (onLoss) onLoss('Dice Battle');
+      }, 1800);
+    };
+
     socket.on('dice_battle_roll', handleRemoteRoll);
     socket.on('dice_battle_turn_passed', handleRemoteTurnPassed);
     socket.on('dice_battle_sync_round', handleRemoteSync);
+    socket.on('game_match_draw', handleRemoteDraw);
 
     return () => {
       socket.off('dice_battle_roll', handleRemoteRoll);
       socket.off('dice_battle_turn_passed', handleRemoteTurnPassed);
       socket.off('dice_battle_sync_round', handleRemoteSync);
+      socket.off('game_match_draw', handleRemoteDraw);
     };
   }, [socket, roomCode, playMode, myPlayer.slot]);
 
   // Dice roll animation and value resolution
   const triggerRoll = () => {
-    if (isRollingRef.current || matchOverRef.current) return;
+    if (isRollingRef.current || matchOverRef.current || isRoundResolvingRef.current) return;
     if (activeSlotRef.current !== myPlayer.slot) {
       showToast(t('Wait for your turn!'), 'info');
       return;
     }
+    if (hasRolledRef.current[myPlayer.slot]) return;
 
     isRollingRef.current = true;
     setIsRolling(true);
@@ -445,7 +460,11 @@ export default function DiceBattleGame({
   };
 
   const aiPerformRoll = () => {
-    if (isRollingRef.current || matchOverRef.current) return;
+    if (isRollingRef.current || matchOverRef.current || isRoundResolvingRef.current) return;
+    const currentActive = activeSlotRef.current;
+    if (!currentActive || currentActive === myPlayer.slot) return;
+    if (hasRolledRef.current[currentActive]) return; // AI already rolled this round!
+
     isRollingRef.current = true;
     setIsRolling(true);
 
@@ -453,7 +472,7 @@ export default function DiceBattleGame({
     const die2 = Math.floor(Math.random() * 6) + 1;
     const values = [die1, die2];
     const total = die1 + die2;
-    applyDiceRoll(activeSlotRef.current, values, total, false);
+    applyDiceRoll(currentActive, values, total, false);
   };
 
   const applyDiceRoll = (slot, finalValues, total, isMe) => {
@@ -512,9 +531,15 @@ export default function DiceBattleGame({
       // Check if all players have rolled this round
       const allDone = playersList.every((p) => hasRolledRef.current[p.slot]);
       if (allDone) {
+        // Lock turns immediately so AI cannot trigger again
+        isRoundResolvingRef.current = true;
+        activeSlotRef.current = 0;
+        setActiveSlot(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+
         setTimeout(() => {
           resolveMultiplayerRound({ ...roundRollsRef.current });
-        }, 600);
+        }, 500);
       } else {
         // Pass turn to next slot
         const nextSlot = (slot % actualPlayersCount) + 1;
@@ -544,21 +569,42 @@ export default function DiceBattleGame({
       }
     });
 
-    let bannerText = '';
     if (isTie) {
-      roundWinner = 'tie';
-      bannerText = t('Round Tied! Re-rolling...');
-    } else if (roundWinner === myPlayer.slot) {
-      bannerText = t('You won this Round!');
-    } else {
-      const winnerName = playersList.find((p) => p.slot === roundWinner)?.name || `${t('Player')} ${roundWinner}`;
-      bannerText = `${winnerName} ${t('won this Round!')}`;
+      setRoundWinnerSlot('tie');
+      setRoundBanner(t('Round Tied! Re-rolling...'));
+
+      bannerOpacity.setValue(0);
+      Animated.timing(bannerOpacity, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }).start();
+
+      setTimeout(() => {
+        hasRolledRef.current = {};
+        roundRollsRef.current = {};
+        isRoundResolvingRef.current = false;
+        setHasRolledThisRound({});
+        setRoundRolls({});
+        setRoundWinnerSlot(null);
+        setRoundBanner('');
+        activeSlotRef.current = 1;
+        setActiveSlot(1);
+      }, 1500);
+      return;
     }
 
+    // A player won with the higher roll!
     setRoundWinnerSlot(roundWinner);
+    const isMeWinner = roundWinner === myPlayer.slot;
+    const winnerName = playersList.find((p) => p.slot === roundWinner)?.name || `${t('Player')} ${roundWinner}`;
+
+    const bannerText = isMeWinner
+      ? `${t('VICTORY!')} ${t('You won with higher roll')} (${highestRoll})`
+      : `${winnerName} ${t('won with higher roll')} (${highestRoll})`;
+
     setRoundBanner(bannerText);
 
-    // Fade banner in
     bannerOpacity.setValue(0);
     Animated.timing(bannerOpacity, {
       toValue: 1,
@@ -566,56 +612,23 @@ export default function DiceBattleGame({
       useNativeDriver: true,
     }).start();
 
-    const nextScores = { ...roundScores };
-    if (roundWinner && roundWinner !== 'tie') {
-      nextScores[roundWinner] = (nextScores[roundWinner] || 0) + 1;
-    }
-    setRoundScores(nextScores);
+    // Lock match permanently so NO AI or player can ever roll again
+    setMatchOver(true);
+    matchOverRef.current = true;
+    isRoundResolvingRef.current = true;
+    activeSlotRef.current = 0;
+    setActiveSlot(0);
+    setMatchWinnerSlot(roundWinner);
+    setRoundScores({ [roundWinner]: 1 });
+    if (timerRef.current) clearInterval(timerRef.current);
 
-    // Check match completion
     setTimeout(() => {
-      const targetWins = Math.ceil(MAX_ROUNDS / 2);
-      const anyPlayerWonTarget = playersList.some((p) => (nextScores[p.slot] || 0) >= targetWins);
-      const isMatchDecided = isTurbo || anyPlayerWonTarget || currentRound >= MAX_ROUNDS;
-
-      if (isMatchDecided) {
-        // Decide match champion (player with highest wins, tie-breaker: total points)
-        let champion = playersList[0].slot;
-        let maxWins = -1;
-        let maxPts = -1;
-
-        playersList.forEach((p) => {
-          const w = nextScores[p.slot] || 0;
-          const pts = totalPoints[p.slot] || 0;
-          if (w > maxWins || (w === maxWins && pts > maxPts)) {
-            maxWins = w;
-            maxPts = pts;
-            champion = p.slot;
-          }
-        });
-
-        setMatchOver(true);
-        setMatchWinnerSlot(champion);
-
-        const isMeWinner = champion === myPlayer.slot;
-        if (isMeWinner) {
-          onWin && onWin('Dice Battle');
-        } else {
-          onLoss && onLoss('Dice Battle');
-        }
+      if (isMeWinner) {
+        onWin && onWin('Dice Battle');
       } else {
-        // Next Round
-        hasRolledRef.current = {};
-        roundRollsRef.current = {};
-        setCurrentRound((r) => r + 1);
-        setHasRolledThisRound({});
-        setRoundRolls({});
-        setRoundWinnerSlot(null);
-        setRoundBanner('');
-        activeSlotRef.current = 1;
-        setActiveSlot(1);
+        onLoss && onLoss('Dice Battle');
       }
-    }, 2000);
+    }, 1200);
   };
 
 
@@ -645,10 +658,10 @@ export default function DiceBattleGame({
         </View>
 
         <View style={styles.potPill}>
-          <Image source={GOLD_COIN_IMG} style={styles.coinIcon} resizeMode="contain" />
+          <Image source={GREEN_COIN_IMG} style={styles.coinIcon} resizeMode="contain" />
           <View>
             <Text style={styles.potLabel}><T>TOTAL POT</T></Text>
-            <Text style={styles.potValue}>{totalPotValue} <T>Coins</T></Text>
+            <Text style={styles.potValue}>{totalPotValue} <T>Game Coins</T></Text>
           </View>
         </View>
 
@@ -924,9 +937,9 @@ export default function DiceBattleGame({
 
             {/* Pot Prize Box */}
             <View style={styles.prizeBox}>
-              <Image source={GOLD_COIN_IMG} style={{ width: 28, height: 28 }} resizeMode="contain" />
+              <Image source={GREEN_COIN_IMG} style={{ width: 28, height: 28 }} resizeMode="contain" />
               <Text style={styles.prizeAmount}>
-                {matchWinnerSlot === myPlayer.slot ? `+${totalPotValue - betAmount}` : `-${betAmount}`} <T>Coins</T>
+                {matchWinnerSlot === myPlayer.slot ? `+${totalPotValue - betAmount}` : `-${betAmount}`} <T>Game Coins</T>
               </Text>
             </View>
 

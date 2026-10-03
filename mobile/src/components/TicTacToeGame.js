@@ -18,7 +18,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOARD_SIZE = Math.min(SCREEN_WIDTH - 32, 360);
 const CELL_SIZE = (BOARD_SIZE - 16) / 3;
 
-const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
+const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
 
 // 8 Winning Combinations for 3x3 Tic Tac Toe
 const WIN_LINES = [
@@ -45,6 +45,7 @@ export default function TicTacToeGame({
   roomCode,
   onWin,
   onLoss,
+  onDraw,
 }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
@@ -222,6 +223,14 @@ export default function TicTacToeGame({
         if (!isRemote && isMultiplayer && socket && roomCode) {
           socket.emit('tictactoe_match_draw', { roomCode });
         }
+        // Auto-close game automatically after tie!
+        setTimeout(() => {
+          if (onDraw) {
+            onDraw('Tic Tac Toe');
+          } else if (onLoss) {
+            onLoss('Tic Tac Toe');
+          }
+        }, 1800);
       } else {
         setWinningLine(result.line);
         // Animate winning laser line
@@ -386,6 +395,14 @@ export default function TicTacToeGame({
       setMatchOver(true);
       setEventNotice(t('Match Draw! Bets Refunded 🤝'));
       showToast(t('Match ended in a Draw! Bets refunded.'), 'info');
+      // Auto-close game automatically after remote tie!
+      setTimeout(() => {
+        if (onDraw) {
+          onDraw('Tic Tac Toe');
+        } else if (onLoss) {
+          onLoss('Tic Tac Toe');
+        }
+      }, 1800);
     };
 
     socket.on('tictactoe_move_made', handleRemoteMove);
@@ -432,10 +449,10 @@ export default function TicTacToeGame({
       {/* MATCH STAKES & WINNER POT STRIP */}
       <View style={styles.stakesStrip}>
         <View style={styles.stakesStripItem}>
-          <Image source={GOLD_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
+          <Image source={GREEN_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
           <View>
             <Text style={styles.stakesStripLabel}><T>Bets / Player</T></Text>
-            <Text style={styles.stakesStripVal}>{currentBet} <T>Coins</T></Text>
+            <Text style={styles.stakesStripVal}>{currentBet} <T>Game Coins</T></Text>
           </View>
         </View>
 
@@ -445,7 +462,7 @@ export default function TicTacToeGame({
           <Text style={styles.stakesTrophyEmoji}>🏆</Text>
           <View>
             <Text style={styles.stakesStripLabel}><T>Winner Takes Pot</T></Text>
-            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Coins</T></Text>
+            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Game Coins</T></Text>
           </View>
         </View>
 
@@ -542,7 +559,7 @@ export default function TicTacToeGame({
               </View>
 
               <View style={styles.centerMedallionRow}>
-                <Image source={GOLD_COIN_IMG} style={styles.centerCoinImg} resizeMode="contain" />
+                <Image source={GREEN_COIN_IMG} style={styles.centerCoinImg} resizeMode="contain" />
                 <Text style={styles.centerBetAmountText}>{currentBet}</Text>
               </View>
 
