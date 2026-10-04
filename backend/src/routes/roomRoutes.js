@@ -9,6 +9,11 @@ const {
   kickUser,
   unkickUser,
   getKickedUsers,
+  getRoomPeople,
+  removeHost,
+  removeAdmin,
+  addHost,
+  addAdmin,
 } = require('../controllers/roomController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -19,6 +24,11 @@ router.route('/')
 router.route('/:id')
   .get(protect, getRoomById);
 
+router.get('/:id/people', protect, getRoomPeople);
+router.post('/:id/remove-host', protect, removeHost);
+router.post('/:id/remove-admin', protect, removeAdmin);
+router.post('/:id/add-host', protect, addHost);
+router.post('/:id/add-admin', protect, addAdmin);
 router.post('/:id/verify-password', protect, verifyRoomPassword);
 router.put('/:id/lock-status', protect, toggleLockRoom);
 router.post('/:id/kick', protect, kickUser);

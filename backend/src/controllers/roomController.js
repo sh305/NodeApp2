@@ -101,12 +101,25 @@ exports.getRoomById = async (req, res) => {
     const userId = req.user._id;
 
     const room = await Room.findById(id)
-      .populate('owner', 'name avatar wealthLevel activeFrame')
-      .populate('seats.user', 'name avatar wealthLevel activeFrame')
-      .populate('activeMembers', 'name avatar wealthLevel');
+      .populate('owner', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('hosts', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('admins', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('members', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
 
     if (!room) {
       return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    // Register user in activeMembers if not already present
+    const alreadyActive = room.activeMembers.some(
+      (m) => (m._id ? m._id.toString() : m.toString()) === userId.toString()
+    );
+    if (!alreadyActive) {
+      room.activeMembers.push(userId);
+      await room.save();
+      await room.populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
     }
 
     // Check if user is kicked from room (3 days vs permanent)
@@ -323,6 +336,194 @@ exports.getKickedUsers = async (req, res) => {
     return res.status(200).json({
       success: true,
       kickedUsers: room.kickedUsers,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get Room People (Hosts, Admins, Members)
+// @route   GET /api/rooms/:id/people
+exports.getRoomPeople = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const room = await Room.findById(id)
+      .populate('owner', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('hosts', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('admins', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('members', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
+
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const ownerId = (room.owner?._id || room.owner || '').toString();
+
+    // Room owner can NEVER be in hosts or admins list (owner cannot be removed)
+    const hostList = (room.hosts || []).filter(
+      (h) => (h._id ? h._id.toString() : h.toString()) !== ownerId
+    );
+    const adminList = (room.admins || []).filter(
+      (a) => (a._id ? a._id.toString() : a.toString()) !== ownerId
+    );
+    const memberList = (room.members || []).filter(
+      (m) => (m._id ? m._id.toString() : m.toString()) !== ownerId
+    );
+
+    return res.status(200).json({
+      success: true,
+      hosts: hostList,
+      admins: adminList,
+      members: memberList,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Remove User from Host Team
+// @route   POST /api/rooms/:id/remove-host
+exports.removeHost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetUserId } = req.body;
+    const room = await Room.findById(id);
+
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const ownerId = (room.owner?._id || room.owner || '').toString();
+    if (ownerId && targetUserId.toString() === ownerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Room owner cannot be removed from Host team',
+      });
+    }
+
+    room.hosts = (room.hosts || []).filter(
+      (h) => (h._id ? h._id.toString() : h.toString()) !== targetUserId.toString()
+    );
+
+    await room.save();
+
+    const updatedRoom = await Room.findById(id)
+      .populate('hosts', 'name avatar wealthLevel activeFrame customId gender');
+
+    const hostList = (updatedRoom.hosts || []).filter(
+      (h) => (h._id ? h._id.toString() : h.toString()) !== ownerId
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'User removed from Host team',
+      hosts: hostList,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Remove User from Admin Team
+// @route   POST /api/rooms/:id/remove-admin
+exports.removeAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetUserId } = req.body;
+    const room = await Room.findById(id);
+
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const ownerId = (room.owner?._id || room.owner || '').toString();
+    if (ownerId && targetUserId.toString() === ownerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Room owner cannot be removed from Admin team',
+      });
+    }
+
+    room.admins = (room.admins || []).filter(
+      (a) => (a._id ? a._id.toString() : a.toString()) !== targetUserId.toString()
+    );
+
+    await room.save();
+
+    const updatedRoom = await Room.findById(id)
+      .populate('admins', 'name avatar wealthLevel activeFrame customId gender');
+
+    const adminList = (updatedRoom.admins || []).filter(
+      (a) => (a._id ? a._id.toString() : a.toString()) !== ownerId
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'User removed from Admin team',
+      admins: adminList,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Add User to Host Team
+// @route   POST /api/rooms/:id/add-host
+exports.addHost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetUserId } = req.body;
+    const room = await Room.findById(id);
+
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    if (!room.hosts) room.hosts = [];
+    if (!room.hosts.some(h => (h._id ? h._id.toString() : h.toString()) === targetUserId.toString())) {
+      room.hosts.push(targetUserId);
+      await room.save();
+    }
+
+    const updatedRoom = await Room.findById(id)
+      .populate('hosts', 'name avatar wealthLevel activeFrame customId gender');
+
+    return res.status(200).json({
+      success: true,
+      message: 'User added to Host team',
+      hosts: updatedRoom.hosts,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Add User to Admin Team
+// @route   POST /api/rooms/:id/add-admin
+exports.addAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetUserId } = req.body;
+    const room = await Room.findById(id);
+
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    if (!room.admins) room.admins = [];
+    if (!room.admins.some(a => (a._id ? a._id.toString() : a.toString()) === targetUserId.toString())) {
+      room.admins.push(targetUserId);
+      await room.save();
+    }
+
+    const updatedRoom = await Room.findById(id)
+      .populate('admins', 'name avatar wealthLevel activeFrame customId gender');
+
+    return res.status(200).json({
+      success: true,
+      message: 'User added to Admin team',
+      admins: updatedRoom.admins,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

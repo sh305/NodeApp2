@@ -193,9 +193,15 @@ exports.getFollowingRooms = async (req, res) => {
       .populate('owner', 'name avatar wealthLevel activeFrame')
       .sort({ updatedAt: -1 });
 
+    const formattedRooms = (rooms || []).map((r) => {
+      const rObj = r.toObject ? r.toObject() : r;
+      rObj.activeMemberCount = r.activeMembers ? r.activeMembers.length : 0;
+      return rObj;
+    });
+
     return res.status(200).json({
       success: true,
-      rooms: rooms || [],
+      rooms: formattedRooms,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -264,7 +270,11 @@ exports.getRecentRooms = async (req, res) => {
     const orderedRooms = [];
     for (const rId of recentRoomIds) {
       const found = roomMap.get(rId.toString());
-      if (found) orderedRooms.push(found);
+      if (found) {
+        const rObj = found.toObject ? found.toObject() : found;
+        rObj.activeMemberCount = found.activeMembers ? found.activeMembers.length : 0;
+        orderedRooms.push(rObj);
+      }
     }
 
     return res.status(200).json({

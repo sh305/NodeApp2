@@ -13,6 +13,7 @@ const userRoutes = require('./routes/userRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const giftRoutes = require('./routes/giftRoutes');
 const translationRoutes = require('./routes/translationRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -38,6 +39,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/gifts', giftRoutes);
 app.use('/api/translations', translationRoutes);
+app.use('/api/search', searchRoutes);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {

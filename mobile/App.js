@@ -10,6 +10,7 @@ import AuthScreen from './src/screens/AuthScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import VoiceRoomScreen from './src/screens/VoiceRoomScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
+import SearchScreen from './src/screens/SearchScreen';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { ToastProvider } from './src/context/ToastContext';
 
@@ -95,6 +96,14 @@ export default function App() {
                         {...props}
                         currentUser={currentUser}
                         onLogout={handleLogout}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Search">
+                    {(props) => (
+                      <SearchScreen
+                        {...props}
+                        currentUser={currentUser}
                       />
                     )}
                   </Stack.Screen>

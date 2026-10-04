@@ -77,6 +77,18 @@ const roomSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    hosts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     // Room Level & EXP System
     roomLevel: {
       type: Number,

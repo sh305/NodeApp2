@@ -32,6 +32,9 @@ import ReportModal from '../components/ReportModal';
 import TreasureBoxModal from '../components/TreasureBoxModal';
 import VoiceRoomEmojiModal from '../components/VoiceRoomEmojiModal';
 import VoiceRoomToolsModal from '../components/VoiceRoomToolsModal';
+import RoomMembersModal from '../components/RoomMembersModal';
+import RoomSettingsModal from '../components/RoomSettingsModal';
+import MyPeopleModal from '../components/MyPeopleModal';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
@@ -96,6 +99,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [roomGoldContributed, setRoomGoldContributed] = useState(0);
   const [roomEmojiModalVisible, setRoomEmojiModalVisible] = useState(false);
   const [roomToolsModalVisible, setRoomToolsModalVisible] = useState(false);
+  const [roomMembersModalVisible, setRoomMembersModalVisible] = useState(false);
+  const [roomSettingsModalVisible, setRoomSettingsModalVisible] = useState(false);
+  const [myPeopleModalVisible, setMyPeopleModalVisible] = useState(false);
+  const [myPeopleInitialTab, setMyPeopleInitialTab] = useState('Host');
   const [activeHostEmoji, setActiveHostEmoji] = useState(null);
   const [activeSeatEmojis, setActiveSeatEmojis] = useState({});
 
@@ -246,6 +253,19 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
     socket.on('user_joined_room', ({ user, timestamp }) => {
       const joinId = `join_${user._id}_${timestamp || ''}`;
+      setRoom((prev) => {
+        if (!prev) return prev;
+        const exists = prev.activeMembers?.some(
+          (m) => String(m._id || m) === String(user._id)
+        );
+        if (!exists) {
+          return {
+            ...prev,
+            activeMembers: [...(prev.activeMembers || []), user],
+          };
+        }
+        return prev;
+      });
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last && last._joinId === joinId) return prev;
@@ -258,6 +278,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           },
         ];
       });
+    });
+
+    socket.on('active_members_updated', ({ activeMembers }) => {
+      if (activeMembers) {
+        setRoom((prev) => (prev ? { ...prev, activeMembers } : prev));
+      }
     });
 
     socket.on('gift_received_animation', (giftData) => {
@@ -330,6 +356,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     return () => {
       showSub.remove();
       hideSub.remove();
+      socket.emit('leave_room', { roomId, userId: currentUser?._id });
       socket.disconnect();
     };
   }, [roomId]);
@@ -754,8 +781,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
         {/* ══ 1. FLOATING HEADER (Level, Name, ID, Members, Trophy, Actions) ══ */}
         <View style={[styles.floatingHeader, { paddingTop: Math.max(12, insets.top + 4) }]}>
-          {/* Left: Compact Glass Pill with Room Info */}
-          <View style={styles.headerInfoPill}>
+          {/* Left: Compact Glass Pill with Room Info (Tap opens members sheet) */}
+          <TouchableOpacity
+            style={styles.headerInfoPill}
+            activeOpacity={0.8}
+            onPress={() => setRoomMembersModalVisible(true)}
+          >
             {/* Hexagon/Diamond Level Badge */}
             <LinearGradient
               colors={['#06B6D4', '#2563EB']}
@@ -791,7 +822,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               />
               <View style={styles.headerMicDot} />
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Right: Trophy, Shop/Pack, Share, Close */}
           <View style={styles.headerRightActions}>
@@ -1520,8 +1551,62 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         visible={roomToolsModalVisible}
         onClose={() => setRoomToolsModalVisible(false)}
         onSelectTool={(tool, toggledState) => {
-          console.log('Room tool selected:', tool.name, toggledState);
+          if (tool?.id === 'members') {
+            setRoomToolsModalVisible(false);
+            setRoomMembersModalVisible(true);
+          } else if (tool?.id === 'room_settings') {
+            setRoomToolsModalVisible(false);
+            setRoomSettingsModalVisible(true);
+          } else {
+            console.log('Room tool selected:', tool.name, toggledState);
+          }
         }}
+      />
+
+      {/* ══ ROOM MEMBERS MODAL (On Seat & Participants) ══ */}
+      <RoomMembersModal
+        visible={roomMembersModalVisible}
+        onClose={() => setRoomMembersModalVisible(false)}
+        room={room}
+        isHostActive={isHostActive}
+        isHostMuted={isHostMuted}
+        currentUser={currentUser}
+        onSelectUser={(selectedUser) => {
+          setSelectedSeatUser(selectedUser);
+        }}
+      />
+
+      {/* ══ ROOM SETTINGS MODAL (Matching User Screenshot) ══ */}
+      <RoomSettingsModal
+        visible={roomSettingsModalVisible}
+        onClose={() => setRoomSettingsModalVisible(false)}
+        room={room}
+        onOpenPeople={(tab) => {
+          setRoomSettingsModalVisible(false);
+          setMyPeopleInitialTab(tab || 'Host');
+          setMyPeopleModalVisible(true);
+        }}
+        onSelectAction={(actionKey) => {
+          if (actionKey === 'room_members') {
+            setRoomSettingsModalVisible(false);
+            setMyPeopleInitialTab('Members');
+            setMyPeopleModalVisible(true);
+          } else {
+            showToast(t('Feature coming soon!'), 'info');
+          }
+        }}
+      />
+
+      {/* ══ MY PEOPLE MODAL (Host / Admin / Members) ══ */}
+      <MyPeopleModal
+        visible={myPeopleModalVisible}
+        onClose={() => {
+          setMyPeopleModalVisible(false);
+          setRoomSettingsModalVisible(true);
+        }}
+        room={room}
+        initialTab={myPeopleInitialTab}
+        currentUser={currentUser}
       />
     </View>
   );

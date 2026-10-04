@@ -32,8 +32,25 @@ function initRoomSockets(io) {
         socket.roomId = roomId;
         socket.userId = userId;
 
-        const user = await User.findById(userId).select('name avatar wealthLevel activeFrame');
+        const user = await User.findById(userId).select('name avatar wealthLevel activeFrame customId gender');
         if (user) {
+          // Add user to room's activeMembers if not present
+          const room = await Room.findById(roomId);
+          if (room) {
+            const alreadyIn = room.activeMembers.some(
+              (m) => (m._id ? m._id.toString() : m.toString()) === userId.toString()
+            );
+            if (!alreadyIn) {
+              room.activeMembers.push(userId);
+              await room.save();
+            }
+            const updatedRoom = await Room.findById(roomId)
+              .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
+            io.to(roomId).emit('active_members_updated', {
+              activeMembers: updatedRoom?.activeMembers || [],
+            });
+          }
+
           // Broadcast to everyone in room that user joined
           io.to(roomId).emit('user_joined_room', {
             user,
@@ -42,6 +59,44 @@ function initRoomSockets(io) {
         }
       } catch (err) {
         console.error('Socket join_room error:', err);
+      }
+    });
+
+    // Explicit leave room
+    socket.on('leave_room', async ({ roomId, userId } = {}) => {
+      try {
+        const targetRoomId = roomId || socket.roomId;
+        const targetUserId = userId || socket.userId;
+        if (targetRoomId && targetUserId) {
+          socket.leave(targetRoomId);
+          const room = await Room.findById(targetRoomId);
+          if (room) {
+            let changed = false;
+            room.seats.forEach((s) => {
+              if (s.user && s.user.toString() === targetUserId.toString()) {
+                s.user = null;
+                changed = true;
+              }
+            });
+            const beforeLen = room.activeMembers.length;
+            room.activeMembers = room.activeMembers.filter(
+              (m) => (m._id ? m._id.toString() : m.toString()) !== targetUserId.toString()
+            );
+            if (room.activeMembers.length !== beforeLen) {
+              changed = true;
+            }
+            if (changed) {
+              await room.save();
+              const updatedRoom = await Room.findById(targetRoomId)
+                .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+                .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
+              io.to(targetRoomId).emit('seats_updated', { seats: updatedRoom.seats });
+              io.to(targetRoomId).emit('active_members_updated', { activeMembers: updatedRoom.activeMembers });
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Socket leave_room error:', e);
       }
     });
 
@@ -1190,11 +1245,22 @@ function initRoomSockets(io) {
                 changed = true;
               }
             });
+            // Also remove from activeMembers
+            const beforeLen = room.activeMembers.length;
+            room.activeMembers = room.activeMembers.filter(
+              (m) => (m._id ? m._id.toString() : m.toString()) !== socket.userId.toString()
+            );
+            if (room.activeMembers.length !== beforeLen) {
+              changed = true;
+            }
+
             if (changed) {
               await room.save();
               const updatedRoom = await Room.findById(socket.roomId)
-                .populate('seats.user', 'name avatar wealthLevel activeFrame');
+                .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+                .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
               io.to(socket.roomId).emit('seats_updated', { seats: updatedRoom.seats });
+              io.to(socket.roomId).emit('active_members_updated', { activeMembers: updatedRoom.activeMembers });
             }
           }
         } catch (e) {}

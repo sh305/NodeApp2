@@ -445,7 +445,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
             {/* Search Icon */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => setSearchVisible(!searchVisible)}
+              onPress={() => navigation.navigate('Search', { initialQuery: '' })}
               style={styles.topSearchBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -458,26 +458,6 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           <Text style={styles.otherTopHeaderTitle}>
             {bottomTab === 'Me' ? t('My Profile') : t(bottomTab)}
           </Text>
-        </View>
-      )}
-
-      {/* Search Input Bar (Dropdown - Only on Room Tab) */}
-      {searchVisible && bottomTab === 'Room' && (
-        <View style={styles.searchBarWrap}>
-          <SearchIcon size={18} color="#94A3B8" />
-          <TextInput
-            style={styles.searchBarInput}
-            placeholder={t('Search rooms, stars, or friends...')}
-            placeholderTextColor="#94A3B8"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={styles.searchClearBtn}>✕</Text>
-            </TouchableOpacity>
-          )}
         </View>
       )}
 
@@ -645,7 +625,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                       <View style={styles.subTabSignalWrap}>
                         <Text style={styles.subTabSignalIcon}>📶</Text>
                         <Text style={styles.subTabSignalCount}>
-                          {room.activeMemberCount || 1}
+                          {room.activeMemberCount ?? 0}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -700,7 +680,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                       <View style={styles.subTabSignalWrap}>
                         <Text style={styles.subTabSignalIcon}>📶</Text>
                         <Text style={styles.subTabSignalCount}>
-                          {room.activeMemberCount || 1}
+                          {room.activeMemberCount ?? 0}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -1031,30 +1011,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Search Bar Dropdown
-  searchBarWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 40,
-    gap: 8,
-  },
-  searchBarInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#0F172A',
-    fontWeight: '600',
-  },
-  searchClearBtn: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: '700',
-    padding: 4,
-  },
+
 
   // 2. Scroll Body
   scrollBody: {
