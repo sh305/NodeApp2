@@ -22,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Rect, G, Ellipse } from 'react-native-svg';
 import api from '../api/client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
+import UserLevelProgressBar from '../components/UserLevelProgressBar';
 import RoomLockModal from '../components/RoomLockModal';
 import GamingView from '../components/GamingView';
 import { useLanguage } from '../context/LanguageContext';
@@ -197,6 +198,33 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
   // Bottom Navigation Bar: 'Room' | 'Gaming' | 'Discover' | 'Message' | 'Me'
   const [bottomTab, setBottomTab] = useState('Room');
 
+  // Me Profile Data State
+  const [myProfile, setMyProfile] = useState(currentUser);
+
+  const fetchMyProfile = async () => {
+    if (!currentUser?._id) return;
+    try {
+      const res = await api.get(`/users/${currentUser._id}/profile`);
+      if (res.data.success) {
+        setMyProfile(res.data.user);
+      }
+    } catch (e) {
+      console.log('Error fetching user profile:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      setMyProfile((prev) => prev || currentUser);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (bottomTab === 'Me') {
+      fetchMyProfile();
+    }
+  }, [bottomTab, currentUser?._id]);
+
   // Search query state
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -264,25 +292,11 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
     }
   };
 
-  const [profileData, setProfileData] = useState(currentUser);
-
-  const fetchUserProfile = async () => {
-    if (!currentUser?._id) return;
-    try {
-      const res = await api.get(`/users/${currentUser._id}/profile`);
-      if (res.data.success) {
-        setProfileData(res.data.user);
-      }
-    } catch (e) {
-      console.log('Error fetching user profile:', e);
-    }
-  };
-
   useEffect(() => {
     fetchRooms();
     fetchRecentRooms();
     fetchFollowingRooms();
-    fetchUserProfile();
+    fetchMyProfile();
   }, [currentUser]);
 
   useFocusEffect(
@@ -290,7 +304,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
       fetchRooms();
       fetchRecentRooms();
       fetchFollowingRooms();
-      fetchUserProfile();
+      fetchMyProfile();
     }, [currentUser])
   );
 
@@ -712,12 +726,12 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           <View style={styles.meProfileWrap}>
             <View style={styles.meProfileCard}>
               <AvatarWithFrame
-                avatarUri={profileData?.avatar || currentUser?.avatar}
-                level={profileData?.wealthLevel || 1}
+                avatarUri={myProfile?.avatar || currentUser?.avatar}
+                level={myProfile?.wealthLevel || currentUser?.wealthLevel || 1}
                 size={90}
               />
               <Text style={styles.meProfileName}>
-                {profileData?.name || currentUser?.name || t('User')}
+                {myProfile?.name || currentUser?.name || t('User')}
               </Text>
               <Text style={styles.meProfileId}>
                 ID: {currentUser?._id ? currentUser._id.slice(-8) : '10001'}
@@ -728,14 +742,14 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                 <View style={styles.meWalletPill}>
                   <Text style={styles.meWalletIcon}>🪙</Text>
                   <Text style={styles.meWalletValue}>
-                    {profileData?.coins ?? currentUser?.coins ?? 1000}
+                    {myProfile?.coins ?? currentUser?.coins ?? 1000}
                   </Text>
                   <Text style={styles.meWalletLabel}>{t('Coins')}</Text>
                 </View>
                 <View style={styles.meWalletPill}>
                   <Text style={styles.meWalletIcon}>💎</Text>
                   <Text style={styles.meWalletValue}>
-                    {profileData?.diamonds ?? currentUser?.diamonds ?? 0}
+                    {myProfile?.diamonds ?? currentUser?.diamonds ?? 0}
                   </Text>
                   <Text style={styles.meWalletLabel}>{t('Diamonds')}</Text>
                 </View>
@@ -745,20 +759,26 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
               <View style={styles.meBadgesRow}>
                 <View style={styles.meWealthBadge}>
                   <Text style={styles.meBadgeText}>
-                    💰 {t('Wealth')} Lv.{profileData?.wealthLevel || 1}
+                    💰 {t('Wealth')} Lv.{myProfile?.wealthLevel || currentUser?.wealthLevel || 1}
                   </Text>
                 </View>
                 <View style={styles.meCharmBadge}>
                   <Text style={styles.meBadgeText}>
-                    💖 {t('Charm')} Lv.{profileData?.charmLevel || 1}
+                    💖 {t('Charm')} Lv.{myProfile?.charmLevel || currentUser?.charmLevel || 1}
                   </Text>
                 </View>
               </View>
 
+              {/* EXP Progress Bar & Level Info */}
+              <UserLevelProgressBar
+                exp={myProfile?.wealthExp ?? currentUser?.wealthExp ?? 0}
+                level={myProfile?.wealthLevel ?? currentUser?.wealthLevel ?? 1}
+              />
+
               {/* Active Frame */}
               <View style={styles.meFrameBadge}>
                 <Text style={styles.meFrameBadgeText}>
-                  🎖️ {t('Active Frame')}: {profileData?.activeFrame?.name || t('Novice Glow')}
+                  🎖️ {t('Active Frame')}: Level {myProfile?.wealthLevel || currentUser?.wealthLevel || 1} Frame
                 </Text>
               </View>
 

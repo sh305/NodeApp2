@@ -86,9 +86,9 @@ const userSchema = new mongoose.Schema(
     },
     // Active Avatar Frame
     activeFrame: {
-      id: { type: String, default: 'frame_lv1' },
-      name: { type: String, default: 'Starter Frame' },
-      frameUrl: { type: String, default: 'https://assets.example.com/frames/frame_lv1.png' },
+      id: { type: String, default: 'level_01' },
+      name: { type: String, default: 'Level 1 Frame' },
+      frameUrl: { type: String, default: '/icons/User Level Frame/level_01.svg' },
     },
     // User Ban System (Reporting Penalty)
     isBanned: {

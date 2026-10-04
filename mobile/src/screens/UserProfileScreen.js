@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
+import UserLevelProgressBar from '../components/UserLevelProgressBar';
 import ReportModal from '../components/ReportModal';
 import ScreenContainer from '../components/ScreenContainer';
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
@@ -45,6 +47,12 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   useEffect(() => {
     fetchProfile();
   }, [userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [userId])
+  );
 
   const handleToggleBlock = async () => {
     try {
@@ -160,9 +168,15 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
             </View>
           </View>
 
+          {/* EXP Progress Bar & Level Info */}
+          <UserLevelProgressBar
+            exp={profile.wealthExp || 0}
+            level={profile.wealthLevel || 1}
+          />
+
           <View style={styles.frameBadge}>
             <Text style={styles.frameBadgeText}>
-              🎖️ {t('Active Frame')}: {profile.activeFrame?.name || t('Novice Glow')}
+              🎖️ {t('Active Frame')}: Level {profile.wealthLevel || 1} Frame
             </Text>
           </View>
 

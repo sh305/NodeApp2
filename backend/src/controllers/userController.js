@@ -38,8 +38,12 @@ exports.getUserProfile = async (req, res) => {
         name: targetUser.name,
         avatar: targetUser.avatar,
         gender: targetUser.gender,
-        wealthLevel: targetUser.wealthLevel,
-        charmLevel: targetUser.charmLevel,
+        wealthLevel: targetUser.wealthLevel || 1,
+        wealthExp: targetUser.wealthExp || 0,
+        charmLevel: targetUser.charmLevel || 1,
+        charmExp: targetUser.charmExp || 0,
+        coins: targetUser.coins || 0,
+        diamonds: targetUser.diamonds || 0,
         activeFrame: targetUser.activeFrame,
         isBlockedByYou: isRequesterBlockedTarget,
       },
@@ -505,3 +509,53 @@ exports.refundGameBet = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Add EXP or reset level for user testing
+// @route   POST /api/users/add-test-exp
+exports.addTestExp = async (req, res) => {
+  try {
+    const { expToAdd, reset } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (reset) {
+      user.wealthExp = 0;
+      user.wealthLevel = 1;
+      const { getUserFrameByLevel } = require('../services/levelService');
+      const resetFrame = getUserFrameByLevel(1);
+      user.activeFrame = resetFrame;
+      await user.save();
+      return res.status(200).json({
+        success: true,
+        user: {
+          wealthLevel: user.wealthLevel,
+          wealthExp: user.wealthExp,
+          activeFrame: user.activeFrame,
+        },
+        message: 'Level and EXP reset to Level 1',
+      });
+    }
+
+    const { addUserWealthExp } = require('../services/levelService');
+    const result = addUserWealthExp(user, Math.max(0, parseInt(expToAdd, 10) || 0));
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      user: {
+        wealthLevel: user.wealthLevel,
+        wealthExp: user.wealthExp,
+        activeFrame: user.activeFrame,
+      },
+      result,
+      message: result.leveledUp
+        ? `Leveled up to Level ${user.wealthLevel}!`
+        : `Added ${expToAdd} EXP`,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
