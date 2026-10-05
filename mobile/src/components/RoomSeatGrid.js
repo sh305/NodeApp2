@@ -15,7 +15,7 @@ import AnimatedSeatEmoji from './AnimatedSeatEmoji';
 const { width } = Dimensions.get('window');
 
 // Animated pulse ring for host seat
-function PulseRing({ active }) {
+function PulseRing({ active, color }) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(0.6)).current;
 
@@ -46,6 +46,7 @@ function PulseRing({ active }) {
     <Animated.View
       style={[
         styles.pulseRing,
+        color && { borderColor: color },
         { transform: [{ scale }], opacity },
       ]}
     />
@@ -67,6 +68,8 @@ export default function RoomSeatGrid({
   activeHostEmoji = null,
   activeSeatEmojis = {},
   onEmojiComplete = null,
+  bossSeat = null,
+  onBossSeatPress = null,
 }) {
   const COLUMNS = 4;
   const GRID_H_PADDING = 12;
@@ -76,6 +79,23 @@ export default function RoomSeatGrid({
     { length: totalSeats },
     (_, i) => seats[i] || { seatIndex: i, user: null }
   );
+
+  const isBossSeatActive = Boolean(
+    bossSeat &&
+      bossSeat.isActive &&
+      bossSeat.expiresAt &&
+      new Date(bossSeat.expiresAt) > new Date()
+  );
+  const bossDaysLeft = isBossSeatActive
+    ? Math.max(
+        1,
+        Math.ceil(
+          (new Date(bossSeat.expiresAt).getTime() - Date.now()) /
+            (1000 * 60 * 60 * 24)
+        )
+      )
+    : 0;
+  const isBossOccupied = Boolean(isBossSeatActive && bossSeat.user);
 
   const isChestUnlocked = Boolean(isChestOpen || (roomGoldContributed && roomGoldContributed >= 12000));
 
@@ -119,19 +139,28 @@ export default function RoomSeatGrid({
           </TouchableOpacity>
         </View>
 
-        {/* Center: Host Seat */}
+        {/* Center: Host Seat (Converts into colorful Boss Seat when isBossSeatActive is true) */}
         <View style={styles.hostCenterContainer}>
           <TouchableOpacity
             style={styles.hostSeatWrapper}
             activeOpacity={0.8}
-            onPress={() => onHostPress && onHostPress({ ...owner, isHostSeat: true })}
+            onPress={() => onHostPress && onHostPress({ ...owner, isHostSeat: true, isBossSeat: isBossSeatActive })}
           >
             <View style={styles.hostGlowRing}>
-              <PulseRing active={Boolean(isHostActive && !isHostMuted)} />
+              <PulseRing
+                active={Boolean(isHostActive && !isHostMuted)}
+                color={isBossSeatActive ? 'rgba(255, 215, 0, 0.85)' : 'rgba(245, 158, 11, 0.65)'}
+              />
 
               <LinearGradient
                 colors={
-                  isHostActive && !isHostMuted
+                  isBossSeatActive
+                    ? isHostActive && !isHostMuted
+                      ? ['#FFE57F', '#FFD700', '#FF8C00', '#FF1493']
+                      : isHostActive && isHostMuted
+                      ? ['#D97706', '#9CA3AF', '#6B7280']
+                      : ['#FFE57F', '#FFD700', '#FF8C00', '#FF007F']
+                    : isHostActive && !isHostMuted
                     ? ['#FDE047', '#F59E0B', '#D97706']
                     : isHostActive && isHostMuted
                     ? ['rgba(156, 163, 175, 0.4)', 'rgba(107, 114, 128, 0.3)']
@@ -140,11 +169,11 @@ export default function RoomSeatGrid({
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[
-                  styles.hostGradientBorder,
+                  isBossSeatActive ? styles.bossHostGradientBorder : styles.hostGradientBorder,
                   isHostActive && isHostMuted && { shadowOpacity: 0.1 },
                 ]}
               >
-                <View style={styles.hostInnerCircle}>
+                <View style={isBossSeatActive ? styles.bossHostInnerCircle : styles.hostInnerCircle}>
                   {isHostActive ? (
                     <Image
                       source={{
@@ -154,6 +183,21 @@ export default function RoomSeatGrid({
                       }}
                       style={styles.hostAvatar}
                     />
+                  ) : isBossSeatActive ? (
+                    <LinearGradient
+                      colors={['#3B0764', '#701A75', '#BE185D', '#F43F5E']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.vacantBossHostBox}
+                    >
+                      <View style={styles.bossCouchAura} />
+                      <Image
+                        source={require('../../assets/icons/Boss Seat.png')}
+                        style={styles.vacantBossSeatImg}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.bossSparkle}>✨</Text>
+                    </LinearGradient>
                   ) : (
                     <View style={styles.vacantHostBox}>
                       <Image
@@ -178,6 +222,24 @@ export default function RoomSeatGrid({
                 </View>
               </LinearGradient>
 
+              {/* Boss Seat Top Badge */}
+              {isBossSeatActive && (
+                <View style={styles.bossSeatTopBadge}>
+                  <Text style={styles.bossSeatTopBadgeText}>👑 BOSS SEAT</Text>
+                </View>
+              )}
+
+              {/* Boss Seat Corner Mini Icon when seated */}
+              {isBossSeatActive && isHostActive && (
+                <View style={styles.bossSeatCornerBadge}>
+                  <Image
+                    source={require('../../assets/icons/Boss Seat.png')}
+                    style={styles.bossSeatCornerIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
+
               {/* Host Green / Red Mic Badge at bottom-right corner */}
               {isHostActive && (
                 <View style={isHostMuted ? styles.hostMicBadgeMuted : styles.hostMicBadge}>
@@ -190,19 +252,34 @@ export default function RoomSeatGrid({
               )}
             </View>
 
-            {/* Host Name with Crown */}
+            {/* Host / Boss Name with Crown */}
             <View style={styles.hostNameContainer}>
-              <Text style={styles.hostCrownEmoji}>👑</Text>
-              <Text style={styles.hostName} numberOfLines={1}>
+              <Text style={styles.hostCrownEmoji}>{isBossSeatActive ? '🛋️' : '👑'}</Text>
+              <Text style={isBossSeatActive ? styles.bossHostName : styles.hostName} numberOfLines={1}>
                 {isHostActive
                   ? owner?.name
                     ? `༻${owner.name}༺`
+                    : isBossSeatActive
+                    ? 'Boss'
                     : 'Host'
                   : isOwner
-                  ? 'Tap to Host'
+                  ? isBossSeatActive
+                    ? 'Tap to Host (Boss)'
+                    : 'Tap to Host'
+                  : isBossSeatActive
+                  ? 'Boss Seat'
                   : 'Host (Vacant)'}
               </Text>
             </View>
+
+            {/* Boss Seat Active Pill with Remaining Days */}
+            {isBossSeatActive && (
+              <View style={styles.bossSeatStatusPill}>
+                <Text style={styles.bossSeatStatusPillText}>
+                  ★ BOSS ACTIVE {bossDaysLeft > 0 ? `(${bossDaysLeft}d)` : ''} ★
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -464,6 +541,129 @@ const styles = StyleSheet.create({
   /* ── Right Spacer ── */
   rightSpacer: {
     width: 60,
+  },
+
+  /* ── Boss Host Seat Overrides ── */
+  bossHostGradientBorder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    padding: 2.8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.95,
+    shadowRadius: 14,
+    elevation: 12,
+    zIndex: 1,
+  },
+  bossHostInnerCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    overflow: 'hidden',
+    backgroundColor: '#1E1B4B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vacantBossHostBox: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 29,
+    position: 'relative',
+  },
+  bossCouchAura: {
+    position: 'absolute',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 215, 0, 0.22)',
+  },
+  vacantBossSeatImg: {
+    width: 38,
+    height: 38,
+    tintColor: '#FFD700',
+    shadowColor: '#FFE57F',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
+  },
+  bossSparkle: {
+    position: 'absolute',
+    top: 4,
+    right: 5,
+    fontSize: 9,
+  },
+  bossSeatTopBadge: {
+    position: 'absolute',
+    top: -9,
+    backgroundColor: '#FFD700',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    zIndex: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 5,
+  },
+  bossSeatTopBadgeText: {
+    color: '#78350F',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  bossSeatCornerBadge: {
+    position: 'absolute',
+    bottom: -3,
+    left: -3,
+    backgroundColor: '#831843',
+    borderRadius: 10,
+    padding: 3,
+    borderWidth: 1.2,
+    borderColor: '#FFD700',
+    zIndex: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 5,
+  },
+  bossSeatCornerIcon: {
+    width: 12,
+    height: 12,
+    tintColor: '#FFD700',
+  },
+  bossHostName: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.95)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+    letterSpacing: 0.3,
+  },
+  bossSeatStatusPill: {
+    backgroundColor: 'rgba(255, 215, 0, 0.18)',
+    borderWidth: 0.8,
+    borderColor: 'rgba(255, 215, 0, 0.5)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginTop: 2,
+  },
+  bossSeatStatusPillText: {
+    color: '#FFD700',
+    fontSize: 8.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
   /* ── 4×N Sofa Seats Grid ── */

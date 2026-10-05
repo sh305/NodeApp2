@@ -106,10 +106,47 @@ exports.getRoomById = async (req, res) => {
       .populate('admins', 'name avatar wealthLevel activeFrame customId gender')
       .populate('members', 'name avatar wealthLevel activeFrame customId gender')
       .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
-      .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
+      .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('bossSeat.purchasedBy', 'name avatar');
 
     if (!room) {
       return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    if (room.checkBossSeatActive) {
+      room.checkBossSeatActive();
+    }
+
+    // Check if user is kicked from room (3 days vs permanent) BEFORE adding to activeMembers
+    const kickStatus = room.isUserKicked(userId);
+    if (kickStatus.kicked) {
+      // Remove kicked user from active members or seats if present
+      let changed = false;
+      room.seats.forEach((seat) => {
+        if (seat.user && (seat.user._id ? seat.user._id.toString() : seat.user.toString()) === userId.toString()) {
+          seat.user = null;
+          changed = true;
+        }
+      });
+      const beforeLen = room.activeMembers.length;
+      room.activeMembers = room.activeMembers.filter(
+        (m) => (m._id ? m._id.toString() : m.toString()) !== userId.toString()
+      );
+      if (room.activeMembers.length !== beforeLen) {
+        changed = true;
+      }
+      if (changed) {
+        await room.save();
+      }
+
+      return res.status(403).json({
+        success: false,
+        kicked: true,
+        kickType: kickStatus.kickType,
+        expiresAt: kickStatus.expiresAt,
+        message: kickStatus.message,
+      });
     }
 
     // Register user in activeMembers if not already present
@@ -120,18 +157,6 @@ exports.getRoomById = async (req, res) => {
       room.activeMembers.push(userId);
       await room.save();
       await room.populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
-    }
-
-    // Check if user is kicked from room (3 days vs permanent)
-    const kickStatus = room.isUserKicked(userId);
-    if (kickStatus.kicked) {
-      return res.status(403).json({
-        success: false,
-        kicked: true,
-        kickType: kickStatus.kickType,
-        expiresAt: kickStatus.expiresAt,
-        message: kickStatus.message,
-      });
     }
 
     room.syncSeats();
@@ -221,54 +246,60 @@ exports.toggleLockRoom = async (req, res) => {
 exports.kickUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { targetUserId, kickType, reason } = req.body; // kickType: '3days' | 'permanent'
+    const { targetUserId, kickType = 'permanent', reason } = req.body; // kickType: '3days' | 'permanent'
     const ownerId = req.user._id;
 
-    if (!['3days', 'permanent'].includes(kickType)) {
-      return res.status(400).json({ success: false, message: 'Invalid kickType. Must be 3days or permanent' });
-    }
+    const chosenKickType = ['3days', 'permanent'].includes(kickType) ? kickType : 'permanent';
 
     const room = await Room.findById(id);
     if (!room) {
       return res.status(404).json({ success: false, message: 'Room not found' });
     }
 
-    if (room.owner.toString() !== ownerId.toString()) {
-      return res.status(403).json({ success: false, message: 'Sirf room owner hi kick kar sakta hai' });
+    const isOwner = room.owner.toString() === ownerId.toString();
+    const isAdmin = room.admins && room.admins.some((a) => (a._id ? a._id.toString() : a.toString()) === ownerId.toString());
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Only room owner or admin can kick users' });
     }
 
     if (targetUserId.toString() === ownerId.toString()) {
-      return res.status(400).json({ success: false, message: 'Owner cannot kick themselves' });
+      return res.status(400).json({ success: false, message: 'Cannot kick yourself' });
     }
 
     let expiresAt = null;
-    if (kickType === '3days') {
+    if (chosenKickType === '3days') {
       expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
     }
 
+    // Look up kicker name
+    const kicker = await User.findById(ownerId).select('name');
+    const kickerName = kicker?.name || (isOwner ? 'Room Owner' : 'Room Admin');
+
     // Remove existing kick for this user if any
     room.kickedUsers = room.kickedUsers.filter(
-      (k) => k.user && k.user.toString() !== targetUserId.toString()
+      (k) => k.user && (k.user._id ? k.user._id.toString() : k.user.toString()) !== targetUserId.toString()
     );
 
     room.kickedUsers.push({
       user: targetUserId,
-      kickType,
+      kickType: chosenKickType,
       expiresAt,
       reason: reason || 'Kicked by room owner',
+      kickedBy: ownerId,
+      kickedByName: kickerName,
       kickedAt: new Date(),
     });
 
     // Remove target user from active seats
     room.seats.forEach((seat) => {
-      if (seat.user && seat.user.toString() === targetUserId.toString()) {
+      if (seat.user && (seat.user._id ? seat.user._id.toString() : seat.user.toString()) === targetUserId.toString()) {
         seat.user = null;
       }
     });
 
     // Remove from activeMembers
     room.activeMembers = room.activeMembers.filter(
-      (m) => m.toString() !== targetUserId.toString()
+      (m) => (m._id ? m._id.toString() : m.toString()) !== targetUserId.toString()
     );
 
     await room.save();
@@ -276,16 +307,16 @@ exports.kickUser = async (req, res) => {
     return res.status(200).json({
       success: true,
       message:
-        kickType === '3days'
-          ? 'User ko 3 din ke liye room se kick kar diya gaya hai.'
-          : 'User ko permanent kick kar diya gaya hai. Jab tak aap unkick nahi karenge wo nahi aa payenge.',
+        chosenKickType === '3days'
+          ? 'User kicked from room for 3 days.'
+          : 'User kicked from room permanently until unblocked.',
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Unkick User from Room (Room Owner removes user from kick list)
+// @desc    Unkick User from Room (Room Owner / Admin removes user from kick list)
 // @route   POST /api/rooms/:id/unkick
 exports.unkickUser = async (req, res) => {
   try {
@@ -298,19 +329,21 @@ exports.unkickUser = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Room not found' });
     }
 
-    if (room.owner.toString() !== ownerId.toString()) {
-      return res.status(403).json({ success: false, message: 'Only room owner can unkick users' });
+    const isOwner = room.owner.toString() === ownerId.toString();
+    const isAdmin = room.admins && room.admins.some((a) => (a._id ? a._id.toString() : a.toString()) === ownerId.toString());
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Only room owner or admin can unblock users' });
     }
 
     room.kickedUsers = room.kickedUsers.filter(
-      (k) => k.user && k.user.toString() !== targetUserId.toString()
+      (k) => k.user && (k.user._id ? k.user._id.toString() : k.user.toString()) !== targetUserId.toString()
     );
 
     await room.save();
 
     return res.status(200).json({
       success: true,
-      message: 'User ko room ke kick list se hata diya gaya hai. Wo ab enter kar sakte hain.',
+      message: 'User unblocked from room successfully.',
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -324,18 +357,46 @@ exports.getKickedUsers = async (req, res) => {
     const { id } = req.params;
     const ownerId = req.user._id;
 
-    const room = await Room.findById(id).populate('kickedUsers.user', 'name avatar wealthLevel');
+    const room = await Room.findById(id)
+      .populate('kickedUsers.user', 'name avatar wealthLevel customId')
+      .populate('kickedUsers.kickedBy', 'name avatar');
+
     if (!room) {
       return res.status(404).json({ success: false, message: 'Room not found' });
     }
 
-    if (room.owner.toString() !== ownerId.toString()) {
+    const isOwner = room.owner.toString() === ownerId.toString();
+    const isAdmin = room.admins && room.admins.some((a) => (a._id ? a._id.toString() : a.toString()) === ownerId.toString());
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
 
+    const formattedList = (room.kickedUsers || [])
+      .filter((k) => k && k.user)
+      .map((k) => {
+        const u = k.user;
+        let displayId = '';
+        if (u.customId) {
+          displayId = u.customId;
+        } else if (u._id) {
+          const hex = u._id.toString().slice(-6);
+          const num = parseInt(hex, 16) || 123456;
+          displayId = `${(num % 90000000) + 10000000}`;
+        }
+        return {
+          _id: u._id,
+          user: u,
+          displayId,
+          kickType: k.kickType || 'permanent',
+          kickedAt: k.kickedAt,
+          expiresAt: k.expiresAt,
+          kickedByName: k.kickedBy?.name || k.kickedByName || 'Room Owner',
+        };
+      });
+
     return res.status(200).json({
       success: true,
-      kickedUsers: room.kickedUsers,
+      kickedUsers: formattedList,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -524,6 +585,164 @@ exports.addAdmin = async (req, res) => {
       success: true,
       message: 'User added to Admin team',
       admins: updatedRoom.admins,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Purchase Boss Seat (1 month: 100k, 3 months: 240k, 12 months: 720k)
+// @route   POST /api/rooms/:id/boss-seat/purchase
+exports.purchaseBossSeat = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { durationMonths } = req.body; // 1, 3, or 12
+    const userId = req.user._id;
+
+    const PRICING = {
+      1: { coins: 100000, days: 30 },
+      3: { coins: 240000, days: 90 },
+      12: { coins: 720000, days: 365 },
+    };
+
+    const tier = PRICING[Number(durationMonths)];
+    if (!tier) {
+      return res.status(400).json({ success: false, message: 'Invalid duration selected' });
+    }
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Check if user has enough coins
+    const currentCoins = Number(user.coins || 0);
+    if (currentCoins < tier.coins) {
+      return res.status(400).json({
+        success: false,
+        notEnoughCoins: true,
+        message: 'Not enough coins, please recharge first',
+      });
+    }
+
+    // Deduct coins from user balance
+    user.coins = currentCoins - tier.coins;
+    await user.save();
+
+    // Calculate expiration date
+    const now = new Date();
+    let baseDate = now;
+    if (room.bossSeat && room.bossSeat.isActive && room.bossSeat.expiresAt && room.bossSeat.expiresAt > now) {
+      baseDate = new Date(room.bossSeat.expiresAt);
+    }
+    const newExpiresAt = new Date(baseDate.getTime() + tier.days * 24 * 60 * 60 * 1000);
+
+    if (!room.bossSeat) {
+      room.bossSeat = {};
+    }
+    room.bossSeat.isActive = true;
+    room.bossSeat.expiresAt = newExpiresAt;
+    room.bossSeat.purchasedBy = userId;
+    await room.save();
+
+    const populatedRoom = await Room.findById(id)
+      .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('bossSeat.purchasedBy', 'name avatar');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Boss Seat activated successfully!',
+      bossSeat: populatedRoom.bossSeat,
+      remainingCoins: user.coins,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Take Boss Seat
+// @route   POST /api/rooms/:id/boss-seat/take
+exports.takeBossSeat = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    if (!room.bossSeat || !room.bossSeat.isActive || (room.bossSeat.expiresAt && new Date() > room.bossSeat.expiresAt)) {
+      return res.status(400).json({ success: false, message: 'Boss Seat is not active in this room' });
+    }
+
+    if (room.bossSeat.user && room.bossSeat.user.toString() !== userId.toString()) {
+      return res.status(400).json({ success: false, message: 'Boss Seat is already occupied' });
+    }
+
+    // A user cannot be on Host seat and Boss seat at the same time
+    const isOwner = room.owner.toString() === userId.toString();
+    if (isOwner && room.isHostActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'You are currently on the Host seat. Please step down from Host seat first.',
+      });
+    }
+
+    // Remove user from regular mic seats if sitting on one
+    room.seats.forEach((s) => {
+      if (s.user && (s.user._id ? s.user._id.toString() : s.user.toString()) === userId.toString()) {
+        s.user = null;
+      }
+    });
+
+    room.bossSeat.user = userId;
+    await room.save();
+
+    const populatedRoom = await Room.findById(id)
+      .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender');
+
+    return res.status(200).json({
+      success: true,
+      message: 'You took the Boss Seat',
+      bossSeat: populatedRoom.bossSeat,
+      seats: populatedRoom.seats,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Leave Boss Seat
+// @route   POST /api/rooms/:id/boss-seat/leave
+exports.leaveBossSeat = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    if (room.bossSeat && room.bossSeat.user && (room.bossSeat.user._id ? room.bossSeat.user._id.toString() : room.bossSeat.user.toString()) === userId.toString()) {
+      room.bossSeat.user = null;
+      await room.save();
+    }
+
+    const populatedRoom = await Room.findById(id)
+      .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
+
+    return res.status(200).json({
+      success: true,
+      message: 'You stepped down from the Boss Seat',
+      bossSeat: populatedRoom.bossSeat,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

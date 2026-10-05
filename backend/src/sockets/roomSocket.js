@@ -28,6 +28,22 @@ function initRoomSockets(io) {
     // Join room
     socket.on('join_room', async ({ roomId, userId }) => {
       try {
+        if (!roomId || !userId) return;
+
+        const room = await Room.findById(roomId);
+        if (!room) return;
+
+        // Check if user is kicked from room
+        const kickStatus = room.isUserKicked(userId);
+        if (kickStatus.kicked) {
+          socket.emit('user_kicked_from_room', {
+            targetUserId: userId,
+            kickType: kickStatus.kickType,
+            message: kickStatus.message || 'You have been kicked out of this room.',
+          });
+          return;
+        }
+
         socket.join(roomId);
         socket.roomId = roomId;
         socket.userId = userId;
@@ -35,21 +51,18 @@ function initRoomSockets(io) {
         const user = await User.findById(userId).select('name avatar wealthLevel activeFrame customId gender');
         if (user) {
           // Add user to room's activeMembers if not present
-          const room = await Room.findById(roomId);
-          if (room) {
-            const alreadyIn = room.activeMembers.some(
-              (m) => (m._id ? m._id.toString() : m.toString()) === userId.toString()
-            );
-            if (!alreadyIn) {
-              room.activeMembers.push(userId);
-              await room.save();
-            }
-            const updatedRoom = await Room.findById(roomId)
-              .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
-            io.to(roomId).emit('active_members_updated', {
-              activeMembers: updatedRoom?.activeMembers || [],
-            });
+          const alreadyIn = room.activeMembers.some(
+            (m) => (m._id ? m._id.toString() : m.toString()) === userId.toString()
+          );
+          if (!alreadyIn) {
+            room.activeMembers.push(userId);
+            await room.save();
           }
+          const updatedRoom = await Room.findById(roomId)
+            .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
+          io.to(roomId).emit('active_members_updated', {
+            activeMembers: updatedRoom?.activeMembers || [],
+          });
 
           // Broadcast to everyone in room that user joined
           io.to(roomId).emit('user_joined_room', {
@@ -85,13 +98,23 @@ function initRoomSockets(io) {
             if (room.activeMembers.length !== beforeLen) {
               changed = true;
             }
+            let bossSeatChanged = false;
+            if (room.bossSeat && room.bossSeat.user && (room.bossSeat.user._id ? room.bossSeat.user._id.toString() : room.bossSeat.user.toString()) === targetUserId.toString()) {
+              room.bossSeat.user = null;
+              bossSeatChanged = true;
+              changed = true;
+            }
             if (changed) {
               await room.save();
               const updatedRoom = await Room.findById(targetRoomId)
                 .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
-                .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
+                .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender')
+                .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
               io.to(targetRoomId).emit('seats_updated', { seats: updatedRoom.seats });
               io.to(targetRoomId).emit('active_members_updated', { activeMembers: updatedRoom.activeMembers });
+              if (bossSeatChanged) {
+                io.to(targetRoomId).emit('boss_seat_updated', { bossSeat: updatedRoom.bossSeat });
+              }
             }
           }
         }
@@ -180,6 +203,93 @@ function initRoomSockets(io) {
         });
       } catch (err) {
         console.error('Socket leave_seat error:', err);
+      }
+    });
+
+    // Take Boss Seat
+    socket.on('take_boss_seat', async ({ roomId, userId }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return;
+
+        // Check if user is kicked
+        const kickStatus = room.isUserKicked(userId);
+        if (kickStatus.kicked) {
+          return socket.emit('error_message', { message: kickStatus.message });
+        }
+
+        if (!room.bossSeat || !room.bossSeat.isActive || (room.bossSeat.expiresAt && new Date() > room.bossSeat.expiresAt)) {
+          return socket.emit('error_message', { message: 'Boss Seat is not active in this room' });
+        }
+
+        if (room.bossSeat.user && room.bossSeat.user.toString() !== userId.toString()) {
+          return socket.emit('error_message', { message: 'Boss Seat is already occupied' });
+        }
+
+        // Cannot take Boss seat if active on Host seat
+        const isOwner = room.owner && room.owner.toString() === userId.toString();
+        if (isOwner && room.isHostActive) {
+          return socket.emit('error_message', {
+            message: 'You are currently on the Host seat. Please step down from Host seat first.',
+          });
+        }
+
+        // Remove from regular mic seats if sitting on one
+        let seatChanged = false;
+        room.seats.forEach((s) => {
+          if (s.user && s.user.toString() === userId.toString()) {
+            s.user = null;
+            seatChanged = true;
+          }
+        });
+
+        room.bossSeat.user = userId;
+        await room.save();
+
+        const updatedRoom = await Room.findById(roomId)
+          .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender')
+          .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender');
+
+        io.to(roomId).emit('boss_seat_updated', { bossSeat: updatedRoom.bossSeat });
+        if (seatChanged) {
+          io.to(roomId).emit('seats_updated', { seats: updatedRoom.seats });
+        }
+      } catch (err) {
+        console.error('Socket take_boss_seat error:', err);
+      }
+    });
+
+    // Leave Boss Seat
+    socket.on('leave_boss_seat', async ({ roomId, userId }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room || !room.bossSeat) return;
+
+        if (room.bossSeat.user && room.bossSeat.user.toString() === userId.toString()) {
+          room.bossSeat.user = null;
+          await room.save();
+        }
+
+        const updatedRoom = await Room.findById(roomId)
+          .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
+
+        io.to(roomId).emit('boss_seat_updated', { bossSeat: updatedRoom.bossSeat });
+      } catch (err) {
+        console.error('Socket leave_boss_seat error:', err);
+      }
+    });
+
+    // Broadcast Boss Seat Purchased / Activated
+    socket.on('notify_boss_seat_purchased', async ({ roomId }) => {
+      try {
+        const room = await Room.findById(roomId)
+          .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender')
+          .populate('bossSeat.purchasedBy', 'name avatar');
+        if (room && room.bossSeat) {
+          io.to(roomId).emit('boss_seat_updated', { bossSeat: room.bossSeat });
+        }
+      } catch (e) {
+        console.error('Socket notify_boss_seat_purchased error:', e);
       }
     });
 
@@ -317,6 +427,13 @@ function initRoomSockets(io) {
         targetUserId,
         kickType,
         message,
+      });
+    });
+
+    // Realtime Unkick Notification
+    socket.on('notify_user_unkicked', ({ roomId, targetUserId }) => {
+      io.to(roomId).emit('user_unkicked_from_room', {
+        targetUserId,
       });
     });
 

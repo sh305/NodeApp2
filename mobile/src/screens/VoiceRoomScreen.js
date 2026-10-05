@@ -35,6 +35,8 @@ import VoiceRoomToolsModal from '../components/VoiceRoomToolsModal';
 import RoomMembersModal from '../components/RoomMembersModal';
 import RoomSettingsModal from '../components/RoomSettingsModal';
 import MyPeopleModal from '../components/MyPeopleModal';
+import KickedUsersModal from '../components/KickedUsersModal';
+import BossSeatModal from '../components/BossSeatModal';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
@@ -102,6 +104,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [roomMembersModalVisible, setRoomMembersModalVisible] = useState(false);
   const [roomSettingsModalVisible, setRoomSettingsModalVisible] = useState(false);
   const [myPeopleModalVisible, setMyPeopleModalVisible] = useState(false);
+  const [kickedUsersModalVisible, setKickedUsersModalVisible] = useState(false);
+  const [bossSeatModalVisible, setBossSeatModalVisible] = useState(false);
   const [myPeopleInitialTab, setMyPeopleInitialTab] = useState('Host');
   const [activeHostEmoji, setActiveHostEmoji] = useState(null);
   const [activeSeatEmojis, setActiveSeatEmojis] = useState({});
@@ -247,6 +251,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       });
     });
 
+    socket.on('boss_seat_updated', ({ bossSeat: bSeat }) => {
+      setRoom((prev) => (prev ? { ...prev, bossSeat: bSeat } : prev));
+    });
+
     socket.on('new_chat_message', (msg) => {
       setMessages((prev) => [...prev, msg]);
     });
@@ -344,12 +352,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     });
 
     socket.on('user_kicked_from_room', ({ targetUserId, kickType, message }) => {
-      if (targetUserId === currentUser?._id) {
-        Alert.alert(
-          'You were kicked 🚫',
-          message || `Room owner has kicked you (${kickType === '3days' ? '3 Days' : 'Permanent'}).`,
-          [{ text: 'Exit', onPress: () => navigation.goBack() }]
+      const myId = currentUser?._id ? String(currentUser._id) : '';
+      const targetId = targetUserId ? String(targetUserId) : '';
+      if (myId && targetId && myId === targetId) {
+        showToast(
+          t(message || 'You have been kicked out of this room.'),
+          'error'
         );
+        navigation.goBack();
       }
     });
 
@@ -408,6 +418,50 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setIsMicMuted(false);
       showToast(t('You left the mic seat 🪑'), 'info');
     }
+    setSelectedSeatUser(null);
+  };
+
+  const handleBossSeatPress = (bossSeat) => {
+    if (bossSeat?.user) {
+      setSelectedSeatUser({ ...bossSeat.user, isBossSeat: true });
+    } else {
+      if (isOwner && isHostActive) {
+        showToast(
+          t('You are currently on the Host seat. Please step down from Host seat first.'),
+          'info'
+        );
+        return;
+      }
+
+      Alert.alert(
+        t('Take Boss Seat 🛋️'),
+        t('Do you want to sit on the Boss Seat?'),
+        [
+          { text: t('Cancel') },
+          {
+            text: t('Take Seat'),
+            onPress: () => {
+              socketRef.current?.emit('take_boss_seat', {
+                roomId,
+                userId: currentUser?._id,
+              });
+              showToast(t('You took the Boss Seat 🛋️'), 'success');
+              if (mySeatIndex !== null) {
+                setMySeatIndex(null);
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const handleLeaveBossSeat = () => {
+    socketRef.current?.emit('leave_boss_seat', {
+      roomId,
+      userId: currentUser?._id,
+    });
+    showToast(t('You stepped down from the Boss Seat 🛋️'), 'info');
     setSelectedSeatUser(null);
   };
 
@@ -713,12 +767,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           message: res.data.message,
         });
 
-        Alert.alert('User Kicked', res.data.message);
+        showToast(t(res.data.message || 'User kicked successfully'), 'success');
         setSelectedSeatUser(null);
         fetchRoomDetails();
       }
     } catch (e) {
-      Alert.alert('Error', e.response?.data?.message || 'Kick action failed');
+      showToast(t(e.response?.data?.message || 'Kick action failed'), 'error');
     }
   };
 
@@ -905,6 +959,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             activeHostEmoji={activeHostEmoji}
             activeSeatEmojis={activeSeatEmojis}
             onEmojiComplete={handleEmojiComplete}
+            bossSeat={room?.bossSeat}
+            onBossSeatPress={handleBossSeatPress}
           />
         </ScrollView>
 
@@ -1428,8 +1484,62 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   </TouchableOpacity>
                 )}
 
+                {/* 🛋️ LEAVE BOSS SEAT */}
+                {Boolean(selectedSeatUser?.isBossSeat && isSelf) && (
+                  <TouchableOpacity
+                    style={[
+                      styles.actionBox,
+                      {
+                        borderColor: '#EF4444',
+                        borderWidth: 1,
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                      },
+                    ]}
+                    onPress={() => {
+                      handleLeaveBossSeat();
+                      setSelectedSeatUser(null);
+                    }}
+                  >
+                    <Text style={styles.actionEmoji}>🚪</Text>
+                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>
+                      <T>Leave Boss Seat</T>
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* 🛋️ REMOVE FROM BOSS SEAT */}
+                {Boolean(selectedSeatUser?.isBossSeat && isOwner && !isSelf) && (
+                  <TouchableOpacity
+                    style={[
+                      styles.actionBox,
+                      {
+                        borderColor: '#F43F5E',
+                        borderWidth: 1,
+                        backgroundColor: 'rgba(244, 63, 94, 0.15)',
+                      },
+                    ]}
+                    onPress={() => {
+                      socketRef.current?.emit('leave_boss_seat', {
+                        roomId,
+                        userId: selectedSeatUser._id,
+                      });
+                      showToast(t('User removed from Boss Seat'), 'info');
+                      setSelectedSeatUser(null);
+                    }}
+                  >
+                    <Image
+                      source={require('../../assets/icons/SofaSeat.png')}
+                      style={{ width: 22, height: 22, marginBottom: 4 }}
+                      resizeMode="contain"
+                    />
+                    <Text style={[styles.actionLabel, { color: '#F43F5E' }]}>
+                      <T>Remove Seat</T>
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
                 {/* 🚪 2. LEAVE SEAT */}
-                {Boolean(!selectedSeatUser?.isHostSeat && isSelf && mySeatIndex !== null) && (
+                {Boolean(!selectedSeatUser?.isHostSeat && !selectedSeatUser?.isBossSeat && isSelf && mySeatIndex !== null) && (
                   <TouchableOpacity
                     style={[
                       styles.actionBox,
@@ -1452,7 +1562,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 )}
 
                 {/* 🪑 3. REMOVE FROM SEAT */}
-                {Boolean(!selectedSeatUser?.isHostSeat && isOwner && !isSelf) && (
+                {Boolean(!selectedSeatUser?.isHostSeat && !selectedSeatUser?.isBossSeat && isOwner && !isSelf) && (
                   <TouchableOpacity
                     style={[
                       styles.actionBox,
@@ -1586,11 +1696,25 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           setMyPeopleInitialTab(tab || 'Host');
           setMyPeopleModalVisible(true);
         }}
+        onOpenKickedUsers={() => {
+          setRoomSettingsModalVisible(false);
+          setKickedUsersModalVisible(true);
+        }}
+        onOpenBossSeat={() => {
+          setRoomSettingsModalVisible(false);
+          setBossSeatModalVisible(true);
+        }}
         onSelectAction={(actionKey) => {
           if (actionKey === 'room_members') {
             setRoomSettingsModalVisible(false);
             setMyPeopleInitialTab('Members');
             setMyPeopleModalVisible(true);
+          } else if (actionKey === 'kicked_users') {
+            setRoomSettingsModalVisible(false);
+            setKickedUsersModalVisible(true);
+          } else if (actionKey === 'boss_seat') {
+            setRoomSettingsModalVisible(false);
+            setBossSeatModalVisible(true);
           } else {
             showToast(t('Feature coming soon!'), 'info');
           }
@@ -1607,6 +1731,35 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         room={room}
         initialTab={myPeopleInitialTab}
         currentUser={currentUser}
+      />
+
+      {/* ══ KICKED-OUT USERS MODAL (Matching Screenshot) ══ */}
+      <KickedUsersModal
+        visible={kickedUsersModalVisible}
+        onClose={() => {
+          setKickedUsersModalVisible(false);
+          setRoomSettingsModalVisible(true);
+        }}
+        room={room}
+        socketRef={socketRef}
+      />
+
+      {/* ══ BOSS SEAT MODAL (Matching Screenshot) ══ */}
+      <BossSeatModal
+        visible={bossSeatModalVisible}
+        onClose={() => {
+          setBossSeatModalVisible(false);
+          setRoomSettingsModalVisible(true);
+        }}
+        room={room}
+        currentUser={currentUser}
+        socketRef={socketRef}
+        onBossSeatPurchased={(updatedBossSeat, remainingCoins) => {
+          setRoom((prev) => (prev ? { ...prev, bossSeat: updatedBossSeat } : prev));
+          if (remainingCoins !== undefined && currentUser) {
+            currentUser.coins = remainingCoins;
+          }
+        }}
       />
     </View>
   );

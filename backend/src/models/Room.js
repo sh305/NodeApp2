@@ -34,7 +34,15 @@ const kickedUserSchema = new mongoose.Schema(
     kickType: {
       type: String,
       enum: ['3days', 'permanent'],
-      required: true,
+      default: 'permanent',
+    },
+    kickedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    kickedByName: {
+      type: String,
+      default: 'Room Owner',
     },
     kickedAt: {
       type: Date,
@@ -124,6 +132,35 @@ const roomSchema = new mongoose.Schema(
     },
     // Dynamically initialized seats
     seats: [seatSchema],
+    // Boss Seat (Purchased tier 1/3/12 months)
+    bossSeat: {
+      isActive: {
+        type: Boolean,
+        default: false,
+      },
+      expiresAt: {
+        type: Date,
+        default: null,
+      },
+      purchasedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+      isMuted: {
+        type: Boolean,
+        default: false,
+      },
+      isLocked: {
+        type: Boolean,
+        default: false,
+      },
+    },
     // Kicked users list (3days vs permanent)
     kickedUsers: [kickedUserSchema],
     // Online participants in room
@@ -155,18 +192,21 @@ roomSchema.methods.verifyPassword = async function (enteredPassword) {
 
 // Method to check if a specific user is currently kicked from this room
 roomSchema.methods.isUserKicked = function (userId) {
-  const kickRecord = this.kickedUsers.find(
-    (k) => k.user && k.user.toString() === userId.toString()
-  );
+  if (!userId) return { kicked: false };
+  const kickRecord = this.kickedUsers.find((k) => {
+    if (!k || !k.user) return false;
+    const uid = k.user._id ? k.user._id.toString() : k.user.toString();
+    return uid === userId.toString();
+  });
 
   if (!kickRecord) return { kicked: false };
 
-  // Permanent kick: cannot enter until room owner explicitly unkicks
-  if (kickRecord.kickType === 'permanent') {
+  // Permanent kick or no expiresAt: cannot enter until explicitly unblocked
+  if (kickRecord.kickType === 'permanent' || !kickRecord.expiresAt) {
     return {
       kicked: true,
       kickType: 'permanent',
-      message: 'Aapko is room se permanent kick kiya gaya hai. Room owner ke unblock karne tak aap enter nahi kar sakte.',
+      message: 'You have been kicked out of this room. You cannot enter until you are unblocked.',
     };
   }
 
@@ -177,14 +217,16 @@ roomSchema.methods.isUserKicked = function (userId) {
       kicked: true,
       kickType: '3days',
       expiresAt: kickRecord.expiresAt,
-      message: `Aapko is room se 3 din ke liye kick kiya gaya hai. (${hoursLeft} ghante bache hain)`,
+      message: `You have been kicked from this room (${hoursLeft} hours remaining). You cannot enter until unblocked.`,
     };
   }
 
   // If 3 days expired, remove kick record automatically
-  this.kickedUsers = this.kickedUsers.filter(
-    (k) => k.user && k.user.toString() !== userId.toString()
-  );
+  this.kickedUsers = this.kickedUsers.filter((k) => {
+    if (!k || !k.user) return false;
+    const uid = k.user._id ? k.user._id.toString() : k.user.toString();
+    return uid !== userId.toString();
+  });
   this.save();
   return { kicked: false };
 };
@@ -202,6 +244,21 @@ roomSchema.methods.syncSeats = function () {
       });
     }
   }
+};
+
+// Check if Boss Seat is active and automatically expire if time is up
+roomSchema.methods.checkBossSeatActive = function () {
+  if (this.bossSeat && this.bossSeat.isActive) {
+    if (this.bossSeat.expiresAt && new Date() > this.bossSeat.expiresAt) {
+      this.bossSeat.isActive = false;
+      this.bossSeat.user = null;
+      this.bossSeat.expiresAt = null;
+      this.save();
+      return false;
+    }
+    return true;
+  }
+  return false;
 };
 
 module.exports = mongoose.model('Room', roomSchema);

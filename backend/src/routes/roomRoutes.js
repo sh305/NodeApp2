@@ -14,6 +14,9 @@ const {
   removeAdmin,
   addHost,
   addAdmin,
+  purchaseBossSeat,
+  takeBossSeat,
+  leaveBossSeat,
 } = require('../controllers/roomController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -34,5 +37,8 @@ router.put('/:id/lock-status', protect, toggleLockRoom);
 router.post('/:id/kick', protect, kickUser);
 router.post('/:id/unkick', protect, unkickUser);
 router.get('/:id/kicked-users', protect, getKickedUsers);
+router.post('/:id/boss-seat/purchase', protect, purchaseBossSeat);
+router.post('/:id/boss-seat/take', protect, takeBossSeat);
+router.post('/:id/boss-seat/leave', protect, leaveBossSeat);
 
 module.exports = router;

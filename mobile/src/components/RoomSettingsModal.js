@@ -20,6 +20,8 @@ export default function RoomSettingsModal({
   room,
   onSelectAction,
   onOpenPeople,
+  onOpenKickedUsers,
+  onOpenBossSeat,
 }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -67,6 +69,26 @@ export default function RoomSettingsModal({
     if (key === 'room_members' && onOpenPeople) {
       onOpenPeople('Members');
       return;
+    }
+    if (key === 'kicked_users') {
+      if (onOpenKickedUsers) {
+        onOpenKickedUsers();
+        return;
+      }
+      if (onSelectAction) {
+        onSelectAction('kicked_users');
+        return;
+      }
+    }
+    if (key === 'boss_seat') {
+      if (onOpenBossSeat) {
+        onOpenBossSeat();
+        return;
+      }
+      if (onSelectAction) {
+        onSelectAction('boss_seat');
+        return;
+      }
     }
     if (onSelectAction) {
       onSelectAction(key);
@@ -182,7 +204,13 @@ export default function RoomSettingsModal({
               activeOpacity={0.75}
               onPress={() => handleItemClick('kicked_users', 'Kicked-out Users')}
             >
-              <Text style={styles.menuIcon}>🚪</Text>
+              <View style={styles.menuIconBox}>
+                <Image
+                  source={require('../../assets/icons/LogOut.png')}
+                  style={styles.menuLogoutIcon}
+                  resizeMode="contain"
+                />
+              </View>
               <Text style={styles.menuTitle}>
                 <T>Kicked-out Users</T>
               </Text>
@@ -386,6 +414,18 @@ const styles = StyleSheet.create({
     width: 28,
     textAlign: 'center',
     marginRight: 12,
+  },
+  menuIconBox: {
+    width: 28,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  menuLogoutIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#FFFFFF',
   },
   menuTitle: {
     flex: 1,
