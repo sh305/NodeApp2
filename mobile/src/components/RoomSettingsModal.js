@@ -23,6 +23,7 @@ export default function RoomSettingsModal({
   onOpenPeople,
   onOpenKickedUsers,
   onOpenBossSeat,
+  onOpenSeatSettings,
   onToggleFreeMode,
   onToggleRoomLock,
 }) {
@@ -139,6 +140,16 @@ export default function RoomSettingsModal({
       }
       if (onSelectAction) {
         onSelectAction('boss_seat');
+        return;
+      }
+    }
+    if (key === 'seat_settings') {
+      if (onOpenSeatSettings) {
+        onOpenSeatSettings();
+        return;
+      }
+      if (onSelectAction) {
+        onSelectAction('seat_settings');
         return;
       }
     }
@@ -285,6 +296,19 @@ export default function RoomSettingsModal({
               <Text style={styles.menuIcon}>🛋️</Text>
               <Text style={styles.menuTitle}>
                 <T>Boss Seat</T>
+              </Text>
+              <Text style={styles.chevronIcon}>›</Text>
+            </TouchableOpacity>
+
+            {/* 2. Seat Settings */}
+            <TouchableOpacity
+              style={styles.menuRow}
+              activeOpacity={0.75}
+              onPress={() => handleItemClick('seat_settings', 'Seat Settings')}
+            >
+              <Text style={styles.menuIcon}>🪑</Text>
+              <Text style={styles.menuTitle}>
+                <T>Seat Settings</T>
               </Text>
               <Text style={styles.chevronIcon}>›</Text>
             </TouchableOpacity>

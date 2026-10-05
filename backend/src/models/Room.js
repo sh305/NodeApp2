@@ -132,6 +132,34 @@ const roomSchema = new mongoose.Schema(
     },
     // Dynamically initialized seats
     seats: [seatSchema],
+    // Seat Layout Configuration (Matching Seat Settings Modal)
+    seatLayout: {
+      type: {
+        type: String,
+        enum: ['regular', 'special', 'default'],
+        default: 'default',
+      },
+      layoutId: {
+        type: String,
+        default: null,
+      },
+      isActivated: {
+        type: Boolean,
+        default: false,
+      },
+      seatCount: {
+        type: Number,
+        default: 8,
+      },
+      columns: {
+        type: Number,
+        default: 4,
+      },
+      specialTheme: {
+        type: String,
+        default: null, // 'music', 'birthday', 'royal', 'magic', 'dating', 'relationship', 'wedding'
+      },
+    },
     // Boss Seat (Purchased tier 1/3/12 months)
     bossSeat: {
       isActive: {

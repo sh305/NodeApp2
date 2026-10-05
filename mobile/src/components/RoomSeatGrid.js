@@ -11,6 +11,59 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import AvatarWithFrame from './AvatarWithFrame';
 import AnimatedSeatEmoji from './AnimatedSeatEmoji';
+import { T } from './TranslatedText';
+
+const SPECIAL_THEME_CONFIGS = {
+  music: {
+    name: 'Music',
+    icon: '🎵',
+    glowColor: '#06B6D4',
+    borderColors: ['#06B6D4', '#3B82F6'],
+    gradientColors: ['rgba(6, 182, 212, 0.45)', 'rgba(59, 130, 246, 0.65)'],
+  },
+  birthday: {
+    name: 'Birthday',
+    icon: '🎂',
+    glowColor: '#A855F7',
+    borderColors: ['#C084FC', '#9333EA'],
+    gradientColors: ['rgba(192, 132, 252, 0.45)', 'rgba(147, 51, 234, 0.65)'],
+  },
+  royal: {
+    name: 'Royal',
+    icon: '👑',
+    glowColor: '#F59E0B',
+    borderColors: ['#FDE047', '#D97706'],
+    gradientColors: ['rgba(253, 224, 71, 0.45)', 'rgba(217, 119, 6, 0.65)'],
+  },
+  magic: {
+    name: 'Magic',
+    icon: '🔮',
+    glowColor: '#EC4899',
+    borderColors: ['#F472B6', '#7C3AED'],
+    gradientColors: ['rgba(244, 114, 182, 0.45)', 'rgba(124, 58, 237, 0.65)'],
+  },
+  dating: {
+    name: 'Dating',
+    icon: '💘',
+    glowColor: '#F43F5E',
+    borderColors: ['#FB7185', '#E11D48'],
+    gradientColors: ['rgba(251, 113, 133, 0.45)', 'rgba(225, 29, 72, 0.65)'],
+  },
+  relationship: {
+    name: 'Relationship',
+    icon: '✨',
+    glowColor: '#6366F1',
+    borderColors: ['#818CF8', '#4F46E5'],
+    gradientColors: ['rgba(129, 140, 248, 0.45)', 'rgba(79, 70, 229, 0.65)'],
+  },
+  wedding: {
+    name: 'Wedding',
+    icon: '💍',
+    glowColor: '#FBBF24',
+    borderColors: ['#FDE68A', '#F59E0B'],
+    gradientColors: ['rgba(253, 230, 138, 0.45)', 'rgba(245, 158, 11, 0.65)'],
+  },
+};
 
 const { width } = Dimensions.get('window');
 
@@ -70,16 +123,40 @@ export default function RoomSeatGrid({
   onEmojiComplete = null,
   bossSeat = null,
   onBossSeatPress = null,
+  seatLayout = null,
 }) {
-  const COLUMNS = 4;
-  const GRID_H_PADDING = 12;
+  const isCustomActive = Boolean(seatLayout?.isActivated && seatLayout?.layoutId);
+  const isSpecial = Boolean(isCustomActive && seatLayout?.type === 'special');
+  const specialTheme = isCustomActive ? seatLayout?.specialTheme : null;
+  const activeThemeConfig = isSpecial && specialTheme ? SPECIAL_THEME_CONFIGS[specialTheme] : null;
+
+  const COLUMNS = isCustomActive ? (seatLayout?.columns || 4) : 4;
+  const GRID_H_PADDING = COLUMNS === 5 ? 6 : 12;
   const SEAT_ITEM_WIDTH = (width - GRID_H_PADDING * 2) / COLUMNS;
-  const totalSeats = seats.length || 8;
+  const seatSize = COLUMNS === 5 ? 44 : 48;
+  const seatInner = COLUMNS === 5 ? 34 : 38;
+  const avatarSize = COLUMNS === 5 ? 42 : 46;
+
+  const totalSeats = isCustomActive ? (seatLayout?.seatCount || 8) : 8;
   const seatRefs = useRef([]);
+  const upperSeatRef = useRef(null);
   const displaySeats = Array.from(
     { length: totalSeats },
     (_, i) => seats[i] || { seatIndex: i, user: null }
   );
+
+  const hasUpperNormalSeat = Boolean(
+    isCustomActive &&
+    seatLayout?.type === 'regular'
+  );
+  const gridCount = hasUpperNormalSeat
+    ? (seatLayout?.columns || 4) * (seatLayout?.rows || 2)
+    : totalSeats;
+  const gridSeats = displaySeats.slice(0, gridCount);
+  const upperSeatIndex = gridCount;
+  const upperNormalSeat = hasUpperNormalSeat
+    ? (displaySeats[upperSeatIndex] || { seatIndex: upperSeatIndex, user: null })
+    : null;
 
   const isBossSeatActive = Boolean(
     bossSeat &&
@@ -140,28 +217,31 @@ export default function RoomSeatGrid({
           </TouchableOpacity>
         </View>
 
-        {/* Center: Host Seat (Converts into colorful Boss Seat when isBossSeatActive is true) */}
-        <View style={styles.hostCenterContainer}>
+        {/* Center: Host Seat + Normal Seat (if 10-seat layout) + Boss Seat (if purchased/active) */}
+        <View
+          style={[
+            styles.upperSeatsPairContainer,
+            isBossSeatActive && hasUpperNormalSeat && { gap: 10 },
+          ]}
+        >
+          {/* 1. Host Seat */}
           <TouchableOpacity
-            style={styles.hostSeatWrapper}
+            style={[
+              styles.upperSeatWrapper,
+              isBossSeatActive && hasUpperNormalSeat && { width: 68 },
+            ]}
             activeOpacity={0.8}
-            onPress={() => onHostPress && onHostPress({ ...owner, isHostSeat: true, isBossSeat: isBossSeatActive })}
+            onPress={() => onHostPress && onHostPress({ ...owner, isHostSeat: true })}
           >
             <View style={styles.hostGlowRing}>
               <PulseRing
                 active={Boolean(isHostActive && !isHostMuted)}
-                color={isBossSeatActive ? 'rgba(255, 215, 0, 0.85)' : 'rgba(245, 158, 11, 0.65)'}
+                color="rgba(245, 158, 11, 0.65)"
               />
 
               <LinearGradient
                 colors={
-                  isBossSeatActive
-                    ? isHostActive && !isHostMuted
-                      ? ['#FFE57F', '#FFD700', '#FF8C00', '#FF1493']
-                      : isHostActive && isHostMuted
-                      ? ['#D97706', '#9CA3AF', '#6B7280']
-                      : ['#FFE57F', '#FFD700', '#FF8C00', '#FF007F']
-                    : isHostActive && !isHostMuted
+                  isHostActive && !isHostMuted
                     ? ['#FDE047', '#F59E0B', '#D97706']
                     : isHostActive && isHostMuted
                     ? ['rgba(156, 163, 175, 0.4)', 'rgba(107, 114, 128, 0.3)']
@@ -169,12 +249,9 @@ export default function RoomSeatGrid({
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={[
-                  isBossSeatActive ? styles.bossHostGradientBorder : styles.hostGradientBorder,
-                  isHostActive && isHostMuted && { shadowOpacity: 0.1 },
-                ]}
+                style={styles.hostGradientBorder}
               >
-                <View style={isBossSeatActive ? styles.bossHostInnerCircle : styles.hostInnerCircle}>
+                <View style={styles.hostInnerCircle}>
                   {isHostActive ? (
                     <Image
                       source={{
@@ -184,21 +261,6 @@ export default function RoomSeatGrid({
                       }}
                       style={styles.hostAvatar}
                     />
-                  ) : isBossSeatActive ? (
-                    <LinearGradient
-                      colors={['#3B0764', '#701A75', '#BE185D', '#F43F5E']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.vacantBossHostBox}
-                    >
-                      <View style={styles.bossCouchAura} />
-                      <Image
-                        source={require('../../assets/icons/Boss Seat.png')}
-                        style={styles.vacantBossSeatImg}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.bossSparkle}>✨</Text>
-                    </LinearGradient>
                   ) : (
                     <View style={styles.vacantHostBox}>
                       <Image
@@ -209,39 +271,20 @@ export default function RoomSeatGrid({
                     </View>
                   )}
 
-                  {/* Animated Reaction Emoji directly inside Host Avatar Profile circle */}
                   {activeHostEmoji && (
                     <AnimatedSeatEmoji
                       key={`host_emoji_${activeHostEmoji.id || activeHostEmoji.timestamp}`}
                       emoji={activeHostEmoji.emoji}
                       emojiData={activeHostEmoji.emojiData}
                       isHost={true}
-                      size={53}
+                      size={50}
                       onComplete={() => onEmojiComplete && onEmojiComplete('host')}
                     />
                   )}
                 </View>
               </LinearGradient>
 
-              {/* Boss Seat Top Badge */}
-              {isBossSeatActive && (
-                <View style={styles.bossSeatTopBadge}>
-                  <Text style={styles.bossSeatTopBadgeText}>👑 BOSS SEAT</Text>
-                </View>
-              )}
-
-              {/* Boss Seat Corner Mini Icon when seated */}
-              {isBossSeatActive && isHostActive && (
-                <View style={styles.bossSeatCornerBadge}>
-                  <Image
-                    source={require('../../assets/icons/Boss Seat.png')}
-                    style={styles.bossSeatCornerIcon}
-                    resizeMode="contain"
-                  />
-                </View>
-              )}
-
-              {/* Host Green / Red Mic Badge at bottom-right corner */}
+              {/* Host Green / Red Mic Badge */}
               {isHostActive && (
                 <View style={isHostMuted ? styles.hostMicBadgeMuted : styles.hostMicBadge}>
                   <Image
@@ -253,44 +296,270 @@ export default function RoomSeatGrid({
               )}
             </View>
 
-            {/* Host / Boss Name with Crown */}
             <View style={styles.hostNameContainer}>
-              <Text style={styles.hostCrownEmoji}>{isBossSeatActive ? '🛋️' : '👑'}</Text>
-              <Text style={isBossSeatActive ? styles.bossHostName : styles.hostName} numberOfLines={1}>
+              <Text style={styles.hostCrownEmoji}>👑</Text>
+              <Text style={styles.hostName} numberOfLines={1}>
                 {isHostActive
                   ? owner?.name
                     ? `༻${owner.name}༺`
-                    : isBossSeatActive
-                    ? 'Boss'
                     : 'Host'
                   : isOwner
-                  ? isBossSeatActive
-                    ? 'Tap to Host (Boss)'
-                    : 'Tap to Host'
-                  : isBossSeatActive
-                  ? 'Boss Seat'
+                  ? 'Tap to Host'
                   : 'Host (Vacant)'}
               </Text>
             </View>
+          </TouchableOpacity>
 
-            {/* Boss Seat Active Pill with Remaining Days */}
-            {isBossSeatActive && (
-              <View style={styles.bossSeatStatusPill}>
-                <Text style={styles.bossSeatStatusPillText}>
-                  ★ BOSS ACTIVE {bossDaysLeft > 0 ? `(${bossDaysLeft}d)` : ''} ★
+          {/* 2. Upper Normal Seat (Shown when 10-seat/regular layout is applied) */}
+          {hasUpperNormalSeat && upperNormalSeat && (
+            <TouchableOpacity
+              ref={upperSeatRef}
+              style={[
+                styles.upperSeatWrapper,
+                isBossSeatActive && { width: 68 },
+              ]}
+              activeOpacity={0.8}
+              onPress={(e) => {
+                const fallbackX = e?.nativeEvent?.pageX || 180;
+                const fallbackY = e?.nativeEvent?.pageY || 120;
+                if (upperSeatRef.current?.measureInWindow) {
+                  upperSeatRef.current.measureInWindow((x, y, w, h) => {
+                    if (typeof x === 'number' && !isNaN(x) && w > 0) {
+                      onSeatPress &&
+                        onSeatPress(upperNormalSeat, upperSeatIndex, {
+                          x: x + w / 2,
+                          y: y + h,
+                          seatX: x,
+                          seatY: y,
+                          seatWidth: w,
+                          seatHeight: h,
+                        });
+                    } else {
+                      onSeatPress &&
+                        onSeatPress(upperNormalSeat, upperSeatIndex, {
+                          x: fallbackX,
+                          y: fallbackY,
+                          seatX: 180,
+                          seatY: 100,
+                          seatWidth: 54,
+                          seatHeight: 54,
+                        });
+                    }
+                  });
+                } else {
+                  onSeatPress &&
+                    onSeatPress(upperNormalSeat, upperSeatIndex, {
+                      x: fallbackX,
+                      y: fallbackY,
+                      seatX: 180,
+                      seatY: 100,
+                      seatWidth: 54,
+                      seatHeight: 54,
+                    });
+                }
+              }}
+            >
+              {upperNormalSeat.user ? (
+                /* Occupied Normal Seat */
+                <View style={styles.occupiedWrapper}>
+                  {Boolean(
+                    upperNormalSeat.user._id === currentUserId &&
+                      !upperNormalSeat.isMuted
+                  ) && (
+                    <View
+                      style={[
+                        styles.mySeatGlow,
+                        {
+                          width: avatarSize + 8,
+                          height: avatarSize + 8,
+                          borderRadius: (avatarSize + 8) / 2,
+                        },
+                      ]}
+                    />
+                  )}
+                  <AvatarWithFrame
+                    avatarUri={upperNormalSeat.user.avatar}
+                    level={upperNormalSeat.user.wealthLevel || 1}
+                    size={avatarSize}
+                    activeEmoji={activeSeatEmojis && activeSeatEmojis[upperSeatIndex]}
+                    onEmojiComplete={() =>
+                      onEmojiComplete && onEmojiComplete(upperSeatIndex)
+                    }
+                  />
+                  <Text style={styles.userName} numberOfLines={1}>
+                    {upperNormalSeat.user.name}
+                  </Text>
+                  <View
+                    style={
+                      upperNormalSeat.isMuted
+                        ? styles.seatMicBadgeMuted
+                        : styles.seatMicBadge
+                    }
+                  >
+                    <Image
+                      source={require('../../assets/icons/Mike.png')}
+                      style={styles.seatMicIcon}
+                      resizeMode="contain"
+                    />
+                  </View>
+                </View>
+              ) : (
+                /* Empty Yellow Seat (Without No.9 text as requested) */
+                <View style={styles.emptySeatWrapper}>
+                  <View
+                    style={[
+                      styles.seatGlowOuter,
+                      styles.upperYellowGlow,
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={
+                        upperNormalSeat.isLockedByOwner
+                          ? ['rgba(239,68,68,0.55)', 'rgba(185,28,28,0.35)']
+                          : ['#FEF08A', '#FACC15', '#EAB308']
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.upperNormalCircle}
+                    >
+                      <View style={styles.upperNormalInner}>
+                        {upperNormalSeat.isLockedByOwner ? (
+                          <View style={styles.lockedSeatWrap}>
+                            <Image
+                              source={require('../../assets/icons/SofaSeat.png')}
+                              style={[
+                                styles.sofaSeatImg,
+                                styles.lockedSofaSeat,
+                              ]}
+                              resizeMode="contain"
+                            />
+                            <View style={styles.lockBadge}>
+                              <Text style={styles.lockedIcon}>🔒</Text>
+                            </View>
+                          </View>
+                        ) : (
+                          <Image
+                            source={require('../../assets/icons/SofaSeat.png')}
+                            style={styles.upperNormalSofaImg}
+                            resizeMode="contain"
+                          />
+                        )}
+                      </View>
+                    </LinearGradient>
+                  </View>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* 3. Boss Seat (Rendered ONLY when purchased and active!) */}
+          {isBossSeatActive && (
+            <TouchableOpacity
+              style={[
+                styles.upperSeatWrapper,
+                hasUpperNormalSeat && { width: 68 },
+              ]}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (isBossOccupied) {
+                  onHostPress && onHostPress({ ...bossSeat.user, isBossSeat: true });
+                } else {
+                  onBossSeatPress && onBossSeatPress(bossSeat);
+                }
+              }}
+            >
+              <View style={styles.hostGlowRing}>
+                <LinearGradient
+                  colors={
+                    isBossOccupied
+                      ? ['#FFE57F', '#FFD700', '#FF8C00', '#FF1493']
+                      : ['#FFD700', '#F59E0B', '#B45309']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.bossGradientBorder}
+                >
+                  <View style={styles.bossInnerCircle}>
+                    {isBossOccupied ? (
+                      <Image
+                        source={{
+                          uri:
+                            bossSeat.user?.avatar ||
+                            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+                        }}
+                        style={styles.hostAvatar}
+                      />
+                    ) : (
+                      <LinearGradient
+                        colors={['#3B0764', '#701A75', '#BE185D', '#F43F5E']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.vacantBossHostBox}
+                      >
+                        <Image
+                          source={require('../../assets/icons/Boss Seat.png')}
+                          style={styles.vacantBossSeatImg}
+                          resizeMode="contain"
+                        />
+                      </LinearGradient>
+                    )}
+                  </View>
+                </LinearGradient>
+
+                {/* Boss Seat Top Badge */}
+                <View style={styles.bossSeatTopBadge}>
+                  <Text style={styles.bossSeatTopBadgeText}>👑 BOSS</Text>
+                </View>
+              </View>
+
+              <View style={styles.hostNameContainer}>
+                <Text style={styles.hostCrownEmoji}>🛋️</Text>
+                <Text style={styles.bossHostName} numberOfLines={1}>
+                  {isBossOccupied
+                    ? bossSeat.user?.name || 'Boss'
+                    : 'Boss Active'}
                 </Text>
               </View>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Right: Balanced Spacer */}
-        <View style={styles.rightSpacer} />
+        {/* Right: Balanced Spacer for Chest */}
+        <View style={styles.chestContainerSpacer} />
       </View>
 
-      {/* ══ 4×2 SOFA SEAT GRID (No.1 to No.8) ══ */}
-      <View style={styles.gridContainer}>
-        {displaySeats.map((seat, index) => {
+      {/* ══ SPECIAL THEME STAGE BADGE (When Special Theme is active) ══ */}
+      {isSpecial && activeThemeConfig && (
+        <View style={styles.specialThemeHeader}>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.12)', 'rgba(0, 0, 0, 0.45)']}
+            style={[
+              styles.specialThemePill,
+              { borderColor: activeThemeConfig.glowColor },
+            ]}
+          >
+            <Text style={styles.specialThemeEmoji}>{activeThemeConfig.icon}</Text>
+            <Text
+              style={[
+                styles.specialThemeTitle,
+                { color: activeThemeConfig.glowColor },
+              ]}
+            >
+              <T>{activeThemeConfig.name}</T> <T>Special Stage</T>
+            </Text>
+            <Text style={styles.specialThemeSparkle}>✨</Text>
+          </LinearGradient>
+        </View>
+      )}
+
+      {/* ══ SOFA SEAT GRID (Dynamic 4×N or 5×N) ══ */}
+      <View
+        style={[
+          styles.gridContainer,
+          COLUMNS === 5 && { paddingHorizontal: 4, rowGap: 10 },
+        ]}
+      >
+        {gridSeats.map((seat, index) => {
           const isOccupied = seat && seat.user;
           const isMe = isOccupied && seat.user._id === currentUserId;
           const isLocked = seat?.isLockedByOwner;
@@ -335,32 +604,56 @@ export default function RoomSeatGrid({
                 } else {
                   onSeatPress &&
                     onSeatPress(seat, index, {
-                      x: fallbackX,
-                      y: fallbackY,
-                      seatX: GRID_H_PADDING + (index % COLUMNS) * SEAT_ITEM_WIDTH,
-                      seatY: 360 + Math.floor(index / COLUMNS) * 95,
-                      seatWidth: SEAT_ITEM_WIDTH,
-                      seatHeight: 65,
-                    });
+                    x: fallbackX,
+                    y: fallbackY,
+                    seatX: GRID_H_PADDING + (index % COLUMNS) * SEAT_ITEM_WIDTH,
+                    seatY: 360 + Math.floor(index / COLUMNS) * 95,
+                    seatWidth: SEAT_ITEM_WIDTH,
+                    seatHeight: 65,
+                  });
                 }
               }}
             >
               {isOccupied ? (
                 /* ── Occupied Seat ── */
                 <View style={styles.occupiedWrapper}>
-                  {Boolean(isMe && !seat.isMuted) && <View style={styles.mySeatGlow} />}
+                  {Boolean(isMe && !seat.isMuted) && (
+                    <View
+                      style={[
+                        styles.mySeatGlow,
+                        {
+                          width: avatarSize + 8,
+                          height: avatarSize + 8,
+                          borderRadius: (avatarSize + 8) / 2,
+                        },
+                      ]}
+                    />
+                  )}
                   <AvatarWithFrame
                     avatarUri={seat.user.avatar}
                     level={seat.user.wealthLevel || 1}
-                    size={46}
+                    size={avatarSize}
                     activeEmoji={activeSeatEmojis && activeSeatEmojis[index]}
                     onEmojiComplete={() => onEmojiComplete && onEmojiComplete(index)}
                   />
 
-                  <Text style={styles.userName} numberOfLines={1}>
+                  <Text
+                    style={[
+                      styles.userName,
+                      COLUMNS === 5 && { fontSize: 10, maxWidth: 58 },
+                    ]}
+                    numberOfLines={1}
+                  >
                     {seat.user.name}
                   </Text>
-                  <Text style={styles.seatNumberText}>No.{seatNumber}</Text>
+                  <Text
+                    style={[
+                      styles.seatNumberText,
+                      COLUMNS === 5 && { fontSize: 10, marginTop: 2 },
+                    ]}
+                  >
+                    No.{seatNumber}
+                  </Text>
                   <View style={seat.isMuted ? styles.seatMicBadgeMuted : styles.seatMicBadge}>
                     <Image
                       source={require('../../assets/icons/Mike.png')}
@@ -370,42 +663,98 @@ export default function RoomSeatGrid({
                   </View>
                 </View>
               ) : (
-                /* ── Empty Seat: Vibrant Cyan / Sky-blue Glass Circle ── */
+                /* ── Empty Seat: Vibrant Cyan Glass Circle or Themed Circle ── */
                 <View style={styles.emptySeatWrapper}>
-                  <View style={styles.seatGlowOuter}>
+                  <View
+                    style={[
+                      styles.seatGlowOuter,
+                      { borderRadius: seatSize / 2 },
+                      activeThemeConfig && { shadowColor: activeThemeConfig.glowColor },
+                    ]}
+                  >
                     <LinearGradient
                       colors={
                         isLocked
                           ? ['rgba(239,68,68,0.55)', 'rgba(185,28,28,0.35)']
+                          : activeThemeConfig
+                          ? activeThemeConfig.gradientColors
                           : ['rgba(56, 189, 248, 0.45)', 'rgba(14, 165, 233, 0.65)']
                       }
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      style={styles.sofaCircle}
+                      style={[
+                        styles.sofaCircle,
+                        {
+                          width: seatSize,
+                          height: seatSize,
+                          borderRadius: seatSize / 2,
+                          borderColor: activeThemeConfig
+                            ? activeThemeConfig.borderColors[0]
+                            : 'rgba(255, 255, 255, 0.45)',
+                        },
+                      ]}
                     >
-                      <View style={styles.seatInner}>
+                      <View
+                        style={[
+                          styles.seatInner,
+                          {
+                            width: seatInner,
+                            height: seatInner,
+                            borderRadius: seatInner / 2,
+                          },
+                        ]}
+                      >
                         {isLocked ? (
                           <View style={styles.lockedSeatWrap}>
-                            <Image
-                              source={require('../../assets/icons/SofaSeat.png')}
-                              style={[styles.sofaSeatImg, styles.lockedSofaSeat]}
-                              resizeMode="contain"
-                            />
+                            {activeThemeConfig ? (
+                              <Text
+                                style={{
+                                  fontSize: COLUMNS === 5 ? 16 : 18,
+                                  opacity: 0.45,
+                                }}
+                              >
+                                {activeThemeConfig.icon}
+                              </Text>
+                            ) : (
+                              <Image
+                                source={require('../../assets/icons/SofaSeat.png')}
+                                style={[
+                                  styles.sofaSeatImg,
+                                  styles.lockedSofaSeat,
+                                  COLUMNS === 5 && { width: 26, height: 26 },
+                                ]}
+                                resizeMode="contain"
+                              />
+                            )}
                             <View style={styles.lockBadge}>
                               <Text style={styles.lockedIcon}>🔒</Text>
                             </View>
                           </View>
+                        ) : activeThemeConfig ? (
+                          <Text style={{ fontSize: COLUMNS === 5 ? 16 : 19 }}>
+                            {activeThemeConfig.icon}
+                          </Text>
                         ) : (
                           <Image
                             source={require('../../assets/icons/SofaSeat.png')}
-                            style={styles.sofaSeatImg}
+                            style={[
+                              styles.sofaSeatImg,
+                              COLUMNS === 5 && { width: 26, height: 26 },
+                            ]}
                             resizeMode="contain"
                           />
                         )}
                       </View>
                     </LinearGradient>
                   </View>
-                  <Text style={styles.seatNumberText}>No.{seatNumber}</Text>
+                  <Text
+                    style={[
+                      styles.seatNumberText,
+                      COLUMNS === 5 && { fontSize: 10, marginTop: 2 },
+                    ]}
+                  >
+                    No.{seatNumber}
+                  </Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -425,20 +774,136 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 
+  /* ── Special Theme Stage Header ── */
+  specialThemeHeader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  specialThemePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 5,
+  },
+  specialThemeEmoji: {
+    fontSize: 13,
+  },
+  specialThemeTitle: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  specialThemeSparkle: {
+    fontSize: 11,
+  },
+
+  /* ── Regular Layout Header Badge ── */
+  regularLayoutHeader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  regularLayoutPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 2.5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 0.8,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  regularLayoutTitle: {
+    color: '#E0E7FF',
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  upperYellowGlow: {
+    borderRadius: 27,
+    shadowColor: '#FACC15',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.85,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  upperNormalCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FEF08A',
+  },
+  upperNormalInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(254, 240, 138, 0.25)',
+  },
+  upperNormalSofaImg: {
+    width: 26,
+    height: 26,
+    tintColor: '#78350F',
+  },
+
   /* ── Upper Section: Chest & Host ── */
   upperSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingHorizontal: 12,
+    marginBottom: 10,
     marginTop: 4,
   },
   chestContainer: {
-    width: 60,
+    width: 52,
     alignItems: 'flex-start',
     justifyContent: 'center',
     paddingTop: 6,
+  },
+  upperSeatsPairContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  upperSeatWrapper: {
+    alignItems: 'center',
+    width: 80,
+  },
+  chestContainerSpacer: {
+    width: 52,
+  },
+  bossGradientBorder: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.85,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 1,
+  },
+  bossInnerCircle: {
+    width: 53,
+    height: 53,
+    borderRadius: 26.5,
+    overflow: 'hidden',
+    backgroundColor: '#1E1B4B',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   treasureChestWrapper: {
     alignItems: 'center',

@@ -38,6 +38,7 @@ import RoomSettingsModal from '../components/RoomSettingsModal';
 import MyPeopleModal from '../components/MyPeopleModal';
 import KickedUsersModal from '../components/KickedUsersModal';
 import BossSeatModal from '../components/BossSeatModal';
+import SeatSettingsModal from '../components/SeatSettingsModal';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
@@ -109,6 +110,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [myPeopleModalVisible, setMyPeopleModalVisible] = useState(false);
   const [kickedUsersModalVisible, setKickedUsersModalVisible] = useState(false);
   const [bossSeatModalVisible, setBossSeatModalVisible] = useState(false);
+  const [seatSettingsModalVisible, setSeatSettingsModalVisible] = useState(false);
   const [myPeopleInitialTab, setMyPeopleInitialTab] = useState('Host');
   const [activeHostEmoji, setActiveHostEmoji] = useState(null);
   const [activeSeatEmojis, setActiveSeatEmojis] = useState({});
@@ -278,6 +280,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
     socket.on('boss_seat_updated', ({ bossSeat: bSeat }) => {
       setRoom((prev) => (prev ? { ...prev, bossSeat: bSeat } : prev));
+    });
+
+    socket.on('seat_layout_updated', ({ seatLayout, seats }) => {
+      setRoom((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          seatLayout,
+          seats: seats || prev.seats,
+        };
+      });
+      if (seats) {
+        const mySeat = seats.findIndex((s) => s.user && s.user._id === currentUser?._id);
+        setMySeatIndex(mySeat !== -1 ? mySeat : null);
+      }
     });
 
     socket.on('free_mode_updated', ({ freeMode }) => {
@@ -599,6 +616,68 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     } catch (err) {
       setRoom((prev) => (prev ? { ...prev, isLocked: !isLocked } : prev));
       showToast(t(err.response?.data?.message || 'Failed to update room lock'), 'error');
+    }
+  };
+
+  const handleApplySeatLayout = async (selectedLayout) => {
+    try {
+      const isReset = selectedLayout?.type === 'default' || !selectedLayout?.layoutId;
+      const layoutId = isReset ? null : (selectedLayout?.id || selectedLayout?.layoutId);
+      const layoutType = isReset ? 'default' : (selectedLayout?.type || (selectedLayout?.theme ? 'special' : 'regular'));
+      const specialTheme = isReset ? null : (selectedLayout?.specialTheme || selectedLayout?.theme || null);
+      const seatCount = isReset ? 8 : (selectedLayout?.seatCount || 8);
+      const columns = isReset ? 4 : (selectedLayout?.columns || 4);
+
+      const res = await api.put(`/rooms/${roomId}/seat-layout`, {
+        layoutId,
+        type: layoutType,
+        seatCount,
+        columns,
+        specialTheme,
+      });
+
+      if (res.data.success) {
+        const updatedSeatLayout = res.data.seatLayout || res.data.room?.seatLayout || {
+          layoutId,
+          type: layoutType,
+          isActivated: !isReset,
+          seatCount,
+          columns,
+          specialTheme,
+        };
+        const updatedSeats = res.data.seats || res.data.room?.seats;
+
+        setRoom((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            ...(res.data.room || {}),
+            seatLayout: updatedSeatLayout,
+            seats: updatedSeats || prev.seats,
+          };
+        });
+
+        setSeatSettingsModalVisible(false);
+        showToast(
+          isReset
+            ? t('Seat layout reset to default')
+            : t('Seat layout applied successfully! 🎉'),
+          'success'
+        );
+
+        socketRef.current?.emit('update_seat_layout', {
+          roomId,
+          userId: currentUser?._id,
+          seatLayout: updatedSeatLayout,
+          seats: updatedSeats,
+        });
+      }
+    } catch (err) {
+      console.log('Seat layout update error:', err);
+      showToast(
+        t(err.response?.data?.message || err.message || 'Failed to update seat layout'),
+        'error'
+      );
     }
   };
 
@@ -1155,6 +1234,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             onEmojiComplete={handleEmojiComplete}
             bossSeat={room?.bossSeat}
             onBossSeatPress={handleBossSeatPress}
+            seatLayout={room?.seatLayout}
           />
         </ScrollView>
 
@@ -1893,6 +1973,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           } else if (tool?.id === 'room_settings') {
             setRoomToolsModalVisible(false);
             setRoomSettingsModalVisible(true);
+          } else if (tool?.id === 'seat_settings' || tool?.id === 'seat_setting') {
+            setRoomToolsModalVisible(false);
+            setSeatSettingsModalVisible(true);
           } else {
             console.log('Room tool selected:', tool.name, toggledState);
           }
@@ -1994,6 +2077,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           setRoomSettingsModalVisible(false);
           setBossSeatModalVisible(true);
         }}
+        onOpenSeatSettings={() => {
+          setRoomSettingsModalVisible(false);
+          setSeatSettingsModalVisible(true);
+        }}
         onSelectAction={(actionKey) => {
           if (actionKey === 'room_members') {
             setRoomSettingsModalVisible(false);
@@ -2005,6 +2092,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           } else if (actionKey === 'boss_seat') {
             setRoomSettingsModalVisible(false);
             setBossSeatModalVisible(true);
+          } else if (actionKey === 'seat_settings') {
+            setRoomSettingsModalVisible(false);
+            setSeatSettingsModalVisible(true);
           } else {
             showToast(t('Feature coming soon!'), 'info');
           }
@@ -2050,6 +2140,16 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             currentUser.coins = remainingCoins;
           }
         }}
+      />
+
+      {/* ══ SEAT SETTINGS MODAL (Regular & Special Seats - Matching User Screenshots) ══ */}
+      <SeatSettingsModal
+        visible={seatSettingsModalVisible}
+        onClose={() => setSeatSettingsModalVisible(false)}
+        currentLayout={room?.seatLayout}
+        room={room}
+        currentUser={currentUser}
+        onApplyLayout={handleApplySeatLayout}
       />
     </View>
   );

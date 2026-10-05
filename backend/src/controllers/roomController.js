@@ -119,6 +119,12 @@ exports.getRoomById = async (req, res) => {
       room.checkBossSeatActive();
     }
 
+    // Default unactivated layouts should have layoutId as null
+    if (room.seatLayout && !room.seatLayout.isActivated) {
+      room.seatLayout.layoutId = null;
+      room.seatLayout.type = 'default';
+    }
+
     // Check if user is kicked from room (3 days vs permanent) BEFORE adding to activeMembers
     const kickStatus = room.isUserKicked(userId);
     if (kickStatus.kicked) {
@@ -941,4 +947,129 @@ exports.verifyRoomPassword = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Update Seat Layout & Theme
+// @route   PUT /api/rooms/:id/seat-layout
+exports.updateSeatLayout = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, layoutId, seatCount, columns, specialTheme } = req.body;
+    const userId = req.user._id.toString();
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const isOwner = room.owner.toString() === userId;
+    const isAdmin = room.admins && room.admins.some((a) => (a._id ? a._id.toString() : a.toString()) === userId);
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Room Owner or Admin can change seat layout' });
+    }
+
+    const isReset = !type || type === 'default' || !layoutId || layoutId === 'default' || layoutId === 'none';
+
+    if (isReset) {
+      room.seatLayout = {
+        type: 'default',
+        layoutId: null,
+        isActivated: false,
+        seatCount: 8,
+        columns: 4,
+        specialTheme: null,
+      };
+
+      if (room.seats.length > 8) {
+        room.seats = room.seats.slice(0, 8);
+      }
+      while (room.seats.length < 8) {
+        room.seats.push({
+          seatIndex: room.seats.length,
+          user: null,
+          isMuted: false,
+          isLockedByOwner: false,
+        });
+      }
+
+      await room.save();
+
+      const populatedRoom = await Room.findById(id)
+        .populate('owner', 'name avatar wealthLevel customId gender')
+        .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+        .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
+
+      return res.status(200).json({
+        success: true,
+        message: 'Seat layout reset to default successfully',
+        room: populatedRoom,
+        seatLayout: populatedRoom.seatLayout,
+        seats: populatedRoom.seats,
+      });
+    }
+
+    // Verify room level requirements for regular layouts
+    const currentRoomLevel = room.roomLevel || 1;
+    if (type === 'regular') {
+      if (layoutId === 'regular_12' && currentRoomLevel < 20) {
+        return res.status(400).json({ success: false, message: 'Requires Room Level 20 or higher' });
+      }
+      if (layoutId === 'regular_14' && currentRoomLevel < 20) {
+        return res.status(400).json({ success: false, message: 'Requires Room Level 20 or higher' });
+      }
+      if (layoutId === 'regular_17' && currentRoomLevel < 25) {
+        return res.status(400).json({ success: false, message: 'Requires Room Level 25 or higher' });
+      }
+      if (layoutId === 'regular_22' && currentRoomLevel < 30) {
+        return res.status(400).json({ success: false, message: 'Requires Room Level 30 or higher' });
+      }
+      if (layoutId === 'regular_27' && currentRoomLevel < 35 && (req.user.vipLevel || 0) < 6) {
+        return res.status(400).json({ success: false, message: 'Requires VIP Level 6 or Room Level 35' });
+      }
+    }
+
+    const targetSeatCount = Number(seatCount) || (type === 'special' ? 8 : 8);
+    const targetColumns = Number(columns) || (targetSeatCount > 8 && targetSeatCount % 5 === 0 ? 5 : 4);
+
+    room.seatLayout = {
+      type: type || 'regular',
+      layoutId: layoutId || null,
+      isActivated: true,
+      seatCount: targetSeatCount,
+      columns: targetColumns,
+      specialTheme: type === 'special' ? (specialTheme || 'music') : null,
+    };
+
+    // Ensure room.seats has at least targetSeatCount elements
+    if (room.seats.length < targetSeatCount) {
+      for (let i = room.seats.length; i < targetSeatCount; i++) {
+        room.seats.push({
+          seatIndex: i,
+          user: null,
+          isMuted: false,
+          isLockedByOwner: false,
+        });
+      }
+    } else if (room.seats.length > targetSeatCount) {
+      room.seats = room.seats.slice(0, targetSeatCount);
+    }
+
+    await room.save();
+
+    const populatedRoom = await Room.findById(id)
+      .populate('owner', 'name avatar wealthLevel customId gender')
+      .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Seat layout updated successfully',
+      room: populatedRoom,
+      seatLayout: populatedRoom.seatLayout,
+      seats: populatedRoom.seats,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 

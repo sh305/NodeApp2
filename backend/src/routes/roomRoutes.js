@@ -21,6 +21,7 @@ const {
   applyForSeat,
   acceptSeatApplicant,
   rejectSeatApplicant,
+  updateSeatLayout,
 } = require('../controllers/roomController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -49,5 +50,7 @@ router.post('/:id/free-mode', protect, toggleFreeMode);
 router.post('/:id/seat-applicants/apply', protect, applyForSeat);
 router.post('/:id/seat-applicants/accept', protect, acceptSeatApplicant);
 router.post('/:id/seat-applicants/reject', protect, rejectSeatApplicant);
+router.put('/:id/seat-layout', protect, updateSeatLayout);
+router.post('/:id/seat-layout', protect, updateSeatLayout);
 
 module.exports = router;

@@ -275,6 +275,24 @@ function initRoomSockets(io) {
       }
     });
 
+    // Update Seat Layout & Special Theme
+    socket.on('update_seat_layout', async ({ roomId, seatLayout, seats }) => {
+      try {
+        io.to(roomId).emit('seat_layout_updated', {
+          seatLayout,
+          seats,
+        });
+        io.to(roomId).emit('new_chat_message', {
+          system: true,
+          text: seatLayout.type === 'special'
+            ? `✨ Room seat layout switched to Special Theme: ${seatLayout.specialTheme}`
+            : `🛋️ Room seat layout updated to ${seatLayout.seatCount + 2} Seats`,
+        });
+      } catch (err) {
+        console.error('Socket update_seat_layout error:', err);
+      }
+    });
+
     // Apply for Seat (when Free Mode is OFF)
     socket.on('apply_for_seat', async ({ roomId, userId, seatIndex }) => {
       try {
