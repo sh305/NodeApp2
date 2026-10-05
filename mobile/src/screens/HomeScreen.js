@@ -328,7 +328,11 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
   const handleRoomClick = (room) => {
     // Record this room in user's recent rooms
     api.post(`/users/recent-rooms/${room._id}`).catch(() => {});
-    if (room.isLocked) {
+    const rOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
+    const cUserId = currentUser?._id ? currentUser._id.toString() : '';
+    const isOwner = Boolean(rOwnerId && cUserId && rOwnerId === cUserId);
+
+    if (room.isLocked && !isOwner) {
       setLockedRoomTarget(room);
     } else {
       navigation.navigate('VoiceRoom', { roomId: room._id, roomTitle: room.title });
@@ -337,15 +341,11 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
 
   const handleVerifyLockedRoom = async (password) => {
     if (!lockedRoomTarget) return;
-    try {
-      const res = await api.post(`/rooms/${lockedRoomTarget._id}/verify-password`, { password });
-      if (res.data.success) {
-        const target = lockedRoomTarget;
-        setLockedRoomTarget(null);
-        navigation.navigate('VoiceRoom', { roomId: target._id, roomTitle: target.title });
-      }
-    } catch (err) {
-      showToast(t('Wrong Password! Please enter correct room password'), 'error');
+    const res = await api.post(`/rooms/${lockedRoomTarget._id}/verify-password`, { password });
+    if (res.data.success) {
+      const target = lockedRoomTarget;
+      setLockedRoomTarget(null);
+      navigation.navigate('VoiceRoom', { roomId: target._id, roomTitle: target.title });
     }
   };
 
@@ -495,16 +495,34 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                     <Text style={styles.mineBadgeText}>{t('Mine')}</Text>
                   </View>
 
-                  {/* Left Room Avatar Image */}
-                  <Image
-                    source={{
-                      uri:
-                        myRoom.coverImage ||
-                        currentUser?.avatar ||
-                        'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200',
-                    }}
-                    style={styles.mineAvatar}
-                  />
+                  {/* Left Room Avatar Image with Lock Overlay if locked */}
+                  <View style={styles.mineAvatarWrap}>
+                    <Image
+                      source={{
+                        uri:
+                          myRoom.coverImage ||
+                          currentUser?.avatar ||
+                          'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200',
+                      }}
+                      style={styles.mineAvatar}
+                    />
+                    {myRoom.isLocked && (
+                      <View style={styles.avatarLockBadge}>
+                        <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+                          <Path
+                            d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z"
+                            fill="#FFFFFF"
+                          />
+                          <Path
+                            d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11"
+                            stroke="#FFFFFF"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                          />
+                        </Svg>
+                      </View>
+                    )}
+                  </View>
 
                   {/* Middle: Real Created Room Title */}
                   <View style={styles.mineTitleWrap}>
@@ -602,15 +620,33 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                       activeOpacity={0.8}
                       onPress={() => handleRoomClick(room)}
                     >
-                      <Image
-                        source={{
-                          uri:
-                            room.coverImage ||
-                            room.owner?.avatar ||
-                            'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200',
-                        }}
-                        style={styles.subTabRoomAvatar}
-                      />
+                      <View style={styles.subTabAvatarWrap}>
+                        <Image
+                          source={{
+                            uri:
+                              room.coverImage ||
+                              room.owner?.avatar ||
+                              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200',
+                          }}
+                          style={styles.subTabRoomAvatar}
+                        />
+                        {room.isLocked && (
+                          <View style={styles.avatarLockBadge}>
+                            <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+                              <Path
+                                d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z"
+                                fill="#FFFFFF"
+                              />
+                              <Path
+                                d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11"
+                                stroke="#FFFFFF"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                              />
+                            </Svg>
+                          </View>
+                        )}
+                      </View>
                       <View style={styles.subTabRoomInfo}>
                         <View style={styles.subTabRoomTitleRow}>
                           <Text style={styles.subTabRoomTitle} numberOfLines={1}>
@@ -657,15 +693,33 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                       activeOpacity={0.8}
                       onPress={() => handleRoomClick(room)}
                     >
-                      <Image
-                        source={{
-                          uri:
-                            room.coverImage ||
-                            room.owner?.avatar ||
-                            'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200',
-                        }}
-                        style={styles.subTabRoomAvatar}
-                      />
+                      <View style={styles.subTabAvatarWrap}>
+                        <Image
+                          source={{
+                            uri:
+                              room.coverImage ||
+                              room.owner?.avatar ||
+                              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200',
+                          }}
+                          style={styles.subTabRoomAvatar}
+                        />
+                        {room.isLocked && (
+                          <View style={styles.avatarLockBadge}>
+                            <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+                              <Path
+                                d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z"
+                                fill="#FFFFFF"
+                              />
+                              <Path
+                                d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11"
+                                stroke="#FFFFFF"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                              />
+                            </Svg>
+                          </View>
+                        )}
+                      </View>
                       <View style={styles.subTabRoomInfo}>
                         <View style={styles.subTabRoomTitleRow}>
                           <Text style={styles.subTabRoomTitle} numberOfLines={1}>
@@ -1105,13 +1159,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
+  mineAvatarWrap: {
+    position: 'relative',
+    marginRight: 14,
+  },
   mineAvatar: {
     width: 52,
     height: 52,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#FFFFFF',
-    marginRight: 14,
   },
   mineTitleWrap: {
     flex: 1,
@@ -1243,12 +1300,32 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
+  subTabAvatarWrap: {
+    position: 'relative',
+    marginRight: 12,
+  },
   subTabRoomAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    marginRight: 12,
     backgroundColor: '#E2E8F0',
+  },
+  avatarLockBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 19,
+    height: 19,
+    borderRadius: 9.5,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
+    elevation: 4,
   },
   subTabRoomInfo: {
     flex: 1,

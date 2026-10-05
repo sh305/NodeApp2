@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from './TranslatedText';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from './Toast';
+import SetRoomPasswordModal from './SetRoomPasswordModal';
 
 export default function RoomSettingsModal({
   visible,
@@ -23,17 +24,19 @@ export default function RoomSettingsModal({
   onOpenKickedUsers,
   onOpenBossSeat,
   onToggleFreeMode,
+  onToggleRoomLock,
 }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { showToast } = useToast();
 
-  // Local switch states matching Screenshot
+  // Local switch states matching Screenshot (Default OFF)
   const [luckyNumberEnabled, setLuckyNumberEnabled] = useState(true);
   const [freeModeEnabled, setFreeModeEnabled] = useState(
     room?.freeMode !== undefined ? Boolean(room.freeMode) : true
   );
   const [roomLockEnabled, setRoomLockEnabled] = useState(Boolean(room?.isLocked));
+  const [setPasswordModalVisible, setSetPasswordModalVisible] = useState(false);
 
   useEffect(() => {
     if (room?.freeMode !== undefined) {
@@ -41,10 +44,43 @@ export default function RoomSettingsModal({
     }
   }, [room?.freeMode]);
 
+  useEffect(() => {
+    setRoomLockEnabled(Boolean(room?.isLocked));
+  }, [room?.isLocked]);
+
   const handleToggleFreeMode = (val) => {
     setFreeModeEnabled(val);
     if (onToggleFreeMode) {
       onToggleFreeMode(val);
+    }
+  };
+
+  const handleToggleRoomLock = (val) => {
+    if (val) {
+      // Keep switch ON and open Set Room Password popup
+      setRoomLockEnabled(true);
+      setSetPasswordModalVisible(true);
+    } else {
+      setRoomLockEnabled(false);
+      if (onToggleRoomLock) {
+        onToggleRoomLock(false, null);
+      }
+    }
+  };
+
+  const handleCancelPassword = () => {
+    setSetPasswordModalVisible(false);
+    // If room is not actually locked yet, revert switch back to OFF
+    if (!room?.isLocked) {
+      setRoomLockEnabled(false);
+    }
+  };
+
+  const handleConfirmPassword = (pin) => {
+    setRoomLockEnabled(true);
+    setSetPasswordModalVisible(false);
+    if (onToggleRoomLock) {
+      onToggleRoomLock(true, pin);
     }
   };
 
@@ -317,16 +353,20 @@ export default function RoomSettingsModal({
               </View>
               <Switch
                 value={roomLockEnabled}
-                onValueChange={(val) => {
-                  setRoomLockEnabled(val);
-                  handleItemClick('room_lock', 'Room Lock');
-                }}
+                onValueChange={handleToggleRoomLock}
                 trackColor={{ false: '#4B5563', true: '#00D293' }}
                 thumbColor="#FFFFFF"
               />
             </View>
           </View>
         </ScrollView>
+
+        {/* ══ SET ROOM PASSWORD MODAL (Matching Screenshot) ══ */}
+        <SetRoomPasswordModal
+          visible={setPasswordModalVisible}
+          onClose={handleCancelPassword}
+          onConfirm={handleConfirmPassword}
+        />
       </View>
     </Modal>
   );

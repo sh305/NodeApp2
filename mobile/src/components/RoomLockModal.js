@@ -1,5 +1,18 @@
-import React, { useState } from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  KeyboardAvoidingView,
+  ActivityIndicator,
+} from 'react-native';
+import { T } from './TranslatedText';
+import { useLanguage } from '../context/LanguageContext';
+import { useToast } from './Toast';
 
 export default function RoomLockModal({
   visible,
@@ -7,60 +20,165 @@ export default function RoomLockModal({
   onVerifyPassword,
   roomTitle = 'Locked Voice Room',
 }) {
-  const [password, setPassword] = useState('');
+  const { t } = useLanguage();
+  const { showToast } = useToast();
+  const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef(null);
+
+  const focusInput = () => {
+    inputRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (visible) {
+      setPin('');
+      const timer = setTimeout(() => {
+        focusInput();
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
 
   const handleSubmit = async () => {
-    if (!password.trim()) {
-      Alert.alert('Error', 'Kripya password enter karein');
-      return;
-    }
+    if (pin.length !== 4) return;
     setLoading(true);
     try {
-      await onVerifyPassword(password);
-      setPassword('');
-      onClose();
+      await onVerifyPassword(pin);
+      setPin('');
     } catch (e) {
-      Alert.alert('Galat Password', e.response?.data?.message || 'Password galat hai, dobara try karein.');
+      setPin('');
+      showToast(t('You have entered wrong password'), 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleCancel = () => {
+    setPin('');
+    onClose();
+  };
+
+  const isComplete = pin.length === 4;
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleCancel}
+      onShow={() => {
+        setPin('');
+        setTimeout(focusInput, 80);
+      }}
+    >
       <View style={styles.overlay}>
-        <View style={styles.box}>
-          <Text style={styles.icon}>🔒</Text>
-          <Text style={styles.title}>Password Protected Room</Text>
-          <Text style={styles.subtitle}>
-            "{roomTitle}" me enter karne ke liye password enter karein:
-          </Text>
+        {/* Backdrop touchable to cancel when tapping outside */}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={handleCancel}
+        />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Room Password / PIN"
-            placeholderTextColor="#9CA3AF"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            autoFocus
-          />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardAvoid}
+          pointerEvents="box-none"
+        >
+          <View style={styles.card}>
+            {/* Title */}
+            <Text style={styles.title}>
+              <T>Enter Room Password</T>
+            </Text>
 
-          <View style={styles.btnRow}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>Cancel</Text>
+            {/* Subtitle with Room Title */}
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {roomTitle}
+            </Text>
+
+            {/* PIN Wrapper: Contains visual boxes underneath & real TextInput directly on top */}
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={focusInput}
+              style={styles.pinWrapper}
+            >
+              {/* 4 PIN Digit Visual Input Boxes */}
+              <View style={styles.pinRow} pointerEvents="none">
+                {[0, 1, 2, 3].map((index) => {
+                  const digit = pin[index] || '';
+                  const isCurrent = pin.length === index;
+
+                  return (
+                    <View
+                      key={`lock_pin_${index}`}
+                      style={[
+                        styles.pinBox,
+                        isCurrent && styles.pinBoxCurrent,
+                      ]}
+                    >
+                      {digit ? (
+                        <Text style={styles.pinDigit}>{digit}</Text>
+                      ) : isCurrent ? (
+                        <View style={styles.cursorUnderline} />
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Real TextInput directly over PIN area to reliably trigger Native Keyboard */}
+              <TextInput
+                ref={inputRef}
+                value={pin}
+                onChangeText={(text) => {
+                  const clean = text.replace(/[^0-9]/g, '').slice(0, 4);
+                  setPin(clean);
+                }}
+                keyboardType="number-pad"
+                maxLength={4}
+                style={styles.realInput}
+                caretHidden={true}
+                autoFocus={true}
+                contextMenuHidden={true}
+                selectTextOnFocus={false}
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.submitBtnText}>Enter Room</Text>
-              )}
-            </TouchableOpacity>
+            {/* Bottom Actions: Cancel & Okay */}
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                onPress={handleCancel}
+                disabled={loading}
+              >
+                <Text style={styles.cancelText}>
+                  <T>Cancel</T>
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                onPress={handleSubmit}
+                disabled={!isComplete || loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#00D293" />
+                ) : (
+                  <Text
+                    style={[
+                      styles.okayText,
+                      !isComplete && styles.okayTextDisabled,
+                    ]}
+                  >
+                    <T>Okay</T>
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -69,75 +187,114 @@ export default function RoomLockModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  box: {
+  keyboardAvoid: {
     width: '100%',
-    backgroundColor: '#1E1E2E',
-    borderRadius: 16,
-    padding: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#374151',
+    justifyContent: 'center',
   },
-  icon: {
-    fontSize: 36,
-    marginBottom: 8,
+  card: {
+    width: '84%',
+    maxWidth: 320,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    paddingTop: 24,
+    paddingBottom: 18,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 20,
   },
   title: {
-    color: '#F59E0B',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
-    marginBottom: 6,
+    color: '#1F2937',
+    marginBottom: 4,
+    textAlign: 'center',
   },
   subtitle: {
-    color: '#9CA3AF',
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  input: {
-    width: '100%',
-    backgroundColor: '#2A2A3E',
-    color: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    letterSpacing: 2,
-    textAlign: 'center',
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: '#6B7280',
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#4B5563',
+    textAlign: 'center',
+    maxWidth: 240,
   },
-  btnRow: {
+  pinWrapper: {
+    width: '100%',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 26,
+  },
+  pinRow: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 12,
     width: '100%',
   },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    backgroundColor: '#374151',
-    borderRadius: 8,
+  pinBox: {
+    width: 50,
+    height: 54,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  pinBoxCurrent: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+  },
+  pinDigit: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  cursorUnderline: {
+    position: 'absolute',
+    bottom: 12,
+    width: 18,
+    height: 2.5,
+    borderRadius: 1,
+    backgroundColor: '#9CA3AF',
+  },
+  realInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.015,
+    color: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+  actionBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   cancelText: {
-    color: '#E5E7EB',
+    fontSize: 15.5,
     fontWeight: '600',
+    color: '#374151',
   },
-  submitBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    backgroundColor: '#F59E0B',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  submitBtnText: {
-    color: '#000000',
+  okayText: {
+    fontSize: 15.5,
     fontWeight: '700',
+    color: '#00D293',
+  },
+  okayTextDisabled: {
+    color: '#A7F3D0',
   },
 });

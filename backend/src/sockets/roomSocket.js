@@ -249,6 +249,32 @@ function initRoomSockets(io) {
       }
     });
 
+    // Toggle Room Lock & 4-Digit Password
+    socket.on('toggle_room_lock', async ({ roomId, isLocked, password }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return;
+        if (isLocked) {
+          if (password && String(password).trim().length === 4) {
+            const salt = await bcrypt.genSalt(10);
+            room.passwordHash = await bcrypt.hash(String(password).trim(), salt);
+            room.isLocked = true;
+          }
+        } else {
+          room.isLocked = false;
+          room.passwordHash = null;
+        }
+        await room.save();
+        io.to(roomId).emit('room_lock_updated', { isLocked: room.isLocked });
+        io.to(roomId).emit('new_chat_message', {
+          system: true,
+          text: room.isLocked ? '🔒 Room is now password protected' : '🔓 Room is now unlocked',
+        });
+      } catch (err) {
+        console.error('Socket toggle_room_lock error:', err);
+      }
+    });
+
     // Apply for Seat (when Free Mode is OFF)
     socket.on('apply_for_seat', async ({ roomId, userId, seatIndex }) => {
       try {

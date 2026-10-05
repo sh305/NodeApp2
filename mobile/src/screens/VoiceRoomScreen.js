@@ -288,6 +288,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setRoom((prev) => (prev ? { ...prev, seatApplicants } : prev));
     });
 
+    socket.on('room_lock_updated', ({ isLocked }) => {
+      setRoom((prev) => (prev ? { ...prev, isLocked } : prev));
+    });
+
     socket.on('new_chat_message', (msg) => {
       setMessages((prev) => [...prev, msg]);
     });
@@ -577,6 +581,25 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         : t('Free Mode Disabled (Application required)'),
       'info'
     );
+  };
+
+  const handleToggleRoomLock = async (isLocked, password) => {
+    try {
+      if (isLocked) {
+        setRoom((prev) => (prev ? { ...prev, isLocked: true } : prev));
+        await api.post(`/rooms/${roomId}/lock`, { isLocked: true, password });
+        socketRef.current?.emit('toggle_room_lock', { roomId, isLocked: true, password });
+        showToast(t('Room password set and locked successfully'), 'success');
+      } else {
+        setRoom((prev) => (prev ? { ...prev, isLocked: false } : prev));
+        await api.post(`/rooms/${roomId}/lock`, { isLocked: false });
+        socketRef.current?.emit('toggle_room_lock', { roomId, isLocked: false });
+        showToast(t('Room unlocked successfully'), 'info');
+      }
+    } catch (err) {
+      setRoom((prev) => (prev ? { ...prev, isLocked: !isLocked } : prev));
+      showToast(t(err.response?.data?.message || 'Failed to update room lock'), 'error');
+    }
   };
 
   const handleLeaveSeat = () => {
@@ -1957,6 +1980,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         onClose={() => setRoomSettingsModalVisible(false)}
         room={room}
         onToggleFreeMode={handleToggleFreeMode}
+        onToggleRoomLock={handleToggleRoomLock}
         onOpenPeople={(tab) => {
           setRoomSettingsModalVisible(false);
           setMyPeopleInitialTab(tab || 'Host');

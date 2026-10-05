@@ -38,6 +38,7 @@ router.post('/:id/add-host', protect, addHost);
 router.post('/:id/add-admin', protect, addAdmin);
 router.post('/:id/verify-password', protect, verifyRoomPassword);
 router.put('/:id/lock-status', protect, toggleLockRoom);
+router.post('/:id/lock', protect, toggleLockRoom);
 router.post('/:id/kick', protect, kickUser);
 router.post('/:id/unkick', protect, unkickUser);
 router.get('/:id/kicked-users', protect, getKickedUsers);

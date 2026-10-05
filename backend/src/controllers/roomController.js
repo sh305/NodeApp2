@@ -865,3 +865,80 @@ exports.rejectSeatApplicant = async (req, res) => {
   }
 };
 
+// @desc    Toggle Room Lock and Set 4-Digit Password
+// @route   PUT /api/rooms/:id/lock-status OR POST /api/rooms/:id/lock
+exports.toggleLockRoom = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isLocked, password } = req.body;
+    const userId = req.user._id.toString();
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const isOwner = room.owner.toString() === userId;
+    const isAdmin = room.admins && room.admins.some((a) => (a._id ? a._id.toString() : a.toString()) === userId);
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Room Owner or Admin can lock the room' });
+    }
+
+    if (isLocked) {
+      if (!password || String(password).trim().length !== 4) {
+        return res.status(400).json({ success: false, message: 'Please enter a 4-digit password' });
+      }
+      const salt = await bcrypt.genSalt(10);
+      room.passwordHash = await bcrypt.hash(String(password).trim(), salt);
+      room.isLocked = true;
+    } else {
+      room.isLocked = false;
+      room.passwordHash = null;
+    }
+
+    await room.save();
+
+    return res.status(200).json({
+      success: true,
+      message: room.isLocked ? 'Room locked with password successfully' : 'Room unlocked successfully',
+      isLocked: room.isLocked,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify Room Password
+// @route   POST /api/rooms/:id/verify-password
+exports.verifyRoomPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    if (!room.isLocked) {
+      return res.status(200).json({ success: true, message: 'Room is not locked' });
+    }
+
+    if (!password || !room.passwordHash) {
+      return res.status(400).json({ success: false, message: 'You have entered wrong password' });
+    }
+
+    const isMatch = await bcrypt.compare(String(password).trim(), room.passwordHash);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'You have entered wrong password' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password verified successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+

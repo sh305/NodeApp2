@@ -16,6 +16,8 @@ import api from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
+import RoomLockModal from '../components/RoomLockModal';
+import Svg, { Path } from 'react-native-svg';
 
 export default function SearchScreen({ route, navigation, currentUser }) {
   const insets = useSafeAreaInsets();
@@ -26,6 +28,7 @@ export default function SearchScreen({ route, navigation, currentUser }) {
   const [query, setQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState('All'); // 'All' | 'User' | 'Room' | 'Family'
   const [loading, setLoading] = useState(false);
+  const [lockedRoomTarget, setLockedRoomTarget] = useState(null);
 
   // Search Results
   const [users, setUsers] = useState([]);
@@ -140,10 +143,28 @@ export default function SearchScreen({ route, navigation, currentUser }) {
   // Navigate to Voice Room
   const handleOpenRoom = (room) => {
     Keyboard.dismiss();
-    navigation.navigate('VoiceRoom', {
-      roomId: room._id,
-      roomTitle: room.title,
-    });
+    const rOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
+    const cUserId = currentUser?._id ? currentUser._id.toString() : '';
+    const isOwner = Boolean(rOwnerId && cUserId && rOwnerId === cUserId);
+
+    if (room.isLocked && !isOwner) {
+      setLockedRoomTarget(room);
+    } else {
+      navigation.navigate('VoiceRoom', {
+        roomId: room._id,
+        roomTitle: room.title,
+      });
+    }
+  };
+
+  const handleVerifyLockedRoom = async (password) => {
+    if (!lockedRoomTarget) return;
+    const res = await api.post(`/rooms/${lockedRoomTarget._id}/verify-password`, { password });
+    if (res.data.success) {
+      const target = lockedRoomTarget;
+      setLockedRoomTarget(null);
+      navigation.navigate('VoiceRoom', { roomId: target._id, roomTitle: target.title });
+    }
   };
 
   // Handle Family Join Click
@@ -226,15 +247,33 @@ export default function SearchScreen({ route, navigation, currentUser }) {
         activeOpacity={0.82}
         onPress={() => handleOpenRoom(item)}
       >
-        {/* Cover Image */}
-        <Image
-          source={{
-            uri:
-              item.coverImage ||
-              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
-          }}
-          style={styles.roomCover}
-        />
+        {/* Cover Image with Lock Overlay if locked */}
+        <View style={styles.roomCoverWrap}>
+          <Image
+            source={{
+              uri:
+                item.coverImage ||
+                'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
+            }}
+            style={styles.roomCover}
+          />
+          {item.isLocked && (
+            <View style={styles.roomCoverLockBadge}>
+              <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z"
+                  fill="#FFFFFF"
+                />
+                <Path
+                  d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11"
+                  stroke="#FFFFFF"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              </Svg>
+            </View>
+          )}
+        </View>
 
         {/* Info Col */}
         <View style={styles.roomInfoCol}>
@@ -494,6 +533,16 @@ export default function SearchScreen({ route, navigation, currentUser }) {
           )}
         </ScrollView>
       )}
+
+      {/* Room Lock Password Modal */}
+      {lockedRoomTarget && (
+        <RoomLockModal
+          visible={!!lockedRoomTarget}
+          onClose={() => setLockedRoomTarget(null)}
+          onVerifyPassword={handleVerifyLockedRoom}
+          roomTitle={lockedRoomTarget.title}
+        />
+      )}
     </View>
   );
 }
@@ -703,12 +752,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
   },
+  roomCoverWrap: {
+    position: 'relative',
+    marginRight: 12,
+  },
   roomCover: {
     width: 60,
     height: 60,
     borderRadius: 14,
     backgroundColor: '#E2E8F0',
-    marginRight: 12,
+  },
+  roomCoverLockBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
+    elevation: 4,
   },
   roomInfoCol: {
     flex: 1,
