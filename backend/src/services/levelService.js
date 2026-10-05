@@ -129,7 +129,7 @@ const USER_LEVEL_PROGRESSION_TABLE = [
 ];
 
 /**
- * Calculates user's level based on cumulative EXP.
+ * Calculates user's level based on cumulative EXPs.
  */
 function getUserLevelFromExp(rawExp) {
   const exp = Math.max(0, Number(rawExp) || 0);
