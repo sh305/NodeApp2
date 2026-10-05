@@ -39,6 +39,13 @@ import MyPeopleModal from '../components/MyPeopleModal';
 import KickedUsersModal from '../components/KickedUsersModal';
 import BossSeatModal from '../components/BossSeatModal';
 import SeatSettingsModal from '../components/SeatSettingsModal';
+import BroadcastModal from '../components/BroadcastModal';
+import FlyingBroadcastBanner from '../components/FlyingBroadcastBanner';
+import ChoosePkModeModal from '../components/ChoosePkModeModal';
+import InviteRoomPkModal from '../components/InviteRoomPkModal';
+import PkBattleFloatingWidget from '../components/PkBattleFloatingWidget';
+import PkInviteReceivedModal from '../components/PkInviteReceivedModal';
+import PkBattleResultModal from '../components/PkBattleResultModal';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
@@ -111,6 +118,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [kickedUsersModalVisible, setKickedUsersModalVisible] = useState(false);
   const [bossSeatModalVisible, setBossSeatModalVisible] = useState(false);
   const [seatSettingsModalVisible, setSeatSettingsModalVisible] = useState(false);
+  const [broadcastModalVisible, setBroadcastModalVisible] = useState(false);
+  const [globalBroadcasts, setGlobalBroadcasts] = useState([]);
   const [myPeopleInitialTab, setMyPeopleInitialTab] = useState('Host');
   const [activeHostEmoji, setActiveHostEmoji] = useState(null);
   const [activeSeatEmojis, setActiveSeatEmojis] = useState({});
@@ -119,6 +128,28 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [roomMembersInitialTab, setRoomMembersInitialTab] = useState('applicants');
   const [targetSeatIndex, setTargetSeatIndex] = useState(null);
   const [seatPopoverCoords, setSeatPopoverCoords] = useState(null);
+
+  // PK Battle State
+  const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
+  const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
+  const [pkInviteReceived, setPkInviteReceived] = useState(null);
+  const [pkBattle, setPkBattle] = useState(null);
+  const [pkRemainingSeconds, setPkRemainingSeconds] = useState(300);
+  const [pkResult, setPkResult] = useState(null);
+  const [isMatchingPk, setIsMatchingPk] = useState(false);
+
+  // PK Reverse Countdown Timer
+  useEffect(() => {
+    let timer = null;
+    if (pkBattle && pkRemainingSeconds > 0) {
+      timer = setInterval(() => {
+        setPkRemainingSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [pkBattle, pkRemainingSeconds]);
 
   const roomOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
   const currentUserIdStr = currentUser?._id ? currentUser._id.toString() : '';
@@ -354,6 +385,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       fetchRoomDetails();
     });
 
+    // Real-time Global Room Broadcast across all rooms in app
+    socket.on('global_room_broadcast', (broadcastData) => {
+      if (broadcastData) {
+        setGlobalBroadcasts((prev) => [...prev, broadcastData]);
+      }
+    });
+
     socket.on('room_emoji_received', (data) => {
       if (!data) return;
       const dataUserId = data.userId ? String(data.userId) : '';
@@ -414,6 +452,73 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           'error'
         );
         navigation.goBack();
+      }
+    });
+
+    // ══ PK BATTLE REAL-TIME LISTENERS ══
+    socket.emit('get_room_pk_status', { roomId });
+
+    socket.on('pk_matching_waiting', ({ message }) => {
+      setIsMatchingPk(true);
+      showToast(t(message || 'Searching for rival room...'), 'info');
+    });
+
+    socket.on('pk_matching_cancelled', () => {
+      setIsMatchingPk(false);
+      showToast(t('Matchmaking cancelled'), 'info');
+    });
+
+    socket.on('pk_invite_received', (data) => {
+      setPkInviteReceived(data);
+    });
+
+    socket.on('pk_invite_sent', ({ message }) => {
+      showToast(t(message || 'PK Battle invitation sent!'), 'success');
+    });
+
+    socket.on('pk_invite_failed', ({ message }) => {
+      showToast(t(message || 'Target room is already in a PK battle'), 'error');
+    });
+
+    socket.on('pk_invite_rejected', ({ message, targetRoomName }) => {
+      showToast(`${t('PK battle rejected')}: ${targetRoomName || ''}`, 'error');
+    });
+
+    socket.on('pk_battle_started', (battle) => {
+      setPkBattle(battle);
+      setPkRemainingSeconds(battle.remainingSeconds || 300);
+      setIsMatchingPk(false);
+      setChoosePkModalVisible(false);
+      setInviteRoomPkModalVisible(false);
+      showToast(t('PK Battle Started!'), 'success');
+    });
+
+    socket.on('pk_score_updated', ({ room1Score, room2Score }) => {
+      setPkBattle((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          room1: { ...prev.room1, score: room1Score },
+          room2: { ...prev.room2, score: room2Score },
+        };
+      });
+    });
+
+    socket.on('pk_timer_sync', ({ remainingSeconds }) => {
+      if (remainingSeconds !== undefined) {
+        setPkRemainingSeconds(remainingSeconds);
+      }
+    });
+
+    socket.on('pk_battle_ended', (result) => {
+      setPkBattle(null);
+      setIsMatchingPk(false);
+      setPkResult(result);
+    });
+
+    socket.on('pk_error', ({ message }) => {
+      if (message) {
+        showToast(t(message), 'error');
       }
     });
 
@@ -1006,6 +1111,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
       if (res.data.success) {
         setRoomGoldContributed((prev) => prev + gift.coinPrice * quantity);
+        const giftCost = (gift.coinPrice || 10) * (quantity || 1);
         socketRef.current.emit('broadcast_gift', {
           roomId,
           giftData: {
@@ -1014,13 +1120,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             giftName: gift.name,
             giftIcon: gift.iconUrl,
             quantity,
+            coins: giftCost,
           },
         });
         setGiftModalVisible(false);
-        Alert.alert('Gift Sent', `${gift.name} x${quantity} sent successfully!`);
+        showToast(t(`${gift.name} x${quantity} sent successfully!`), 'success');
       }
     } catch (e) {
-      Alert.alert('Gift Failed', e.response?.data?.message || 'Coin balance low');
+      showToast(t(e.response?.data?.message || 'Coin balance low'), 'error');
     }
   };
 
@@ -1966,6 +2073,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       <VoiceRoomToolsModal
         visible={roomToolsModalVisible}
         onClose={() => setRoomToolsModalVisible(false)}
+        roomPkActive={Boolean(pkBattle || isMatchingPk)}
         onSelectTool={(tool, toggledState) => {
           if (tool?.id === 'members') {
             setRoomToolsModalVisible(false);
@@ -1976,6 +2084,24 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           } else if (tool?.id === 'seat_settings' || tool?.id === 'seat_setting') {
             setRoomToolsModalVisible(false);
             setSeatSettingsModalVisible(true);
+          } else if (tool?.id === 'broadcast') {
+            setRoomToolsModalVisible(false);
+            setBroadcastModalVisible(true);
+          } else if (tool?.id === 'room_pk') {
+            if (toggledState) {
+              setRoomToolsModalVisible(false);
+              setChoosePkModalVisible(true);
+            } else {
+              // Toggled OFF -> Instant Forfeit as requested by user
+              if (pkBattle) {
+                socketRef.current?.emit('forfeit_pk_battle', { roomId });
+                showToast(t('You forfeited the battle by turning off Room PK.'), 'error');
+              } else if (isMatchingPk) {
+                socketRef.current?.emit('cancel_pk_match', { roomId });
+                setIsMatchingPk(false);
+                showToast(t('Matchmaking cancelled'), 'info');
+              }
+            }
           } else {
             console.log('Room tool selected:', tool.name, toggledState);
           }
@@ -2150,6 +2276,142 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         room={room}
         currentUser={currentUser}
         onApplyLayout={handleApplySeatLayout}
+      />
+
+      {/* ══ GLOBAL ROOM BROADCAST MODAL (Matching Screenshot) ══ */}
+      <BroadcastModal
+        visible={broadcastModalVisible}
+        onClose={() => setBroadcastModalVisible(false)}
+        roomId={roomId}
+        roomTitle={room?.title || roomTitle}
+        currentUser={currentUser}
+        onBroadcastSent={(remainingCoins) => {
+          if (currentUser && remainingCoins !== undefined) {
+            currentUser.coins = remainingCoins;
+          }
+        }}
+      />
+
+      {/* ══ GLOBAL FLYING BROADCAST MESSAGES ACROSS ALL ROOMS (Top-most Touch Layer) ══ */}
+      {globalBroadcasts.map((broadcastItem, bIdx) => (
+        <View
+          key={broadcastItem.id || `b_${bIdx}`}
+          style={{
+            position: 'absolute',
+            top: Math.max(16, insets.top) + 60 + (bIdx * 56),
+            left: 0,
+            right: 0,
+            height: 60,
+            zIndex: 99999,
+            elevation: 99999,
+          }}
+          pointerEvents="box-none"
+        >
+          <FlyingBroadcastBanner
+            broadcast={broadcastItem}
+            currentRoomId={roomId}
+            onPressRoom={(targetRoomId, targetRoomTitle) => {
+              showToast(t('Leaving current room & entering broadcast room...'), 'info');
+              // Cleanly leave current room on socket
+              socketRef.current?.emit('leave_room', { roomId, userId: currentUser?._id });
+              // Instantly replace screen to target room
+              navigation.replace('VoiceRoom', {
+                roomId: targetRoomId,
+                roomTitle: targetRoomTitle || 'Voice Room',
+              });
+            }}
+            onFinished={(finishedId) => {
+              setGlobalBroadcasts((prev) => prev.filter((item) => item.id !== finishedId));
+            }}
+          />
+        </View>
+      ))}
+      {/* ══ REAL-TIME MOVABLE PK BATTLE FLOATING WIDGET (Matching Screenshot 2) ══ */}
+      {Boolean(pkBattle) && (
+        <PkBattleFloatingWidget
+          battleData={pkBattle}
+          remainingSeconds={pkRemainingSeconds}
+          currentRoomId={roomId}
+          isOwnerOrAdmin={isOwner || isAdmin}
+          onClose={() => {
+            socketRef.current?.emit('forfeit_pk_battle', { roomId });
+            showToast(t('You forfeited the battle by turning off Room PK.'), 'error');
+          }}
+        />
+      )}
+
+      {/* ══ CHOOSE TO PK MODE MODAL (Matching Screenshot 1) ══ */}
+      <ChoosePkModeModal
+        visible={choosePkModalVisible}
+        onClose={() => setChoosePkModalVisible(false)}
+        onSelectMatch={() => {
+          if (!socketRef.current) return;
+          setIsMatchingPk(true);
+          socketRef.current.emit('request_pk_match', {
+            roomId,
+            roomName: room?.title || roomTitle,
+            roomAvatar: room?.coverImage || '',
+          });
+        }}
+        onSelectInvite={() => {
+          setInviteRoomPkModalVisible(true);
+        }}
+      />
+
+      {/* ══ INVITE A ROOM MODAL (Matching Screenshot 3) ══ */}
+      <InviteRoomPkModal
+        visible={inviteRoomPkModalVisible}
+        onClose={() => setInviteRoomPkModalVisible(false)}
+        currentRoomId={roomId}
+        onInviteRoom={(targetRoom) => {
+          if (!socketRef.current) return;
+          socketRef.current.emit('send_pk_invite', {
+            fromRoomId: roomId,
+            fromRoomName: room?.title || roomTitle,
+            fromRoomAvatar: room?.coverImage || '',
+            targetRoomId: targetRoom._id,
+          });
+        }}
+      />
+
+      {/* ══ INCOMING PK CHALLENGE MODAL ══ */}
+      <PkInviteReceivedModal
+        visible={Boolean(pkInviteReceived)}
+        invitation={pkInviteReceived}
+        onAccept={() => {
+          if (!socketRef.current || !pkInviteReceived) return;
+          socketRef.current.emit('respond_pk_invite', {
+            fromRoomId: pkInviteReceived.fromRoomId,
+            fromRoomName: pkInviteReceived.fromRoomName,
+            fromRoomAvatar: pkInviteReceived.fromRoomAvatar,
+            targetRoomId: roomId,
+            targetRoomName: room?.title || roomTitle,
+            targetRoomAvatar: room?.coverImage || '',
+            accepted: true,
+          });
+          setPkInviteReceived(null);
+        }}
+        onReject={() => {
+          if (!socketRef.current || !pkInviteReceived) return;
+          socketRef.current.emit('respond_pk_invite', {
+            fromRoomId: pkInviteReceived.fromRoomId,
+            fromRoomName: pkInviteReceived.fromRoomName,
+            fromRoomAvatar: pkInviteReceived.fromRoomAvatar,
+            targetRoomId: roomId,
+            targetRoomName: room?.title || roomTitle,
+            targetRoomAvatar: room?.coverImage || '',
+            accepted: false,
+          });
+          setPkInviteReceived(null);
+        }}
+      />
+
+      {/* ══ PK BATTLE END RESULT MODAL (Win / Defeat / Draw) ══ */}
+      <PkBattleResultModal
+        visible={Boolean(pkResult)}
+        resultData={pkResult}
+        currentRoomId={roomId}
+        onClose={() => setPkResult(null)}
       />
     </View>
   );

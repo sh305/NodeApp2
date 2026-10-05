@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -49,15 +49,15 @@ const SECTIONS = [
       { id: 'room_settings', name: 'Room Settings', icon: ICONS.room_settings },
       { id: 'seat_settings', name: 'Seat Settings', icon: ICONS.seat_settings },
       { id: 'broadcast', name: 'Broadcast', icon: ICONS.broadcast },
-      { id: 'gather_members', name: 'Gather Members', icon: ICONS.gather_members },
+      // { id: 'gather_members', name: 'Gather Members', icon: ICONS.gather_members },
     ],
   },
   {
     key: 'entertainment_tools',
     title: 'Entertainment tools',
     items: [
-      { id: 'star_calculator', name: 'Star Calculator', icon: ICONS.star_calculator, hasToggle: true },
-      { id: 'combat', name: 'Combat', icon: ICONS.combat, hasToggle: true },
+      //{ id: 'star_calculator', name: 'Star Calculator', icon: ICONS.star_calculator, hasToggle: true },
+      //{ id: 'combat', name: 'Combat', icon: ICONS.combat, hasToggle: true },
       { id: 'room_pk', name: 'Room PK', icon: ICONS.room_pk, hasToggle: true },
       { id: 'game_pk', name: 'Game PK', icon: ICONS.game_pk, hasToggle: true },
       { id: 'games', name: 'Games', icon: ICONS.games },
@@ -85,6 +85,7 @@ export default function VoiceRoomToolsModal({
   visible,
   onClose,
   onSelectTool,
+  roomPkActive = false,
 }) {
   const insets = useSafeAreaInsets();
 
@@ -92,7 +93,7 @@ export default function VoiceRoomToolsModal({
   const [toggleStates, setToggleStates] = useState({
     star_calculator: false,
     combat: false,
-    room_pk: false,
+    room_pk: Boolean(roomPkActive),
     game_pk: false,
     soccer_rival: false,
     no_gift_effects: false,
@@ -100,8 +101,22 @@ export default function VoiceRoomToolsModal({
     mute: false,
   });
 
+  useEffect(() => {
+    setToggleStates((prev) => ({
+      ...prev,
+      room_pk: Boolean(roomPkActive),
+    }));
+  }, [roomPkActive]);
+
   const handleItemPress = (item) => {
     if (item.hasToggle) {
+      if (item.id === 'room_pk') {
+        const nextVal = !roomPkActive;
+        if (onSelectTool) {
+          onSelectTool(item, nextVal);
+        }
+        return;
+      }
       const nextVal = !toggleStates[item.id];
       setToggleStates((prev) => ({
         ...prev,
@@ -149,7 +164,7 @@ export default function VoiceRoomToolsModal({
                 {/* 4-Column Grid */}
                 <View style={styles.gridRow}>
                   {section.items.map((item) => {
-                    const isToggledOn = Boolean(toggleStates[item.id]);
+                    const isToggledOn = item.id === 'room_pk' ? Boolean(roomPkActive) : Boolean(toggleStates[item.id]);
 
                     return (
                       <TouchableOpacity

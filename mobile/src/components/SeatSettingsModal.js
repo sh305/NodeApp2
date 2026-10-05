@@ -9,6 +9,7 @@ import {
   Image,
   Dimensions,
   Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { T } from './TranslatedText';
@@ -268,12 +269,10 @@ export default function SeatSettingsModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        {/* Backdrop touchable */}
-        <TouchableOpacity
-          style={StyleSheet.absoluteFillObject}
-          activeOpacity={1}
-          onPress={onClose}
-        />
+        {/* Dismiss backdrop on tap outside */}
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={styles.backdrop} />
+        </TouchableWithoutFeedback>
 
         <View style={styles.sheetContainer}>
           {/* Header Title */}
@@ -523,6 +522,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    flex: 1,
+    width: '100%',
   },
   sheetContainer: {
     backgroundColor: '#FFFFFF',

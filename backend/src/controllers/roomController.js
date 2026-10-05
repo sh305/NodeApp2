@@ -1072,4 +1072,92 @@ exports.updateSeatLayout = async (req, res) => {
   }
 };
 
+// @desc    Send global broadcast message across all active rooms
+// @route   POST /api/rooms/:id/broadcast
+// @access  Private
+exports.sendRoomBroadcast = async (req, res) => {
+  try {
+    const { message } = req.body;
+    const roomId = req.params.id;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Broadcast message cannot be empty',
+      });
+    }
+
+    const room = await Room.findById(roomId).populate('owner', 'name avatar');
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: 'Room not found',
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Determine VIP status & coin cost
+    const isVip = Boolean(user.isVip || (user.vipLevel && user.vipLevel > 0));
+    const cost = isVip ? 750 : 1500;
+
+    if ((user.coins || 0) < cost) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient coins. You need ${cost} coins to send a broadcast.`,
+        requiredCoins: cost,
+        userCoins: user.coins || 0,
+      });
+    }
+
+    // Deduct coins atomically
+    user.coins = Math.max(0, (user.coins || 0) - cost);
+    await user.save();
+
+    const broadcastPayload = {
+      id: `${Date.now()}_${user._id}`,
+      sender: {
+        _id: user._id,
+        name: user.name,
+        avatar: user.avatar,
+        isVip,
+        vipLevel: user.vipLevel || 0,
+      },
+      roomId: room._id,
+      roomTitle: room.title,
+      roomTopic: room.topic || '',
+      roomCover: room.coverImage || '',
+      message: message.trim(),
+      cost,
+      timestamp: new Date(),
+    };
+
+    // Emit globally across ALL connected socket clients in every room
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('global_room_broadcast', broadcastPayload);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Broadcast sent successfully to all rooms!',
+      broadcast: broadcastPayload,
+      remainingCoins: user.coins,
+    });
+  } catch (error) {
+    console.error('sendRoomBroadcast error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Server error sending broadcast',
+    });
+  }
+};
+
+
 

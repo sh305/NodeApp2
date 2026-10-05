@@ -21,6 +21,167 @@ function getActiveLobbiesList() {
   return list;
 }
 
+// Active Voice Room PK Battles in RAM
+const activePkBattles = new Map(); // battleId -> { id, room1, room2, duration, remainingSeconds, timerInterval, status }
+const roomToPkBattle = new Map(); // roomId -> battleId
+const pkMatchmakingQueue = []; // [ { roomId, roomName, roomAvatar, socketId } ]
+
+function startPkBattle(io, roomA, roomB, directSocket = null) {
+  const battleId = `pk_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const cleanId1 = String(roomA.roomId);
+  const cleanId2 = String(roomB.roomId);
+
+  // Clear any existing battle for room 1
+  const existingBattle1 = roomToPkBattle.get(cleanId1);
+  if (existingBattle1) {
+    const ob1 = activePkBattles.get(existingBattle1);
+    if (ob1?.timerInterval) clearInterval(ob1.timerInterval);
+    activePkBattles.delete(existingBattle1);
+  }
+  // Clear any existing battle for room 2
+  const existingBattle2 = roomToPkBattle.get(cleanId2);
+  if (existingBattle2) {
+    const ob2 = activePkBattles.get(existingBattle2);
+    if (ob2?.timerInterval) clearInterval(ob2.timerInterval);
+    activePkBattles.delete(existingBattle2);
+  }
+
+  const battle = {
+    id: battleId,
+    room1: {
+      roomId: cleanId1,
+      name: roomA.roomName || 'Room 1',
+      avatar: roomA.roomAvatar || '',
+      score: 0,
+    },
+    room2: {
+      roomId: cleanId2,
+      name: roomB.roomName || 'Room 2',
+      avatar: roomB.roomAvatar || '',
+      score: 0,
+    },
+    duration: 300, // 5 minutes in seconds
+    remainingSeconds: 300,
+    status: 'active',
+    timerInterval: null,
+  };
+
+  activePkBattles.set(battleId, battle);
+  roomToPkBattle.set(cleanId1, battleId);
+  roomToPkBattle.set(cleanId2, battleId);
+
+  // Remove from matchmaking queue if present
+  const r1Idx = pkMatchmakingQueue.findIndex((q) => q.roomId === cleanId1);
+  if (r1Idx !== -1) pkMatchmakingQueue.splice(r1Idx, 1);
+  const r2Idx = pkMatchmakingQueue.findIndex((q) => q.roomId === cleanId2);
+  if (r2Idx !== -1) pkMatchmakingQueue.splice(r2Idx, 1);
+
+  // Broadcast battle start to both rooms
+  const startPayload = {
+    battleId,
+    room1: battle.room1,
+    room2: battle.room2,
+    duration: battle.duration,
+    remainingSeconds: battle.remainingSeconds,
+  };
+  io.to(cleanId1).emit('pk_battle_started', startPayload);
+  io.to(cleanId2).emit('pk_battle_started', startPayload);
+  if (directSocket) {
+    directSocket.emit('pk_battle_started', startPayload);
+  }
+
+  // 1-second countdown tick
+  battle.timerInterval = setInterval(() => {
+    battle.remainingSeconds -= 1;
+
+    // Periodic sync
+    if (battle.remainingSeconds % 5 === 0 && battle.remainingSeconds > 0) {
+      io.to(cleanId1).emit('pk_timer_sync', { remainingSeconds: battle.remainingSeconds });
+      io.to(cleanId2).emit('pk_timer_sync', { remainingSeconds: battle.remainingSeconds });
+    }
+
+    if (battle.remainingSeconds <= 0) {
+      clearInterval(battle.timerInterval);
+      battle.timerInterval = null;
+      battle.status = 'ended';
+
+      let winnerRoomId = null;
+      let loserRoomId = null;
+      let isDraw = false;
+
+      if (battle.room1.score > battle.room2.score) {
+        winnerRoomId = battle.room1.roomId;
+        loserRoomId = battle.room2.roomId;
+      } else if (battle.room2.score > battle.room1.score) {
+        winnerRoomId = battle.room2.roomId;
+        loserRoomId = battle.room1.roomId;
+      } else {
+        isDraw = true;
+      }
+
+      const endPayload = {
+        battleId,
+        winnerRoomId,
+        loserRoomId,
+        isDraw,
+        forfeited: false,
+        room1: battle.room1,
+        room2: battle.room2,
+      };
+
+      io.to(cleanId1).emit('pk_battle_ended', endPayload);
+      io.to(cleanId2).emit('pk_battle_ended', endPayload);
+
+      setTimeout(() => {
+        roomToPkBattle.delete(cleanId1);
+        roomToPkBattle.delete(cleanId2);
+        activePkBattles.delete(battleId);
+      }, 10000);
+    }
+  }, 1000);
+
+  return battle;
+}
+
+function forfeitPkBattle(io, forfeitingRoomId) {
+  const cleanForfeitingId = String(forfeitingRoomId);
+  const battleId = roomToPkBattle.get(cleanForfeitingId);
+  if (!battleId) return null;
+  const battle = activePkBattles.get(battleId);
+  if (!battle || battle.status !== 'active') return null;
+
+  if (battle.timerInterval) {
+    clearInterval(battle.timerInterval);
+    battle.timerInterval = null;
+  }
+  battle.status = 'ended';
+
+  const loserRoomId = cleanForfeitingId;
+  const winnerRoomId = battle.room1.roomId === loserRoomId ? battle.room2.roomId : battle.room1.roomId;
+
+  const endPayload = {
+    battleId,
+    winnerRoomId,
+    loserRoomId,
+    isDraw: false,
+    forfeited: true,
+    forfeitedByRoomId: loserRoomId,
+    room1: battle.room1,
+    room2: battle.room2,
+  };
+
+  io.to(battle.room1.roomId).emit('pk_battle_ended', endPayload);
+  io.to(battle.room2.roomId).emit('pk_battle_ended', endPayload);
+
+  setTimeout(() => {
+    roomToPkBattle.delete(battle.room1.roomId);
+    roomToPkBattle.delete(battle.room2.roomId);
+    activePkBattles.delete(battleId);
+  }, 10000);
+
+  return endPayload;
+}
+
 function initRoomSockets(io) {
   io.on('connection', (socket) => {
     console.log(`⚡ Socket connected: ${socket.id}`);
@@ -608,9 +769,32 @@ function initRoomSockets(io) {
       });
     });
 
-    // Broadcast Gift Animation to Room
+    // Broadcast Gift Animation to Room & Sync PK Battle Score
     socket.on('broadcast_gift', ({ roomId, giftData }) => {
       io.to(roomId).emit('gift_received_animation', giftData);
+
+      // Check if room is in active PK battle
+      const cleanRoomId = String(roomId);
+      const battleId = roomToPkBattle.get(cleanRoomId);
+      if (battleId) {
+        const battle = activePkBattles.get(battleId);
+        if (battle && battle.status === 'active') {
+          const giftCoins = Number(giftData?.coins || (giftData?.giftPrice ? giftData.giftPrice * (giftData.quantity || 1) : 10)) || 10;
+          if (battle.room1.roomId === cleanRoomId) {
+            battle.room1.score += giftCoins;
+          } else if (battle.room2.roomId === cleanRoomId) {
+            battle.room2.score += giftCoins;
+          }
+
+          const scorePayload = {
+            battleId,
+            room1Score: battle.room1.score,
+            room2Score: battle.room2.score,
+          };
+          io.to(battle.room1.roomId).emit('pk_score_updated', scorePayload);
+          io.to(battle.room2.roomId).emit('pk_score_updated', scorePayload);
+        }
+      }
     });
 
     // Real-time Voice Room Animated Emoji Reaction
@@ -627,6 +811,13 @@ function initRoomSockets(io) {
       });
     });
 
+    // Global Room Broadcast across ALL rooms in the app
+    socket.on('send_global_broadcast', (broadcastData) => {
+      if (broadcastData) {
+        io.emit('global_room_broadcast', broadcastData);
+      }
+    });
+
     // Realtime Kick Notification (Forces target user out of room)
     socket.on('notify_user_kicked', ({ roomId, targetUserId, kickType, message }) => {
       io.to(roomId).emit('user_kicked_from_room', {
@@ -634,6 +825,164 @@ function initRoomSockets(io) {
         kickType,
         message,
       });
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // ⚔️ REAL-TIME VOICE ROOM PK BATTLE EVENTS
+    // ═══════════════════════════════════════════════════════════════
+
+    // 1. Request random PK Matchmaking (Picks random active rival room from app)
+    socket.on('request_pk_match', async ({ roomId, roomName, roomAvatar }) => {
+      try {
+        if (!roomId) return;
+        const cleanRoomId = String(roomId);
+
+        // Make sure socket is joined in this room channel
+        socket.join(cleanRoomId);
+
+        // If there is any existing battle, clear it so fresh match starts instantly
+        const existingBattleId = roomToPkBattle.get(cleanRoomId);
+        if (existingBattleId) {
+          const exBattle = activePkBattles.get(existingBattleId);
+          if (exBattle?.timerInterval) clearInterval(exBattle.timerInterval);
+          activePkBattles.delete(existingBattleId);
+          roomToPkBattle.delete(cleanRoomId);
+        }
+
+        // 1. Check if another room is actively queued in matchmaking
+        const queueRivalIndex = pkMatchmakingQueue.findIndex((q) => q.roomId !== cleanRoomId);
+        if (queueRivalIndex !== -1) {
+          const rival = pkMatchmakingQueue.splice(queueRivalIndex, 1)[0];
+          startPkBattle(io, { roomId: cleanRoomId, roomName, roomAvatar }, rival, socket);
+          return;
+        }
+
+        // 2. Query all other rooms currently in the app database
+        const otherRooms = await Room.find({
+          _id: { $ne: cleanRoomId },
+        })
+          .populate('owner', 'name avatar')
+          .select('title coverImage roomLevel activeMembers owner');
+
+        if (otherRooms.length > 0) {
+          // Pick a random room from available rooms
+          const randomRoom = otherRooms[Math.floor(Math.random() * otherRooms.length)];
+          const rivalData = {
+            roomId: String(randomRoom._id),
+            roomName: randomRoom.title || randomRoom.owner?.name || 'Rival Room',
+            roomAvatar:
+              randomRoom.coverImage ||
+              randomRoom.owner?.avatar ||
+              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
+          };
+
+          // Start PK battle immediately!
+          startPkBattle(io, { roomId: cleanRoomId, roomName, roomAvatar }, rivalData, socket);
+          return;
+        }
+
+        // 3. Fallback: If no other room exists, create a dynamic rival room so battle always starts
+        const fallbackRivals = [
+          { name: 'Royal Champions 👑', avatar: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400' },
+          { name: 'Star Beats Club 🌟', avatar: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400' },
+          { name: 'Night Chill & Chat 🎧', avatar: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400' },
+          { name: 'Bollywood Stars 🎬', avatar: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400' },
+        ];
+        const randomFallback = fallbackRivals[Math.floor(Math.random() * fallbackRivals.length)];
+        const simulatedRival = {
+          roomId: `sim_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+          roomName: randomFallback.name,
+          roomAvatar: randomFallback.avatar,
+        };
+
+        startPkBattle(io, { roomId: cleanRoomId, roomName, roomAvatar }, simulatedRival, socket);
+      } catch (err) {
+        console.error('request_pk_match error:', err);
+        socket.emit('pk_error', { message: 'Failed to start PK match' });
+      }
+    });
+
+    // 2. Cancel PK Matchmaking
+    socket.on('cancel_pk_match', ({ roomId }) => {
+      const cleanRoomId = String(roomId);
+      const idx = pkMatchmakingQueue.findIndex((q) => q.roomId === cleanRoomId);
+      if (idx !== -1) {
+        pkMatchmakingQueue.splice(idx, 1);
+      }
+      socket.emit('pk_matching_cancelled');
+    });
+
+    // 3. Direct PK Battle Invitation
+    socket.on('send_pk_invite', ({ fromRoomId, fromRoomName, fromRoomAvatar, targetRoomId }) => {
+      const cleanTargetId = String(targetRoomId);
+      const cleanFromId = String(fromRoomId);
+
+      if (roomToPkBattle.has(cleanTargetId)) {
+        socket.emit('pk_invite_failed', { message: 'Target room is already in a PK battle' });
+        return;
+      }
+      if (roomToPkBattle.has(cleanFromId)) {
+        socket.emit('pk_invite_failed', { message: 'Your room is already in a PK battle' });
+        return;
+      }
+
+      io.to(cleanTargetId).emit('pk_invite_received', {
+        fromRoomId: cleanFromId,
+        fromRoomName: fromRoomName || 'Challenger Room',
+        fromRoomAvatar: fromRoomAvatar || '',
+      });
+      socket.emit('pk_invite_sent', { message: 'PK Battle invitation sent!' });
+    });
+
+    // 4. Respond to PK Invite (Accept / Reject)
+    socket.on('respond_pk_invite', ({ fromRoomId, fromRoomName, fromRoomAvatar, targetRoomId, targetRoomName, targetRoomAvatar, accepted }) => {
+      const cleanTargetId = String(targetRoomId);
+      const cleanFromId = String(fromRoomId);
+
+      if (!accepted) {
+        io.to(cleanFromId).emit('pk_invite_rejected', {
+          message: 'PK battle rejected',
+          targetRoomName: targetRoomName || 'Rival Room',
+        });
+        return;
+      }
+
+      // If accepted, check active battle
+      if (roomToPkBattle.has(cleanTargetId) || roomToPkBattle.has(cleanFromId)) {
+        socket.emit('pk_error', { message: 'One of the rooms is already in a PK battle' });
+        return;
+      }
+
+      startPkBattle(
+        io,
+        { roomId: cleanFromId, roomName: fromRoomName, roomAvatar: fromRoomAvatar },
+        { roomId: cleanTargetId, roomName: targetRoomName, roomAvatar: targetRoomAvatar }
+      );
+    });
+
+    // 5. Forfeit PK Battle (when Room PK toggle is turned OFF)
+    socket.on('forfeit_pk_battle', ({ roomId }) => {
+      if (roomId) {
+        forfeitPkBattle(io, roomId);
+      }
+    });
+
+    // 6. Get Current PK Status for new joiners
+    socket.on('get_room_pk_status', ({ roomId }) => {
+      const cleanRoomId = String(roomId);
+      const battleId = roomToPkBattle.get(cleanRoomId);
+      if (battleId) {
+        const battle = activePkBattles.get(battleId);
+        if (battle && battle.status === 'active') {
+          socket.emit('pk_battle_started', {
+            battleId,
+            room1: battle.room1,
+            room2: battle.room2,
+            duration: battle.duration,
+            remainingSeconds: battle.remainingSeconds,
+          });
+        }
+      }
     });
 
     // Realtime Unkick Notification
@@ -1663,6 +2012,12 @@ function initRoomSockets(io) {
             });
           }
           io.emit('active_game_lobbies_changed', getActiveLobbiesList());
+        }
+
+        // Remove from PK matchmaking queue on disconnect
+        const qIdx = pkMatchmakingQueue.findIndex((q) => q.socketId === socket.id);
+        if (qIdx !== -1) {
+          pkMatchmakingQueue.splice(qIdx, 1);
         }
       }
     });

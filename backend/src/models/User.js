@@ -84,6 +84,15 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 1,
     },
+    // VIP Membership System
+    isVip: {
+      type: Boolean,
+      default: false,
+    },
+    vipLevel: {
+      type: Number,
+      default: 0,
+    },
     // Active Avatar Frame
     activeFrame: {
       id: { type: String, default: 'level_01' },

@@ -27,6 +27,9 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e7, // 10MB limit for image attachments
 });
 
+// Attach io instance to express app
+app.set('io', io);
+
 // Middleware
 app.use(cors());
 app.use(express.json());

@@ -11,14 +11,36 @@ const getAutoDetectedHost = () => {
     return window.location.hostname;
   }
 
-  // 2. Expo Constants hostUri (Expo Go / Development build - e.g. 192.168.1.4:8081)
+  // 2. Android Emulator (Only true emulators use 127.0.0.1 loopback via adb reverse)
+  const model = String(Platform.constants?.Model || '').toLowerCase();
+  const fingerprint = String(Platform.constants?.Fingerprint || '').toLowerCase();
+  const brand = String(Platform.constants?.Brand || '').toLowerCase();
+  const manufacturer = String(Platform.constants?.Manufacturer || '').toLowerCase();
+  const hardware = String(Platform.constants?.Hardware || '').toLowerCase();
+
+  const isAndroidEmulator =
+    Platform.OS === 'android' &&
+    (model.includes('sdk') ||
+      model.includes('emulator') ||
+      fingerprint.includes('generic') ||
+      fingerprint.includes('sdk') ||
+      brand.includes('generic') ||
+      hardware.includes('goldfish') ||
+      hardware.includes('ranchu') ||
+      manufacturer.includes('genymotion'));
+
+  if (isAndroidEmulator) {
+    return '127.0.0.1';
+  }
+
+  // 3. Expo Constants hostUri (Physical Phone / Development build - e.g. 192.168.1.4:8081)
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) {
     const ip = hostUri.split(':')[0];
     if (ip && ip !== 'localhost' && ip !== '127.0.0.1') return ip;
   }
 
-  // 3. Expo Constants linkingUri (e.g. exp://192.168.1.4:8081)
+  // 4. Expo Constants linkingUri (e.g. exp://192.168.1.4:8081)
   const linkingUri = Constants.linkingUri;
   if (linkingUri) {
     const match = linkingUri.match(/:\/\/(?:www\.)?([^/:]+)/);
@@ -27,7 +49,7 @@ const getAutoDetectedHost = () => {
     }
   }
 
-  // 4. React Native bundle scriptURL (Metro bundler URL)
+  // 5. React Native bundle scriptURL (Metro bundler URL)
   const scriptURL = NativeModules.SourceCode?.scriptURL;
   if (scriptURL) {
     const match = scriptURL.match(/https?:\/\/([^/:]+)/);
@@ -36,13 +58,8 @@ const getAutoDetectedHost = () => {
     }
   }
 
-  // 5. Android Emulator loopback
-  if (Platform.OS === 'android') {
-    return '10.0.2.2';
-  }
-
   // 6. Default fallback
-  return 'localhost';
+  return '127.0.0.1';
 };
 
 const detectedHost = getAutoDetectedHost();
