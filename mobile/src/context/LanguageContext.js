@@ -878,6 +878,10 @@ export const LanguageProvider = ({ children }) => {
       'Points',
       'Winner',
       'Loser',
+      'No other active rooms online right now. Waiting for rival room to match...',
+      'No other active rooms online right now.',
+      'Target room is currently inactive or empty.',
+      'No active rooms online',
     ])
   );
 

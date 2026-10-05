@@ -44,9 +44,11 @@ export default function InviteRoomPkModal({
     try {
       const res = await api.get('/rooms');
       if (res.data?.success && Array.isArray(res.data.rooms)) {
-        // Exclude current room
+        // Exclude current room and exclude inactive/empty rooms
         const filtered = res.data.rooms.filter(
-          (r) => String(r._id) !== String(currentRoomId)
+          (r) =>
+            String(r._id) !== String(currentRoomId) &&
+            ((r.activeMemberCount || 0) > 0 || (r.activeMembers?.length || 0) > 0)
         );
         setRooms(filtered);
       }
@@ -182,7 +184,7 @@ export default function InviteRoomPkModal({
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>
-                    <T>No rooms found</T>
+                    <T>No active rooms online</T>
                   </Text>
                 </View>
               }

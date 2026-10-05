@@ -463,6 +463,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       showToast(t(message || 'Searching for rival room...'), 'info');
     });
 
+    socket.on('pk_no_active_rooms', ({ message }) => {
+      setIsMatchingPk(false);
+      showToast(t(message || 'No other active rooms online right now.'), 'info');
+    });
+
     socket.on('pk_matching_cancelled', () => {
       setIsMatchingPk(false);
       showToast(t('Matchmaking cancelled'), 'info');
@@ -2073,7 +2078,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       <VoiceRoomToolsModal
         visible={roomToolsModalVisible}
         onClose={() => setRoomToolsModalVisible(false)}
-        roomPkActive={Boolean(pkBattle || isMatchingPk)}
+        roomPkActive={Boolean(pkBattle)}
         onSelectTool={(tool, toggledState) => {
           if (tool?.id === 'members') {
             setRoomToolsModalVisible(false);

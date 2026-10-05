@@ -864,9 +864,18 @@ function initRoomSockets(io) {
           .populate('owner', 'name avatar')
           .select('title coverImage roomLevel activeMembers owner');
 
-        if (otherRooms.length > 0) {
-          // Pick a random room from available rooms
-          const randomRoom = otherRooms[Math.floor(Math.random() * otherRooms.length)];
+        // Strictly filter ONLY rooms that are currently active (have users connected or in activeMembers)
+        const activeRooms = otherRooms.filter((r) => {
+          const rId = String(r._id);
+          const socketCount = io.sockets.adapter.rooms.get(rId)?.size || 0;
+          const memberCount = r.activeMembers ? r.activeMembers.length : 0;
+          const isBusyInPk = roomToPkBattle.has(rId);
+          return !isBusyInPk && (socketCount > 0 || memberCount > 0);
+        });
+
+        if (activeRooms.length > 0) {
+          // Pick a random room from available live active rooms
+          const randomRoom = activeRooms[Math.floor(Math.random() * activeRooms.length)];
           const rivalData = {
             roomId: String(randomRoom._id),
             roomName: randomRoom.title || randomRoom.owner?.name || 'Rival Room',
@@ -881,21 +890,10 @@ function initRoomSockets(io) {
           return;
         }
 
-        // 3. Fallback: If no other room exists, create a dynamic rival room so battle always starts
-        const fallbackRivals = [
-          { name: 'Royal Champions 👑', avatar: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400' },
-          { name: 'Star Beats Club 🌟', avatar: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400' },
-          { name: 'Night Chill & Chat 🎧', avatar: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400' },
-          { name: 'Bollywood Stars 🎬', avatar: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400' },
-        ];
-        const randomFallback = fallbackRivals[Math.floor(Math.random() * fallbackRivals.length)];
-        const simulatedRival = {
-          roomId: `sim_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-          roomName: randomFallback.name,
-          roomAvatar: randomFallback.avatar,
-        };
-
-        startPkBattle(io, { roomId: cleanRoomId, roomName, roomAvatar }, simulatedRival, socket);
+        // If no other rooms are active right now, notify and do not keep toggle on
+        socket.emit('pk_no_active_rooms', {
+          message: 'No other active rooms online right now.',
+        });
       } catch (err) {
         console.error('request_pk_match error:', err);
         socket.emit('pk_error', { message: 'Failed to start PK match' });
@@ -923,6 +921,13 @@ function initRoomSockets(io) {
       }
       if (roomToPkBattle.has(cleanFromId)) {
         socket.emit('pk_invite_failed', { message: 'Your room is already in a PK battle' });
+        return;
+      }
+
+      // Check if target room is actually active (has connected users)
+      const targetSockets = io.sockets.adapter.rooms.get(cleanTargetId)?.size || 0;
+      if (targetSockets === 0) {
+        socket.emit('pk_invite_failed', { message: 'Target room is currently inactive or empty.' });
         return;
       }
 
