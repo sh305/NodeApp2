@@ -107,6 +107,7 @@ exports.getRoomById = async (req, res) => {
       .populate('members', 'name avatar wealthLevel activeFrame customId gender')
       .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
       .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('seatApplicants', 'name avatar wealthLevel activeFrame customId gender')
       .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender')
       .populate('bossSeat.purchasedBy', 'name avatar');
 
@@ -258,8 +259,13 @@ exports.kickUser = async (req, res) => {
 
     const isOwner = room.owner.toString() === ownerId.toString();
     const isAdmin = room.admins && room.admins.some((a) => (a._id ? a._id.toString() : a.toString()) === ownerId.toString());
-    if (!isOwner && !isAdmin) {
-      return res.status(403).json({ success: false, message: 'Only room owner or admin can kick users' });
+    const isHost = room.isHostActive && (isOwner || (room.hosts && room.hosts.some((h) => (h._id ? h._id.toString() : h.toString()) === ownerId.toString())));
+    if (!isOwner && !isAdmin && !isHost) {
+      return res.status(403).json({ success: false, message: 'Only room owner, admin, or host can kick users' });
+    }
+
+    if (targetUserId.toString() === room.owner.toString()) {
+      return res.status(403).json({ success: false, message: 'Cannot kick room owner' });
     }
 
     if (targetUserId.toString() === ownerId.toString()) {
@@ -748,3 +754,114 @@ exports.leaveBossSeat = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Toggle Free Mode (Open mic vs Queue/Application mode)
+// @route   POST /api/rooms/:id/free-mode
+exports.toggleFreeMode = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { freeMode } = req.body;
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+    room.freeMode = Boolean(freeMode);
+    await room.save();
+    return res.status(200).json({
+      success: true,
+      freeMode: room.freeMode,
+      message: room.freeMode ? 'Free Mode enabled' : 'Free Mode disabled',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Apply for a Mic Seat (when Free Mode is OFF)
+// @route   POST /api/rooms/:id/seat-applicants/apply
+exports.applyForSeat = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+    if (!room.seatApplicants) room.seatApplicants = [];
+    if (!room.seatApplicants.some((aId) => aId.toString() === userId.toString())) {
+      room.seatApplicants.push(userId);
+      await room.save();
+    }
+    const populated = await Room.findById(id).populate('seatApplicants', 'name avatar wealthLevel activeFrame customId gender');
+    return res.status(200).json({
+      success: true,
+      message: 'Application sent to host!',
+      seatApplicants: populated.seatApplicants,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Accept Seat Applicant
+// @route   POST /api/rooms/:id/seat-applicants/accept
+exports.acceptSeatApplicant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { applicantId, seatIndex } = req.body;
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+    room.syncSeats();
+    let targetIndex = seatIndex !== undefined && seatIndex !== null ? Number(seatIndex) : -1;
+    if (targetIndex < 0 || targetIndex >= room.seats.length || room.seats[targetIndex]?.user) {
+      targetIndex = room.seats.findIndex((s) => !s.user);
+    }
+    if (targetIndex !== -1) {
+      room.seats[targetIndex].user = applicantId;
+    }
+    if (room.seatApplicants) {
+      room.seatApplicants = room.seatApplicants.filter((aId) => aId.toString() !== applicantId.toString());
+    }
+    await room.save();
+    const populated = await Room.findById(id)
+      .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+      .populate('seatApplicants', 'name avatar wealthLevel activeFrame customId gender');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Applicant placed on seat',
+      seats: populated.seats,
+      seatApplicants: populated.seatApplicants,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reject Seat Applicant
+// @route   POST /api/rooms/:id/seat-applicants/reject
+exports.rejectSeatApplicant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { applicantId } = req.body;
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+    if (room.seatApplicants) {
+      room.seatApplicants = room.seatApplicants.filter((aId) => aId.toString() !== applicantId.toString());
+      await room.save();
+    }
+    const populated = await Room.findById(id).populate('seatApplicants', 'name avatar wealthLevel activeFrame customId gender');
+    return res.status(200).json({
+      success: true,
+      message: 'Applicant removed',
+      seatApplicants: populated.seatApplicants,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+

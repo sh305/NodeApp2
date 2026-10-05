@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -22,6 +22,7 @@ export default function RoomSettingsModal({
   onOpenPeople,
   onOpenKickedUsers,
   onOpenBossSeat,
+  onToggleFreeMode,
 }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -29,8 +30,23 @@ export default function RoomSettingsModal({
 
   // Local switch states matching Screenshot
   const [luckyNumberEnabled, setLuckyNumberEnabled] = useState(true);
-  const [freeModeEnabled, setFreeModeEnabled] = useState(true);
+  const [freeModeEnabled, setFreeModeEnabled] = useState(
+    room?.freeMode !== undefined ? Boolean(room.freeMode) : true
+  );
   const [roomLockEnabled, setRoomLockEnabled] = useState(Boolean(room?.isLocked));
+
+  useEffect(() => {
+    if (room?.freeMode !== undefined) {
+      setFreeModeEnabled(Boolean(room.freeMode));
+    }
+  }, [room?.freeMode]);
+
+  const handleToggleFreeMode = (val) => {
+    setFreeModeEnabled(val);
+    if (onToggleFreeMode) {
+      onToggleFreeMode(val);
+    }
+  };
 
   const roomCoverUri =
     room?.coverImage ||
@@ -282,7 +298,7 @@ export default function RoomSettingsModal({
               </View>
               <Switch
                 value={freeModeEnabled}
-                onValueChange={(val) => setFreeModeEnabled(val)}
+                onValueChange={handleToggleFreeMode}
                 trackColor={{ false: '#4B5563', true: '#00D293' }}
                 thumbColor="#FFFFFF"
               />

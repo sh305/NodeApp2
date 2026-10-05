@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -24,35 +24,52 @@ export default function RoomMembersModal({
   isHostMuted = false,
   currentUser = null,
   onSelectUser = null,
+  initialTab = 'applicants',
+  targetSeatIndex = null,
+  onInviteUser = null,
+  onAcceptApplicant = null,
+  onRejectApplicant = null,
 }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState('on_seat'); // 'on_seat' | 'participants'
+  const [activeTab, setActiveTab] = useState(initialTab || 'applicants'); // 'applicants' | 'on_seat' | 'participants'
 
-  // 1. Gather all users who are currently "On Seat"
+  useEffect(() => {
+    if (visible) {
+      setActiveTab(initialTab || 'applicants');
+    }
+  }, [visible, initialTab]);
+
+  // 1. Gather all users who are currently "On Seat" (Host Seat is INCLUDED; Room Owner is excluded from regular mic seats)
   const seatedUsers = useMemo(() => {
     const list = [];
+    const ownerId = room?.owner?._id ? String(room.owner._id) : (room?.owner ? String(room.owner) : '');
 
-    // Host Seat (if host is active and room has an owner)
-    if (isHostActive && room?.owner) {
+    // Host Seat (ALWAYS included in On Seat when host is active)
+    if (isHostActive && (room?.owner || (room?.hosts && room.hosts.length > 0))) {
+      const hostUser = (room?.hosts && room.hosts.length > 0 ? room.hosts[0] : null) || room?.owner;
       list.push({
-        _id: room.owner._id || 'host_id',
-        name: room.owner.name || 'Room Host',
-        avatar: room.owner.avatar,
-        wealthLevel: room.owner.wealthLevel || 1,
-        gender: room.owner.gender || 'male',
-        customId: room.owner.customId,
+        _id: hostUser?._id || 'host_id',
+        name: hostUser?.name || 'Room Host',
+        avatar: hostUser?.avatar,
+        wealthLevel: hostUser?.wealthLevel || 1,
+        gender: hostUser?.gender || 'male',
+        customId: hostUser?.customId,
         isHost: true,
+        isHostSeat: true,
         seatNumber: 0,
         seatLabel: 'Host',
         isMuted: Boolean(isHostMuted),
-        userObj: room.owner,
+        userObj: hostUser,
       });
     }
 
-    // Regular mic seats (No.1, No.2, No.3, ...)
+    // Regular mic seats (No.1, No.2, No.3, ...) - Room Owner on mic seats is excluded, everyone else is included
     (room?.seats || []).forEach((seat, index) => {
       if (seat && seat.user && (seat.user._id || seat.user.name)) {
+        const uId = seat.user._id ? String(seat.user._id) : '';
+        if (ownerId && uId === ownerId) return; // Skip Room Owner from regular mic seats
+
         const seatNum = seat.seatNumber !== undefined ? seat.seatNumber : index + 1;
         list.push({
           _id: seat.user._id || `seat_${seatNum}`,
@@ -71,26 +88,28 @@ export default function RoomMembersModal({
     });
 
     return list;
-  }, [room?.seats, room?.owner, isHostActive, isHostMuted]);
+  }, [room?.seats, room?.owner, room?.hosts, isHostActive, isHostMuted]);
 
-  // Set of all seated user IDs (to filter out from Participants)
+  // Set of all seated user IDs + Room Owner ID (to filter out from room audience)
   const seatedIds = useMemo(() => {
-    return new Set(seatedUsers.map((u) => String(u._id)));
-  }, [seatedUsers]);
+    const set = new Set(seatedUsers.map((u) => String(u._id)));
+    const ownerId = room?.owner?._id ? String(room.owner._id) : (room?.owner ? String(room.owner) : '');
+    if (ownerId) set.add(ownerId);
+    return set;
+  }, [seatedUsers, room?.owner]);
 
-  // 2. Gather all room "Participants" (Users in room but NOT on any seat)
-  const participants = useMemo(() => {
+  // 2. Gather all room audience/members (Applicants tab: All users who came to room but are not seated)
+  const roomAudience = useMemo(() => {
     const map = new Map();
     const rawMembers = room?.activeMembers || [];
 
-    // Process backend active members
     rawMembers.forEach((member) => {
       if (member && member._id) {
         const idStr = String(member._id);
         if (!seatedIds.has(idStr)) {
           map.set(idStr, {
             _id: member._id,
-            name: member.name || 'Participant',
+            name: member.name || 'Audience',
             avatar: member.avatar,
             wealthLevel: member.wealthLevel || 1,
             gender: member.gender || 'male',
@@ -101,7 +120,7 @@ export default function RoomMembersModal({
       }
     });
 
-    // Make sure currentUser is included in participants if in room and not seated
+    // Make sure currentUser is included if in room and not seated
     if (currentUser && currentUser._id) {
       const currentIdStr = String(currentUser._id);
       if (!seatedIds.has(currentIdStr) && !map.has(currentIdStr)) {
@@ -121,13 +140,46 @@ export default function RoomMembersModal({
     return Array.from(map.values());
   }, [room?.activeMembers, seatedIds, currentUser]);
 
+  // 3. Seat Applicants (Participants tab: Users who applied for a seat)
+  const seatApplicants = useMemo(() => {
+    const rawApplicants = room?.seatApplicants || [];
+    return rawApplicants.map((applicant, idx) => ({
+      _id: applicant._id || applicant,
+      name: applicant.name || `Applicant ${idx + 1}`,
+      avatar: applicant.avatar,
+      wealthLevel: applicant.wealthLevel || 1,
+      gender: applicant.gender || 'male',
+      customId: applicant.customId,
+      userObj: applicant,
+    }));
+  }, [room?.seatApplicants]);
+
   const handleUserPress = (item) => {
     if (onSelectUser && item.userObj) {
       onClose();
-      onSelectUser(item.userObj);
+      onSelectUser({ ...item.userObj, isHostSeat: Boolean(item.isHost) });
     }
   };
 
+  const handleInvitePress = (item) => {
+    if (onInviteUser) {
+      onInviteUser(item.userObj || item, targetSeatIndex);
+    }
+  };
+
+  const handleAcceptPress = (applicantId) => {
+    if (onAcceptApplicant) {
+      onAcceptApplicant(applicantId, targetSeatIndex);
+    }
+  };
+
+  const handleRejectPress = (applicantId) => {
+    if (onRejectApplicant) {
+      onRejectApplicant(applicantId);
+    }
+  };
+
+  // ── Render 1: On Seat User Item ──
   const renderSeatedItem = ({ item }) => {
     const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120';
     return (
@@ -136,7 +188,7 @@ export default function RoomMembersModal({
         activeOpacity={0.75}
         onPress={() => handleUserPress(item)}
       >
-        {/* Left: Seat Indicator Badge */}
+        {/* Seat Badge Pill */}
         <View
           style={[
             styles.seatBadgePill,
@@ -160,10 +212,14 @@ export default function RoomMembersModal({
             style={styles.userAvatarImg}
             resizeMode="cover"
           />
-          {item.isHost && <View style={styles.hostCrownCornerBadge}><Text style={styles.hostCrownEmoji}>👑</Text></View>}
+          {item.isHost && (
+            <View style={styles.hostCrownCornerBadge}>
+              <Text style={styles.hostCrownEmoji}>👑</Text>
+            </View>
+          )}
         </View>
 
-        {/* Center: Info (Name, Level, ID) */}
+        {/* Info */}
         <View style={styles.userInfoCol}>
           <View style={styles.nameRow}>
             <Text style={styles.userNameText} numberOfLines={1}>
@@ -190,7 +246,7 @@ export default function RoomMembersModal({
           </View>
         </View>
 
-        {/* Right: Mic Status */}
+        {/* Mic Status */}
         <View
           style={[
             styles.micStatusPill,
@@ -211,37 +267,44 @@ export default function RoomMembersModal({
     );
   };
 
-  const renderParticipantItem = ({ item, index }) => {
+  // ── Render 2: Room Member (Applicants Tab) ──
+  const renderAudienceItem = ({ item, index }) => {
     const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120';
     return (
-      <TouchableOpacity
-        style={styles.userRowCard}
-        activeOpacity={0.75}
-        onPress={() => handleUserPress(item)}
-      >
+      <View style={styles.userRowCard}>
         {/* Index counter */}
         <View style={styles.indexCircle}>
           <Text style={styles.indexCircleText}>{index + 1}</Text>
         </View>
 
         {/* Avatar */}
-        <View style={styles.avatarWrapper}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => handleUserPress(item)}
+          style={styles.avatarWrapper}
+        >
           <Image
             source={{ uri: item.avatar || defaultAvatar }}
             style={styles.userAvatarImg}
             resizeMode="cover"
           />
-        </View>
+        </TouchableOpacity>
 
-        {/* Center: Info */}
-        <View style={styles.userInfoCol}>
+        {/* Info */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => handleUserPress(item)}
+          style={styles.userInfoCol}
+        >
           <View style={styles.nameRow}>
             <Text style={styles.userNameText} numberOfLines={1}>
               {item.name}
             </Text>
             {item.isSelf && (
               <View style={styles.youBadge}>
-                <Text style={styles.youBadgeText}><T>You</T></Text>
+                <Text style={styles.youBadgeText}>
+                  <T>You</T>
+                </Text>
               </View>
             )}
           </View>
@@ -263,30 +326,129 @@ export default function RoomMembersModal({
               <Text style={styles.customIdText}>ID: {item.customId}</Text>
             ) : null}
           </View>
-        </View>
+        </TouchableOpacity>
 
-        {/* Right: Audience tag */}
-        <View style={styles.audiencePill}>
-          <Text style={styles.audienceEmoji}>🎧</Text>
-          <Text style={styles.audienceLabel}><T>Audience</T></Text>
+        {/* Action: Invite button */}
+        {!item.isSelf && (
+          <TouchableOpacity
+            style={styles.inviteActionBtn}
+            activeOpacity={0.8}
+            onPress={() => handleInvitePress(item)}
+          >
+            <Text style={styles.inviteActionBtnText}>
+              <T>Invite</T>
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  // ── Render 3: Seat Applicant (Participants Tab) ──
+  const renderApplicantItem = ({ item }) => {
+    const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120';
+    return (
+      <View style={styles.userRowCard}>
+        {/* Avatar */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => handleUserPress(item)}
+          style={styles.avatarWrapper}
+        >
+          <Image
+            source={{ uri: item.avatar || defaultAvatar }}
+            style={styles.userAvatarImg}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+
+        {/* Info */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => handleUserPress(item)}
+          style={styles.userInfoCol}
+        >
+          <View style={styles.nameRow}>
+            <Text style={styles.userNameText} numberOfLines={1}>
+              {item.name}
+            </Text>
+          </View>
+          <View style={styles.tagsRow}>
+            <View style={styles.levelTag}>
+              <Text style={styles.levelTagText}>Lv.{item.wealthLevel || 1}</Text>
+            </View>
+            <View
+              style={[
+                styles.genderTag,
+                item.gender === 'female' ? styles.genderTagFemale : styles.genderTagMale,
+              ]}
+            >
+              <Text style={styles.genderTagText}>
+                {item.gender === 'female' ? '♀' : '♂'}
+              </Text>
+            </View>
+            {item.customId ? (
+              <Text style={styles.customIdText}>ID: {item.customId}</Text>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+
+        {/* Action Buttons: Agree & Reject */}
+        <View style={styles.applicantActionRow}>
+          <TouchableOpacity
+            style={styles.agreeBtn}
+            activeOpacity={0.8}
+            onPress={() => handleAcceptPress(item._id)}
+          >
+            <Text style={styles.agreeBtnText}>
+              <T>Agree</T>
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.rejectBtn}
+            activeOpacity={0.8}
+            onPress={() => handleRejectPress(item._id)}
+          >
+            <Text style={styles.rejectBtnText}>
+              <T>Reject</T>
+            </Text>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
   const renderEmptyState = (type) => {
-    const isOnSeat = type === 'on_seat';
+    let emoji = '👥';
+    let title = 'No members found';
+    let subtitle = '';
+
+    if (type === 'applicants') {
+      emoji = '👥';
+      title = 'No other audience in room';
+      subtitle = 'Users listening in the room will appear here';
+    } else if (type === 'on_seat') {
+      emoji = '🪑';
+      title = 'No users on seat';
+      subtitle = 'Users who take a seat will appear here';
+    } else if (type === 'participants') {
+      emoji = '🛋️';
+      title = 'No seat applicants yet';
+      subtitle = 'When users apply for a seat, they will appear here';
+    }
+
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyEmoji}>{isOnSeat ? '🪑' : '👥'}</Text>
+        <Text style={styles.emptyEmoji}>{emoji}</Text>
         <Text style={styles.emptyTitle}>
-          {isOnSeat ? <T>No users on seat</T> : <T>No other participants</T>}
+          <T>{title}</T>
         </Text>
-        <Text style={styles.emptySubtitle}>
-          {isOnSeat
-            ? <T>Users who take a seat will appear here</T>
-            : <T>Users listening in the room will appear here</T>}
-        </Text>
+        {subtitle ? (
+          <Text style={styles.emptySubtitle}>
+            <T>{subtitle}</T>
+          </Text>
+        ) : null}
       </View>
     );
   };
@@ -304,19 +466,40 @@ export default function RoomMembersModal({
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
 
-        {/* White Card Bottom Sheet Matching Screenshot */}
+        {/* White Card Bottom Sheet Matching User Screenshot */}
         <View
           style={[
             styles.sheetCard,
             { paddingBottom: Math.max(16, insets.bottom + 8) },
           ]}
         >
-          {/* Subtle Top Grab Handle */}
+          {/* Top Grab Handle */}
           <View style={styles.handleBar} />
 
-          {/* ══ TOP TABS: "On Seat" & "Participants" ══ */}
+          {/* Target Seat Badge (Showing which seat is being assigned) */}
+          
+
+          {/* ══ TOP 3 TABS (Matching Screenshot 2): Applicants, On Seat, Participants ══ */}
           <View style={styles.tabsHeader}>
-            {/* Tab 1: On Seat */}
+            {/* Tab 1: Applicants (Room members / all users who came to the room) */}
+            <TouchableOpacity
+              style={styles.tabBtn}
+              activeOpacity={0.8}
+              onPress={() => setActiveTab('applicants')}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === 'applicants' && styles.tabTextActive,
+                ]}
+              >
+                <T>Applicants</T>
+                {roomAudience.length > 0 ? ` (${roomAudience.length})` : ''}
+              </Text>
+              {activeTab === 'applicants' && <View style={styles.activeIndicator} />}
+            </TouchableOpacity>
+
+            {/* Tab 2: On Seat */}
             <TouchableOpacity
               style={styles.tabBtn}
               activeOpacity={0.8}
@@ -334,7 +517,7 @@ export default function RoomMembersModal({
               {activeTab === 'on_seat' && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
 
-            {/* Tab 2: Participants */}
+            {/* Tab 3: Participants (Seat Applicants / Applied Queue) */}
             <TouchableOpacity
               style={styles.tabBtn}
               activeOpacity={0.8}
@@ -347,17 +530,26 @@ export default function RoomMembersModal({
                 ]}
               >
                 <T>Participants</T>
-                {participants.length > 0 ? ` (${participants.length})` : ''}
+                {seatApplicants.length > 0 ? ` (${seatApplicants.length})` : ''}
               </Text>
               {activeTab === 'participants' && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
           </View>
 
-          {/* Thin subtle divider */}
+          {/* Divider Line */}
           <View style={styles.dividerLine} />
 
           {/* Tab Content */}
-          {activeTab === 'on_seat' ? (
+          {activeTab === 'applicants' ? (
+            <FlatList
+              data={roomAudience}
+              keyExtractor={(item) => `audience_${item._id}`}
+              renderItem={renderAudienceItem}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={() => renderEmptyState('applicants')}
+            />
+          ) : activeTab === 'on_seat' ? (
             <FlatList
               data={seatedUsers}
               keyExtractor={(item) => `seated_${item._id}_${item.seatNumber}`}
@@ -368,9 +560,9 @@ export default function RoomMembersModal({
             />
           ) : (
             <FlatList
-              data={participants}
-              keyExtractor={(item) => `participant_${item._id}`}
-              renderItem={renderParticipantItem}
+              data={seatApplicants}
+              keyExtractor={(item) => `applicant_${item._id}`}
+              renderItem={renderApplicantItem}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={() => renderEmptyState('participants')}
@@ -411,21 +603,41 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 6,
   },
+  targetSeatBanner: {
+    alignSelf: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    marginBottom: 4,
+  },
+  targetSeatBannerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  targetSeatHighlight: {
+    color: '#059669',
+    fontWeight: '800',
+  },
   tabsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingTop: 4,
   },
   tabBtn: {
     alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 10,
     position: 'relative',
+    minWidth: 80,
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '500',
     color: '#6B7280',
     letterSpacing: 0.2,
@@ -438,7 +650,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 3.5,
     borderRadius: 2,
-    backgroundColor: '#00D293', // Mint green matching user's screenshot indicator
+    backgroundColor: '#00D293', // Mint green matching screenshot 2
     marginTop: 6,
   },
   dividerLine: {
@@ -498,11 +710,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 10,
   },
   indexCircleText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#6B7280',
   },
   avatarWrapper: {
@@ -513,16 +725,18 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    backgroundColor: '#E5E7EB',
   },
   hostCrownCornerBadge: {
     position: 'absolute',
     top: -6,
-    right: -4,
+    left: -4,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    padding: 1.5,
   },
   hostCrownEmoji: {
-    fontSize: 12,
+    fontSize: 10,
   },
   userInfoCol: {
     flex: 1,
@@ -536,60 +750,57 @@ const styles = StyleSheet.create({
   userNameText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#111827',
     maxWidth: 160,
   },
   youBadge: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    backgroundColor: '#E0E7FF',
     borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     marginLeft: 6,
-    borderWidth: 0.5,
-    borderColor: '#A7F3D0',
   },
   youBadgeText: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#059669',
+    fontWeight: '700',
+    color: '#4F46E5',
   },
   tagsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 4,
+    gap: 5,
   },
   levelTag: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 5,
+    backgroundColor: '#00D293',
+    borderRadius: 10,
+    paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: 4,
   },
   levelTagText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
-    color: '#D97706',
+    color: '#FFFFFF',
   },
   genderTag: {
-    width: 16,
-    height: 16,
+    width: 15,
+    height: 15,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  genderTagMale: {
-    backgroundColor: '#DBEAFE',
-  },
   genderTagFemale: {
-    backgroundColor: '#FCE7F3',
+    backgroundColor: '#F43F5E',
+  },
+  genderTagMale: {
+    backgroundColor: '#3B82F6',
   },
   genderTagText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
-    color: '#2563EB',
+    color: '#FFFFFF',
   },
   customIdText: {
-    fontSize: 10,
+    fontSize: 10.5,
     color: '#9CA3AF',
     marginLeft: 2,
   },
@@ -599,67 +810,93 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    gap: 3,
   },
   micStatusPillLive: {
     backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
   },
   micStatusPillMuted: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
   },
   micStatusIcon: {
     fontSize: 11,
+    marginRight: 3,
   },
   micStatusLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   micStatusLabelLive: {
-    color: '#059669',
+    color: '#10B981',
   },
   micStatusLabelMuted: {
-    color: '#DC2626',
+    color: '#EF4444',
   },
-  audiencePill: {
+
+  /* Action Buttons */
+  inviteActionBtn: {
+    backgroundColor: '#00D293',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteActionBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  applicantActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    gap: 8,
+  },
+  agreeBtn: {
+    backgroundColor: '#00D293',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  agreeBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  rejectBtn: {
     backgroundColor: '#F3F4F6',
-    gap: 3,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  audienceEmoji: {
-    fontSize: 11,
-  },
-  audienceLabel: {
-    fontSize: 11,
-    fontWeight: '500',
+  rejectBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#6B7280',
   },
+
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
+    paddingVertical: 50,
   },
   emptyEmoji: {
-    fontSize: 42,
+    fontSize: 38,
     marginBottom: 10,
   },
   emptyTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#374151',
+    color: '#111827',
     marginBottom: 4,
   },
   emptySubtitle: {
-    fontSize: 12,
+    fontSize: 12.5,
     color: '#9CA3AF',
     textAlign: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
   },
 });

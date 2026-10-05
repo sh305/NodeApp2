@@ -17,6 +17,7 @@ import {
   Share,
   Dimensions,
   useWindowDimensions,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,6 +41,8 @@ import BossSeatModal from '../components/BossSeatModal';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const VOICE_ROOM_EMOJIS = [
   '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
@@ -109,10 +112,32 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [myPeopleInitialTab, setMyPeopleInitialTab] = useState('Host');
   const [activeHostEmoji, setActiveHostEmoji] = useState(null);
   const [activeSeatEmojis, setActiveSeatEmojis] = useState({});
+  const [seatPopoverVisible, setSeatPopoverVisible] = useState(false);
+  const [seatPopoverTargetSeat, setSeatPopoverTargetSeat] = useState(null);
+  const [roomMembersInitialTab, setRoomMembersInitialTab] = useState('applicants');
+  const [targetSeatIndex, setTargetSeatIndex] = useState(null);
+  const [seatPopoverCoords, setSeatPopoverCoords] = useState(null);
 
   const roomOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
   const currentUserIdStr = currentUser?._id ? currentUser._id.toString() : '';
   const isOwner = Boolean(roomOwnerId && currentUserIdStr && roomOwnerId === currentUserIdStr);
+  const isAdmin = Boolean(
+    room?.admins &&
+      room.admins.some(
+        (aId) => (aId._id ? aId._id.toString() : aId.toString()) === currentUserIdStr
+      )
+  );
+
+  // Host rights are granted ONLY when host seat is occupied (Conforming to Admin Rights table)
+  const isHost = Boolean(
+    isHostActive &&
+      mySeatIndex === null &&
+      (isOwner ||
+        (room?.hosts &&
+          room.hosts.some(
+            (hId) => (hId._id ? hId._id.toString() : hId.toString()) === currentUserIdStr
+          )))
+  );
 
   const socketRef = useRef(null);
   const chatInputRef = useRef(null);
@@ -255,6 +280,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setRoom((prev) => (prev ? { ...prev, bossSeat: bSeat } : prev));
     });
 
+    socket.on('free_mode_updated', ({ freeMode }) => {
+      setRoom((prev) => (prev ? { ...prev, freeMode } : prev));
+    });
+
+    socket.on('seat_applicants_updated', ({ seatApplicants }) => {
+      setRoom((prev) => (prev ? { ...prev, seatApplicants } : prev));
+    });
+
     socket.on('new_chat_message', (msg) => {
       setMessages((prev) => [...prev, msg]);
     });
@@ -371,15 +404,40 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     };
   }, [roomId]);
 
-  const handleSeatPress = (seat, index) => {
+  const handleSeatPress = (seat, index, coords) => {
     if (seat.user) {
       setSelectedSeatUser({ ...seat.user, seatIndex: index });
     } else {
-      // Condition: A user cannot be in 2 places! If active on Host seat, cannot take a mic seat
-      if (isOwner && isHostActive) {
-        showToast(
-          t('You are already on the Host seat! Step down from hosting first.'),
-          'info'
+      // ── FREE MODE CHECK (When Free Mode is OFF, seat is protected) ──
+      const isFreeMode = room?.freeMode !== false;
+      if (!isFreeMode) {
+        // If owner or admin: show Members / Invite floating popover (Matching Screenshot 1)
+        if (isOwner || isAdmin) {
+          setSeatPopoverTargetSeat({ seat, index });
+          setTargetSeatIndex(index);
+          setSeatPopoverCoords(coords || { x: 100, y: 350 });
+          setSeatPopoverVisible(true);
+          return;
+        }
+
+        // If audience: prompt to apply for seat
+        Alert.alert(
+          t('Apply for Seat 🪑'),
+          t('Free Mode is OFF. Do you want to apply for this seat?'),
+          [
+            { text: t('Cancel'), style: 'cancel' },
+            {
+              text: t('Apply'),
+              onPress: () => {
+                socketRef.current?.emit('apply_for_seat', {
+                  roomId,
+                  userId: currentUser?._id,
+                  seatIndex: index,
+                });
+                showToast(t('Application sent to host! 📨'), 'success');
+              },
+            },
+          ]
         );
         return;
       }
@@ -406,6 +464,119 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         });
       }
     }
+  };
+
+  // Popover handlers (Matching Screenshot 1)
+  const handleOpenMembersFromPopover = () => {
+    setSeatPopoverVisible(false);
+    setRoomMembersInitialTab('applicants');
+    setRoomMembersModalVisible(true);
+  };
+
+  const handleOpenInviteFromPopover = () => {
+    setSeatPopoverVisible(false);
+    setRoomMembersInitialTab('participants');
+    setRoomMembersModalVisible(true);
+  };
+
+  const POPOVER_CARD_WIDTH = 138;
+  const POPOVER_CARD_HEIGHT = 92;
+
+  const getSeatPopoverLayout = () => {
+    if (!seatPopoverCoords) {
+      return {
+        cardStyle: {
+          position: 'absolute',
+          top: Math.round(SCREEN_HEIGHT * 0.44),
+          left: 20,
+        },
+        arrowOffset: 26,
+      };
+    }
+
+    let seatCenterX = 100;
+    let cardTop = 360;
+
+    if (
+      typeof seatPopoverCoords.seatY === 'number' &&
+      typeof seatPopoverCoords.seatX === 'number'
+    ) {
+      const seatW = seatPopoverCoords.seatWidth || 60;
+      seatCenterX = seatPopoverCoords.seatX + seatW / 2;
+      // In seatItem, the 48px circular seat is at the top.
+      // Card top at seatY + 46 puts the top edge right under the circle,
+      // and with arrow top: -6, the tip is at seatY + 40, physically attached to the seat!
+      cardTop = seatPopoverCoords.seatY + 46;
+    } else {
+      seatCenterX = seatPopoverCoords.x || 100;
+      cardTop = (seatPopoverCoords.y || 360) + 4;
+    }
+
+    // Keep card inside screen bounds
+    let cardLeft = seatCenterX - 32;
+    if (cardLeft + POPOVER_CARD_WIDTH > SCREEN_WIDTH - 12) {
+      cardLeft = SCREEN_WIDTH - POPOVER_CARD_WIDTH - 12;
+    }
+    if (cardLeft < 12) {
+      cardLeft = 12;
+    }
+
+    cardTop = Math.max(80, Math.min(cardTop, SCREEN_HEIGHT - POPOVER_CARD_HEIGHT - 90));
+
+    // Pointer arrow aligns directly to the center of the seat circle
+    let arrowOffset = seatCenterX - cardLeft - 6;
+    arrowOffset = Math.max(16, Math.min(arrowOffset, POPOVER_CARD_WIDTH - 28));
+
+    return {
+      cardStyle: {
+        position: 'absolute',
+        top: cardTop,
+        left: cardLeft,
+      },
+      arrowOffset,
+    };
+  };
+
+  // Seat invitation & applicant handlers (Matching Screenshot 2)
+  const handleInviteUserToSeat = (targetUser, seatIdx) => {
+    const sIndex = seatIdx !== null && seatIdx !== undefined ? seatIdx : targetSeatIndex;
+    socketRef.current?.emit('invite_to_seat', {
+      roomId,
+      targetUserId: targetUser._id,
+      seatIndex: sIndex,
+    });
+    showToast(t(`Invited ${targetUser.name || 'user'} to seat! 🛋️`), 'success');
+    setRoomMembersModalVisible(false);
+  };
+
+  const handleAcceptSeatApplicant = (applicantId, seatIdx) => {
+    const sIndex = seatIdx !== null && seatIdx !== undefined ? seatIdx : targetSeatIndex;
+    socketRef.current?.emit('accept_seat_applicant', {
+      roomId,
+      applicantId,
+      seatIndex: sIndex,
+    });
+    showToast(t('Applicant placed on seat! 🎉'), 'success');
+  };
+
+  const handleRejectSeatApplicant = (applicantId) => {
+    socketRef.current?.emit('reject_seat_applicant', {
+      roomId,
+      applicantId,
+    });
+    showToast(t('Application declined'), 'info');
+  };
+
+  const handleToggleFreeMode = (val) => {
+    socketRef.current?.emit('toggle_free_mode', { roomId, freeMode: val });
+    api.post(`/rooms/${roomId}/free-mode`, { freeMode: val }).catch(() => {});
+    setRoom((prev) => (prev ? { ...prev, freeMode: val } : prev));
+    showToast(
+      val
+        ? t('Free Mode Enabled (Anyone can take seats)')
+        : t('Free Mode Disabled (Application required)'),
+      'info'
+    );
   };
 
   const handleLeaveSeat = () => {
@@ -1436,11 +1607,15 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Report ID</Text>
                 </TouchableOpacity>
 
-                {/* 👑 1. LEAVE HOSTING */}
+                {/* 👑 1. LEAVE HOSTING / REMOVE HOST (Owner, Admin, or Self) */}
                 {Boolean(
                   (selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) &&
                     isHostActive &&
-                    isOwner
+                    (
+                      isSelf ||
+                      isOwner ||
+                      (isAdmin && selectedUserIdStr !== roomOwnerId)
+                    )
                 ) && (
                   <TouchableOpacity
                     style={[
@@ -1451,11 +1626,22 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                         backgroundColor: 'rgba(245, 158, 11, 0.15)',
                       },
                     ]}
-                    onPress={handleLeaveHosting}
+                    onPress={() => {
+                      if (isSelf) {
+                        handleLeaveHosting();
+                      } else {
+                        socketRef.current?.emit('leave_host', {
+                          roomId,
+                          userId: selectedSeatUser._id,
+                        });
+                        showToast(t('Host stepped down from Host seat'), 'info');
+                        setSelectedSeatUser(null);
+                      }
+                    }}
                   >
                     <Text style={styles.actionEmoji}>👑</Text>
                     <Text style={[styles.actionLabel, { color: '#F59E0B' }]}>
-                      <T>Leave Hosting</T>
+                      <T>{isSelf ? 'Leave Hosting' : 'Remove Host'}</T>
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -1464,7 +1650,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 {Boolean(
                   (selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) &&
                     !isHostActive &&
-                    isOwner
+                    (isOwner || (room?.hosts && room.hosts.some(h => (h._id ? h._id.toString() : h.toString()) === currentUserIdStr)))
                 ) && (
                   <TouchableOpacity
                     style={[
@@ -1507,8 +1693,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   </TouchableOpacity>
                 )}
 
-                {/* 🛋️ REMOVE FROM BOSS SEAT */}
-                {Boolean(selectedSeatUser?.isBossSeat && isOwner && !isSelf) && (
+                {/* 🛋️ REMOVE FROM BOSS SEAT (Owner and Admin) */}
+                {Boolean(
+                  selectedSeatUser?.isBossSeat &&
+                    (isOwner || isAdmin) &&
+                    !isSelf &&
+                    selectedUserIdStr !== roomOwnerId
+                ) && (
                   <TouchableOpacity
                     style={[
                       styles.actionBox,
@@ -1538,7 +1729,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   </TouchableOpacity>
                 )}
 
-                {/* 🚪 2. LEAVE SEAT */}
+                {/* 🚪 2. LEAVE SEAT (Self on mic seat) */}
                 {Boolean(!selectedSeatUser?.isHostSeat && !selectedSeatUser?.isBossSeat && isSelf && mySeatIndex !== null) && (
                   <TouchableOpacity
                     style={[
@@ -1561,8 +1752,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   </TouchableOpacity>
                 )}
 
-                {/* 🪑 3. REMOVE FROM SEAT */}
-                {Boolean(!selectedSeatUser?.isHostSeat && !selectedSeatUser?.isBossSeat && isOwner && !isSelf) && (
+                {/* 🪑 3. REMOVE FROM SEAT (Kick off the seat: Owner, Admin, Host) */}
+                {Boolean(
+                  !selectedSeatUser?.isHostSeat &&
+                    !selectedSeatUser?.isBossSeat &&
+                    (isOwner || isAdmin || isHost) &&
+                    !isSelf &&
+                    selectedUserIdStr !== roomOwnerId
+                ) && (
                   <TouchableOpacity
                     style={[
                       styles.actionBox,
@@ -1585,14 +1782,20 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   </TouchableOpacity>
                 )}
 
-                {/* Kick Option for Room Owner */}
-                {Boolean(isOwner && !isSelf) && (
+                {/* 👢 4. KICK FROM ROOM (Kick off the room: Owner, Admin, Host) */}
+                {Boolean(
+                  (isOwner || isAdmin || isHost) &&
+                    !isSelf &&
+                    selectedUserIdStr !== roomOwnerId
+                ) && (
                   <TouchableOpacity
                     style={[styles.actionBox, styles.kickActionBox]}
                     onPress={() => setKickModalVisible(true)}
                   >
                     <Text style={styles.actionEmoji}>👢</Text>
-                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Kick (3d/Perm)</Text>
+                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>
+                      <T>Kick (3d/Perm)</T>
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1673,7 +1876,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
       />
 
-      {/* ══ ROOM MEMBERS MODAL (On Seat & Participants) ══ */}
+      {/* ══ ROOM MEMBERS MODAL (Applicants, On Seat, Participants - Matching Screenshot 2) ══ */}
       <RoomMembersModal
         visible={roomMembersModalVisible}
         onClose={() => setRoomMembersModalVisible(false)}
@@ -1681,16 +1884,79 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         isHostActive={isHostActive}
         isHostMuted={isHostMuted}
         currentUser={currentUser}
+        initialTab={roomMembersInitialTab}
+        targetSeatIndex={targetSeatIndex}
+        onInviteUser={handleInviteUserToSeat}
+        onAcceptApplicant={handleAcceptSeatApplicant}
+        onRejectApplicant={handleRejectSeatApplicant}
         onSelectUser={(selectedUser) => {
           setSelectedSeatUser(selectedUser);
         }}
       />
+
+      {/* ══ SEAT POPOVER MODAL (Members / Invite - Matching User Screenshot) ══ */}
+      {(() => {
+        const popoverLayout = getSeatPopoverLayout();
+        return (
+          <Modal
+            visible={seatPopoverVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSeatPopoverVisible(false)}
+          >
+            <TouchableWithoutFeedback onPress={() => setSeatPopoverVisible(false)}>
+              <View style={styles.seatPopoverOverlay}>
+                <TouchableWithoutFeedback>
+                  <View style={[styles.seatPopoverCard, popoverLayout.cardStyle]}>
+                    {/* Upward pointer arrow physically attaching popover to the seat circle */}
+                    <View
+                      style={[
+                        styles.seatPopoverArrow,
+                        { left: popoverLayout.arrowOffset },
+                      ]}
+                    />
+
+                    <TouchableOpacity
+                      style={styles.seatPopoverItem}
+                      activeOpacity={0.75}
+                      onPress={handleOpenMembersFromPopover}
+                    >
+                      <Text style={styles.seatPopoverIconText}>👤</Text>
+                      <Text style={styles.seatPopoverText}>
+                        <T>Members</T>
+                      </Text>
+                    </TouchableOpacity>
+
+                <View style={styles.seatPopoverDivider} />
+
+                <TouchableOpacity
+                  style={styles.seatPopoverItem}
+                  activeOpacity={0.75}
+                  onPress={handleOpenInviteFromPopover}
+                >
+                  <Image
+                    source={require('../../assets/icons/SofaSeat.png')}
+                    style={styles.seatPopoverSofaImg}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.seatPopoverText}>
+                    <T>Invite</T>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    );
+  })()}
 
       {/* ══ ROOM SETTINGS MODAL (Matching User Screenshot) ══ */}
       <RoomSettingsModal
         visible={roomSettingsModalVisible}
         onClose={() => setRoomSettingsModalVisible(false)}
         room={room}
+        onToggleFreeMode={handleToggleFreeMode}
         onOpenPeople={(tab) => {
           setRoomSettingsModalVisible(false);
           setMyPeopleInitialTab(tab || 'Host');
@@ -2592,5 +2858,66 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+
+  /* ── Seat Popover Styles (Matching Screenshot 1) ── */
+  seatPopoverOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  seatPopoverCard: {
+    position: 'absolute',
+    backgroundColor: '#161622',
+    borderRadius: 14,
+    width: 138,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.55,
+    shadowRadius: 12,
+    elevation: 16,
+    zIndex: 9999,
+  },
+  seatPopoverArrow: {
+    position: 'absolute',
+    top: -6,
+    width: 12,
+    height: 12,
+    backgroundColor: '#161622',
+    transform: [{ rotate: '45deg' }],
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.22)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.22)',
+    zIndex: 10,
+  },
+  seatPopoverItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  seatPopoverIconText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  seatPopoverSofaImg: {
+    width: 18,
+    height: 18,
+    tintColor: '#FFFFFF',
+  },
+  seatPopoverText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  seatPopoverDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginHorizontal: 12,
   },
 });

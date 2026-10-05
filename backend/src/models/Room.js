@@ -170,6 +170,18 @@ const roomSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    // Free Mode (true = open mic/anyone can take seat; false = application required)
+    freeMode: {
+      type: Boolean,
+      default: true,
+    },
+    // Seat Applicants (queue of users waiting for approval when freeMode is false)
+    seatApplicants: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     timestamps: true,

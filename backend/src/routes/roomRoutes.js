@@ -17,6 +17,10 @@ const {
   purchaseBossSeat,
   takeBossSeat,
   leaveBossSeat,
+  toggleFreeMode,
+  applyForSeat,
+  acceptSeatApplicant,
+  rejectSeatApplicant,
 } = require('../controllers/roomController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -40,5 +44,9 @@ router.get('/:id/kicked-users', protect, getKickedUsers);
 router.post('/:id/boss-seat/purchase', protect, purchaseBossSeat);
 router.post('/:id/boss-seat/take', protect, takeBossSeat);
 router.post('/:id/boss-seat/leave', protect, leaveBossSeat);
+router.post('/:id/free-mode', protect, toggleFreeMode);
+router.post('/:id/seat-applicants/apply', protect, applyForSeat);
+router.post('/:id/seat-applicants/accept', protect, acceptSeatApplicant);
+router.post('/:id/seat-applicants/reject', protect, rejectSeatApplicant);
 
 module.exports = router;

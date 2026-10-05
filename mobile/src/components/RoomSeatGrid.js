@@ -75,6 +75,7 @@ export default function RoomSeatGrid({
   const GRID_H_PADDING = 12;
   const SEAT_ITEM_WIDTH = (width - GRID_H_PADDING * 2) / COLUMNS;
   const totalSeats = seats.length || 8;
+  const seatRefs = useRef([]);
   const displaySeats = Array.from(
     { length: totalSeats },
     (_, i) => seats[i] || { seatIndex: i, user: null }
@@ -298,9 +299,51 @@ export default function RoomSeatGrid({
           return (
             <TouchableOpacity
               key={`sofa_seat_${index}`}
+              ref={(el) => {
+                seatRefs.current[index] = el;
+              }}
               style={[styles.seatItem, { width: SEAT_ITEM_WIDTH }]}
               activeOpacity={0.75}
-              onPress={() => onSeatPress(seat, index)}
+              onPress={(e) => {
+                const fallbackX = e?.nativeEvent?.pageX || (GRID_H_PADDING + (index % COLUMNS + 0.5) * SEAT_ITEM_WIDTH);
+                const fallbackY = e?.nativeEvent?.pageY || (360 + Math.floor(index / COLUMNS) * 95);
+
+                if (seatRefs.current[index]?.measureInWindow) {
+                  seatRefs.current[index].measureInWindow((x, y, w, h) => {
+                    if (typeof x === 'number' && !isNaN(x) && w > 0) {
+                      onSeatPress &&
+                        onSeatPress(seat, index, {
+                          x: x + w / 2,
+                          y: y + h,
+                          seatX: x,
+                          seatY: y,
+                          seatWidth: w,
+                          seatHeight: h,
+                        });
+                    } else {
+                      onSeatPress &&
+                        onSeatPress(seat, index, {
+                          x: fallbackX,
+                          y: fallbackY,
+                          seatX: GRID_H_PADDING + (index % COLUMNS) * SEAT_ITEM_WIDTH,
+                          seatY: 360 + Math.floor(index / COLUMNS) * 95,
+                          seatWidth: SEAT_ITEM_WIDTH,
+                          seatHeight: 65,
+                        });
+                    }
+                  });
+                } else {
+                  onSeatPress &&
+                    onSeatPress(seat, index, {
+                      x: fallbackX,
+                      y: fallbackY,
+                      seatX: GRID_H_PADDING + (index % COLUMNS) * SEAT_ITEM_WIDTH,
+                      seatY: 360 + Math.floor(index / COLUMNS) * 95,
+                      seatWidth: SEAT_ITEM_WIDTH,
+                      seatHeight: 65,
+                    });
+                }
+              }}
             >
               {isOccupied ? (
                 /* ── Occupied Seat ── */

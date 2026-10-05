@@ -147,13 +147,17 @@ function initRoomSockets(io) {
           return socket.emit('error_message', { message: 'Seat already occupied' });
         }
 
-        // CONDITION: A user cannot be in 2 places!
-        // If the user is the room owner and currently active on the Host seat, they CANNOT sit on a mic seat!
         const isOwner = room.owner && room.owner.toString() === userId.toString();
-        const isHostActive = room.isHostActive !== false;
-        if (isOwner && isHostActive) {
+        const isAdmin = room.admins && room.admins.some((aId) => aId.toString() === userId.toString());
+        if (isOwner && room.isHostActive) {
+          room.isHostActive = false;
+          io.to(roomId).emit('host_status_updated', { isHostActive: false });
+        }
+
+        // When Free Mode is OFF, only owner and admin can directly take seat. Audience must apply.
+        if (room.freeMode === false && !isOwner && !isAdmin) {
           return socket.emit('error_message', {
-            message: 'You are currently on the Host seat. Please step down from Host seat first.',
+            message: 'Free Mode is OFF. Please apply to take a mic seat.',
           });
         }
 
@@ -181,14 +185,36 @@ function initRoomSockets(io) {
       }
     });
 
-    // Leave Mic Seat
+    // Leave Mic Seat / Remove from Seat (Admin Rights table: Owner, Admin, Host)
     socket.on('leave_seat', async ({ roomId, userId }) => {
       try {
         const room = await Room.findById(roomId);
         if (!room) return;
 
+        const requesterId = (socket.userId || userId)?.toString();
+        const targetUserId = userId?.toString();
+        const ownerId = room.owner?.toString();
+        const isOwner = ownerId && requesterId === ownerId;
+        const isAdmin = room.admins && room.admins.some((aId) => aId.toString() === requesterId);
+        const isHost = room.isHostActive && (isOwner || (room.hosts && room.hosts.some((hId) => hId.toString() === requesterId)));
+        const isSelf = requesterId === targetUserId;
+
+        // If removing someone else: only Owner, Admin, or Host can remove (Table: Kick off the seat)
+        if (!isSelf && !isOwner && !isAdmin && !isHost) {
+          return socket.emit('error_message', {
+            message: 'You do not have permission to remove users from seat',
+          });
+        }
+
+        // Room Owner can NEVER be removed from seat by anyone else
+        if (!isSelf && targetUserId === ownerId) {
+          return socket.emit('error_message', {
+            message: 'Cannot remove Room Owner from seat',
+          });
+        }
+
         room.seats.forEach((s) => {
-          if (s.user && s.user.toString() === userId) {
+          if (s.user && s.user.toString() === targetUserId) {
             s.user = null;
           }
         });
@@ -196,13 +222,128 @@ function initRoomSockets(io) {
         await room.save();
 
         const updatedRoom = await Room.findById(roomId)
-          .populate('seats.user', 'name avatar wealthLevel activeFrame');
+          .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender');
 
         io.to(roomId).emit('seats_updated', {
           seats: updatedRoom.seats,
         });
       } catch (err) {
         console.error('Socket leave_seat error:', err);
+      }
+    });
+
+    // Toggle Free Mode
+    socket.on('toggle_free_mode', async ({ roomId, freeMode }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return;
+        room.freeMode = Boolean(freeMode);
+        await room.save();
+        io.to(roomId).emit('free_mode_updated', { freeMode: room.freeMode });
+        io.to(roomId).emit('new_chat_message', {
+          system: true,
+          text: room.freeMode ? '📢 Free Mode was turned ON' : '📢 Free Mode was turned OFF (Application required)',
+        });
+      } catch (err) {
+        console.error('Socket toggle_free_mode error:', err);
+      }
+    });
+
+    // Apply for Seat (when Free Mode is OFF)
+    socket.on('apply_for_seat', async ({ roomId, userId, seatIndex }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return;
+        if (!room.seatApplicants) room.seatApplicants = [];
+        if (!room.seatApplicants.some((id) => id.toString() === userId.toString())) {
+          room.seatApplicants.push(userId);
+          await room.save();
+        }
+        const updatedRoom = await Room.findById(roomId)
+          .populate('seatApplicants', 'name avatar wealthLevel activeFrame customId gender');
+        io.to(roomId).emit('seat_applicants_updated', {
+          seatApplicants: updatedRoom.seatApplicants,
+        });
+        const applicant = await User.findById(userId);
+        if (applicant) {
+          io.to(roomId).emit('new_chat_message', {
+            system: true,
+            text: `📢 ${applicant.name} applied for a mic seat!`,
+          });
+        }
+      } catch (err) {
+        console.error('Socket apply_for_seat error:', err);
+      }
+    });
+
+    // Accept Seat Applicant
+    socket.on('accept_seat_applicant', async ({ roomId, applicantId, seatIndex }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return;
+        room.syncSeats();
+        let targetIndex = seatIndex !== undefined && seatIndex !== null ? Number(seatIndex) : -1;
+        if (targetIndex < 0 || targetIndex >= room.seats.length || room.seats[targetIndex]?.user) {
+          targetIndex = room.seats.findIndex((s) => !s.user);
+        }
+        if (targetIndex !== -1) {
+          room.seats[targetIndex].user = applicantId;
+        }
+        if (room.seatApplicants) {
+          room.seatApplicants = room.seatApplicants.filter((id) => id.toString() !== applicantId.toString());
+        }
+        await room.save();
+        const updatedRoom = await Room.findById(roomId)
+          .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+          .populate('seatApplicants', 'name avatar wealthLevel activeFrame customId gender');
+        io.to(roomId).emit('seats_updated', { seats: updatedRoom.seats });
+        io.to(roomId).emit('seat_applicants_updated', { seatApplicants: updatedRoom.seatApplicants });
+      } catch (err) {
+        console.error('Socket accept_seat_applicant error:', err);
+      }
+    });
+
+    // Reject Seat Applicant
+    socket.on('reject_seat_applicant', async ({ roomId, applicantId }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return;
+        if (room.seatApplicants) {
+          room.seatApplicants = room.seatApplicants.filter((id) => id.toString() !== applicantId.toString());
+          await room.save();
+        }
+        const updatedRoom = await Room.findById(roomId)
+          .populate('seatApplicants', 'name avatar wealthLevel activeFrame customId gender');
+        io.to(roomId).emit('seat_applicants_updated', { seatApplicants: updatedRoom.seatApplicants });
+      } catch (err) {
+        console.error('Socket reject_seat_applicant error:', err);
+      }
+    });
+
+    // Invite User to Seat
+    socket.on('invite_to_seat', async ({ roomId, targetUserId, seatIndex }) => {
+      try {
+        const room = await Room.findById(roomId);
+        if (!room) return;
+        room.syncSeats();
+        let targetIndex = seatIndex !== undefined && seatIndex !== null ? Number(seatIndex) : -1;
+        if (targetIndex < 0 || targetIndex >= room.seats.length || room.seats[targetIndex]?.user) {
+          targetIndex = room.seats.findIndex((s) => !s.user);
+        }
+        if (targetIndex !== -1) {
+          room.seats[targetIndex].user = targetUserId;
+        }
+        if (room.seatApplicants) {
+          room.seatApplicants = room.seatApplicants.filter((id) => id.toString() !== targetUserId.toString());
+        }
+        await room.save();
+        const updatedRoom = await Room.findById(roomId)
+          .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+          .populate('seatApplicants', 'name avatar wealthLevel activeFrame customId gender');
+        io.to(roomId).emit('seats_updated', { seats: updatedRoom.seats });
+        io.to(roomId).emit('seat_applicants_updated', { seatApplicants: updatedRoom.seatApplicants });
+      } catch (err) {
+        console.error('Socket invite_to_seat error:', err);
       }
     });
 
@@ -297,10 +438,31 @@ function initRoomSockets(io) {
     socket.on('leave_host', async ({ roomId, userId }) => {
       try {
         const room = await Room.findById(roomId);
-        if (room) {
-          room.isHostActive = false;
-          await room.save();
+        if (!room) return;
+
+        const requesterId = (socket.userId || userId)?.toString();
+        const ownerId = room.owner?.toString();
+        const isAdmin = room.admins && room.admins.some((aId) => aId.toString() === requesterId);
+        const isOwner = ownerId && requesterId === ownerId;
+        const isSelf = requesterId === userId?.toString();
+
+        // Authority check: Only Self, Room Owner, or Admin can perform leave_host
+        if (!isSelf && !isOwner && !isAdmin) {
+          return socket.emit('error_message', {
+            message: 'Only Room Owner or Admin can remove someone from Hosting',
+          });
         }
+
+        // Admin CANNOT remove Room Owner from Hosting
+        if (isAdmin && !isOwner && userId?.toString() === ownerId) {
+          return socket.emit('error_message', {
+            message: 'Cannot remove Room Owner from Hosting',
+          });
+        }
+
+        room.isHostActive = false;
+        await room.save();
+
         io.to(roomId).emit('host_status_updated', {
           isHostActive: false,
           userId,
