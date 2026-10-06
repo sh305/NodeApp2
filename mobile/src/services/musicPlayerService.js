@@ -12,6 +12,8 @@ const STORAGE_KEY = '@yoyo_my_music_tracks';
 const PLAY_IN_OTHER_APPS_KEY = '@yoyo_music_play_other_apps';
 const DEVICE_LIBRARY_KEY = '@yoyo_device_audio_library';
 
+
+
 class MusicPlayerManager {
   constructor() {
     this.audioPlayer = null;
@@ -226,6 +228,17 @@ class MusicPlayerManager {
     this.playInOtherApps = val;
     await AsyncStorage.setItem(PLAY_IN_OTHER_APPS_KEY, val ? 'true' : 'false');
     this.notify();
+  }
+
+  async addMultipleToDeviceLibrary(songs) {
+    if (!Array.isArray(songs) || songs.length === 0) return;
+    const existingUris = new Set(this.deviceLibrary.map((s) => s.uri));
+    const toAdd = songs.filter((s) => !existingUris.has(s.uri));
+    if (toAdd.length > 0) {
+      this.deviceLibrary = [...toAdd, ...this.deviceLibrary];
+      await AsyncStorage.setItem(DEVICE_LIBRARY_KEY, JSON.stringify(this.deviceLibrary));
+      this.notify();
+    }
   }
 
   async addToDeviceLibrary(song) {

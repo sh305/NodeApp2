@@ -170,18 +170,17 @@ export default function LocalMusicPlayerModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View style={styles.backdrop} />
-        </TouchableWithoutFeedback>
-
-        {/* Floating Player Card matching Screenshot 1 */}
-        <View
-          style={[
-            styles.playerCard,
-            { marginBottom: Math.max(50, insets.bottom + 40) },
-          ]}
-        >
+      {/* Outer tap = dismiss modal (music keeps playing) */}
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.modalOverlay}>
+          {/* Inner tap on card = do nothing (stop propagation) */}
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <View
+              style={[
+                styles.playerCard,
+                { marginBottom: Math.max(50, insets.bottom + 40) },
+              ]}
+            >
           <VinylWatermark />
 
           {/* Header Title */}
@@ -303,8 +302,10 @@ export default function LocalMusicPlayerModal({
               other app starts playing audio, users in the room can also hear it.
             </T>
           </Text>
+            </View>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
@@ -314,9 +315,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
   },
   playerCard: {
     marginHorizontal: 16,

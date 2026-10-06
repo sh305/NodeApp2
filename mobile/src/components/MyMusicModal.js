@@ -7,6 +7,7 @@ import {
   StyleSheet,
   FlatList,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import Svg, { Path, Rect, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +22,21 @@ try {
   DocumentPicker = require('expo-document-picker');
 } catch (e) {
   console.log('expo-document-picker not available:', e);
+}
+
+let MediaLibrary = null;
+try {
+  // eslint-disable-next-line global-require
+  MediaLibrary = require('expo-media-library');
+} catch (e) {
+  // Silent fallback
+}
+
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '<unknown>';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
 // ── SVG ICONS ──
@@ -114,6 +130,55 @@ export default function MyMusicModal({ visible, onClose }) {
 
   // Local device/custom scanned songs pool
   const [libraryPool, setLibraryPool] = useState(playerState.deviceLibrary || []);
+  const [isScanning, setIsScanning] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+
+  // ── Auto Scan Phone Storage for Music Files ──
+  const scanDeviceMusic = async () => {
+    try {
+      if (!MediaLibrary) return;
+      setIsScanning(true);
+      setPermissionDenied(false);
+
+      const perm = await MediaLibrary.requestPermissionsAsync();
+      if (perm.status !== 'granted') {
+        setPermissionDenied(true);
+        setIsScanning(false);
+        return;
+      }
+
+      const res = await MediaLibrary.getAssetsAsync({
+        mediaType: 'audio',
+        first: 500,
+        sortBy: [['creationTime', false]],
+      });
+
+      if (res && res.assets && res.assets.length > 0) {
+        const scannedTracks = res.assets.map((asset) => ({
+          id: `dev_${asset.id}`,
+          title: asset.filename || 'Audio Track',
+          artist: formatDuration(asset.duration),
+          uri: asset.uri,
+          duration: asset.duration,
+        }));
+
+        await musicPlayer.addMultipleToDeviceLibrary(scannedTracks);
+
+        setLibraryPool((prev) => {
+          const map = new Map();
+          scannedTracks.forEach((t) => map.set(t.uri, t));
+          prev.forEach((t) => map.set(t.uri, t));
+          return Array.from(map.values());
+        });
+      }
+    } catch (err) {
+      // In Expo Go, Google Play Android policy restricts Expo Go from media library permissions.
+      // Seamlessly fall back so user can use the direct Audio tab picker.
+      setPermissionDenied(true);
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   useEffect(() => {
     const unsub = musicPlayer.subscribe((state) => {
@@ -122,6 +187,13 @@ export default function MyMusicModal({ visible, onClose }) {
     });
     return unsub;
   }, []);
+
+  // Auto-scan whenever opening or switching to 'add' mode
+  useEffect(() => {
+    if (visible && viewMode === 'add') {
+      scanDeviceMusic();
+    }
+  }, [visible, viewMode]);
 
   // Reset states when modal closes or mode changes
   useEffect(() => {
@@ -226,9 +298,7 @@ export default function MyMusicModal({ visible, onClose }) {
         }));
 
         // Persist all selected tracks to device library
-        for (const track of newTracks) {
-          await musicPlayer.addToDeviceLibrary(track);
-        }
+        await musicPlayer.addMultipleToDeviceLibrary(newTracks);
 
         // Add to active library pool
         setLibraryPool((prev) => {
@@ -430,12 +500,7 @@ export default function MyMusicModal({ visible, onClose }) {
               const existingIds = new Set(myMusicList.map((s) => s.id));
               setSelectedToAdd(existingIds);
               setViewMode('add');
-              // If library is currently empty, automatically open device picker
-              if (libraryPool.length === 0) {
-                setTimeout(() => {
-                  handlePickFromDevice();
-                }, 300);
-              }
+              scanDeviceMusic();
             }}
           >
             <Text style={styles.greenPillBtnText}>
@@ -497,27 +562,17 @@ export default function MyMusicModal({ visible, onClose }) {
       <View style={styles.container}>
         {renderHeader()}
 
-        {/* Prominent device pick shortcut in 'add' mode */}
-        {viewMode === 'add' && (
-          <TouchableOpacity
-            style={styles.devicePickBanner}
-            activeOpacity={0.75}
-            onPress={handlePickFromDevice}
-          >
-            <DeviceUploadIcon size={22} color="#10B981" />
-            <View style={styles.devicePickTextCol}>
-              <Text style={styles.devicePickBannerText}>
-                <T>Select Music from Phone</T>
-              </Text>
-              <Text style={styles.devicePickBannerSubText}>
-                <T>Pick All / Multiple Songs</T>
-              </Text>
-            </View>
-            <View style={styles.devicePickBadge}>
-              <Text style={styles.devicePickBadgeText}>+ Add</Text>
-            </View>
-          </TouchableOpacity>
+        {/* Scanning indicator banner in 'add' mode */}
+        {viewMode === 'add' && isScanning && (
+          <View style={styles.scanningBanner}>
+            <ActivityIndicator size="small" color="#10B981" />
+            <Text style={styles.scanningBannerText}>
+              <T>Scanning device music...</T>
+            </Text>
+          </View>
         )}
+
+
 
         {/* Songs List */}
         <FlatList
@@ -609,6 +664,41 @@ const styles = StyleSheet.create({
   },
   headerDevicePickBtn: {
     padding: 6,
+  },
+  permissionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FEF3C7',
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  permissionBannerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  permissionBannerSubText: {
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 2,
+  },
+  permissionBtn: {
+    backgroundColor: '#D97706',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  permissionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   devicePickBanner: {
     flexDirection: 'row',

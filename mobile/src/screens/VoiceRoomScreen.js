@@ -48,6 +48,7 @@ import PkInviteReceivedModal from '../components/PkInviteReceivedModal';
 import PkBattleResultModal from '../components/PkBattleResultModal';
 import LocalMusicPlayerModal from '../components/LocalMusicPlayerModal';
 import MyMusicModal from '../components/MyMusicModal';
+import SoundEffectsModal from '../components/SoundEffectsModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
@@ -117,6 +118,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [roomToolsModalVisible, setRoomToolsModalVisible] = useState(false);
   const [localMusicPlayerVisible, setLocalMusicPlayerVisible] = useState(false);
   const [myMusicModalVisible, setMyMusicModalVisible] = useState(false);
+  const [soundEffectsModalVisible, setSoundEffectsModalVisible] = useState(false);
   const [roomMembersModalVisible, setRoomMembersModalVisible] = useState(false);
   const [roomSettingsModalVisible, setRoomSettingsModalVisible] = useState(false);
   const [myPeopleModalVisible, setMyPeopleModalVisible] = useState(false);
@@ -2116,6 +2118,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           } else if (tool?.id === 'my_music') {
             setRoomToolsModalVisible(false);
             setLocalMusicPlayerVisible(true);
+          } else if (tool?.id === 'sound_effect') {
+            setRoomToolsModalVisible(false);
+            setSoundEffectsModalVisible(true);
           } else {
             console.log('Room tool selected:', tool.name, toggledState);
           }
@@ -2133,6 +2138,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       <MyMusicModal
         visible={myMusicModalVisible}
         onClose={() => setMyMusicModalVisible(false)}
+      />
+
+      {/* ══ SOUND EFFECTS MODAL ══ */}
+      <SoundEffectsModal
+        visible={soundEffectsModalVisible}
+        onClose={() => setSoundEffectsModalVisible(false)}
       />
 
       {/* ══ ROOM MEMBERS MODAL (Applicants, On Seat, Participants - Matching Screenshot 2) ══ */}
