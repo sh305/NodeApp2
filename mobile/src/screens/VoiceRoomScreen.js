@@ -46,6 +46,9 @@ import InviteRoomPkModal from '../components/InviteRoomPkModal';
 import PkBattleFloatingWidget from '../components/PkBattleFloatingWidget';
 import PkInviteReceivedModal from '../components/PkInviteReceivedModal';
 import PkBattleResultModal from '../components/PkBattleResultModal';
+import LocalMusicPlayerModal from '../components/LocalMusicPlayerModal';
+import MyMusicModal from '../components/MyMusicModal';
+import { musicPlayer } from '../services/musicPlayerService';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
@@ -112,6 +115,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [roomGoldContributed, setRoomGoldContributed] = useState(0);
   const [roomEmojiModalVisible, setRoomEmojiModalVisible] = useState(false);
   const [roomToolsModalVisible, setRoomToolsModalVisible] = useState(false);
+  const [localMusicPlayerVisible, setLocalMusicPlayerVisible] = useState(false);
+  const [myMusicModalVisible, setMyMusicModalVisible] = useState(false);
   const [roomMembersModalVisible, setRoomMembersModalVisible] = useState(false);
   const [roomSettingsModalVisible, setRoomSettingsModalVisible] = useState(false);
   const [myPeopleModalVisible, setMyPeopleModalVisible] = useState(false);
@@ -530,6 +535,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     return () => {
       showSub.remove();
       hideSub.remove();
+      musicPlayer.stopAndUnload();
       socket.emit('leave_room', { roomId, userId: currentUser?._id });
       socket.disconnect();
     };
@@ -2107,10 +2113,26 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 showToast(t('Matchmaking cancelled'), 'info');
               }
             }
+          } else if (tool?.id === 'my_music') {
+            setRoomToolsModalVisible(false);
+            setLocalMusicPlayerVisible(true);
           } else {
             console.log('Room tool selected:', tool.name, toggledState);
           }
         }}
+      />
+
+      {/* ══ LOCAL MUSIC PLAYER (Play local music - Screenshot 1) ══ */}
+      <LocalMusicPlayerModal
+        visible={localMusicPlayerVisible}
+        onClose={() => setLocalMusicPlayerVisible(false)}
+        onOpenPlaylist={() => setMyMusicModalVisible(true)}
+      />
+
+      {/* ══ MY MUSIC MODAL (Screenshots 2, 3, 4 - List, Add, Edit/Delete) ══ */}
+      <MyMusicModal
+        visible={myMusicModalVisible}
+        onClose={() => setMyMusicModalVisible(false)}
       />
 
       {/* ══ ROOM MEMBERS MODAL (Applicants, On Seat, Participants - Matching Screenshot 2) ══ */}
