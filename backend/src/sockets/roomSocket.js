@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const Room = require('../models/Room');
 const User = require('../models/User');
 
@@ -767,6 +768,34 @@ function initRoomSockets(io) {
         imageUrl,
         timestamp: new Date(),
       });
+    });
+
+    socket.on('request_lucky_number', async ({ roomId } = {}) => {
+      try {
+        if (
+          !roomId ||
+          String(socket.roomId) !== String(roomId) ||
+          !socket.rooms.has(String(roomId)) ||
+          !socket.userId
+        ) return;
+
+        const user = await User.findById(socket.userId).select('name avatar wealthLevel');
+        if (!user) return;
+
+        io.to(String(roomId)).emit('lucky_number_received', {
+          id: `lucky_number_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+          number: crypto.randomInt(1, 101),
+          sender: {
+            _id: String(user._id),
+            name: user.name || 'User',
+            avatar: user.avatar || '',
+            wealthLevel: user.wealthLevel || 1,
+          },
+          createdAt: new Date(),
+        });
+      } catch (err) {
+        console.error('Socket request_lucky_number error:', err);
+      }
     });
 
     // Broadcast Gift Animation to Room & Sync PK Battle Score

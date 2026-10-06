@@ -328,7 +328,11 @@ export default function RoomSettingsModal({
 
             {/* 3. Lucky Number (Toggle) */}
             <View style={styles.menuRowWithSwitch}>
-              <Text style={styles.menuIcon}>🎲</Text>
+              <Image
+                source={require('../../assets/icons/dice.png')}
+                style={styles.menuIconImage}
+                resizeMode="contain"
+              />
               <View style={styles.switchInfoCol}>
                 <Text style={styles.switchTitle}>
                   <T>Lucky Number</T>
@@ -493,6 +497,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     width: 28,
     textAlign: 'center',
+  },
+  menuIconImage: {
+    width: 24,
+    height: 24,
+    marginHorizontal: 2,
     marginRight: 12,
   },
   menuIconBox: {

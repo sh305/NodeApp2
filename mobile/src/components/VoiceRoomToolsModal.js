@@ -34,7 +34,7 @@ const ICONS = {
   // Other tools
   task: require('../../assets/icons/Room Icons/tool_task.png'),
   lucky_packet: require('../../assets/icons/Room Icons/tool_lucky_packet.png'),
-  lucky_number: require('../../assets/icons/Room Icons/tool_lucky_number.png'),
+  lucky_number: require('../../assets/icons/dice.png'),
   no_gift_effects: require('../../assets/icons/Room Icons/tool_no_gift_effects.png'),
   no_enter_effects: require('../../assets/icons/Room Icons/tool_no_enter_effects.png'),
   mute: require('../../assets/icons/Room Icons/tool_mute.png'),

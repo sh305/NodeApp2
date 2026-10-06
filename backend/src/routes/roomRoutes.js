@@ -24,6 +24,11 @@ const {
   updateSeatLayout,
   sendRoomBroadcast,
 } = require('../controllers/roomController');
+const {
+  sendLuckyPacket,
+  getRoomLuckyPackets,
+  claimLuckyPacket,
+} = require('../controllers/luckyPacketController');
 const { protect } = require('../middlewares/authMiddleware');
 
 router.route('/')
@@ -54,5 +59,8 @@ router.post('/:id/seat-applicants/reject', protect, rejectSeatApplicant);
 router.put('/:id/seat-layout', protect, updateSeatLayout);
 router.post('/:id/seat-layout', protect, updateSeatLayout);
 router.post('/:id/broadcast', protect, sendRoomBroadcast);
+router.post('/:id/lucky-packets', protect, sendLuckyPacket);
+router.get('/:id/lucky-packets', protect, getRoomLuckyPackets);
+router.post('/:id/lucky-packets/:packetId/claim', protect, claimLuckyPacket);
 
 module.exports = router;

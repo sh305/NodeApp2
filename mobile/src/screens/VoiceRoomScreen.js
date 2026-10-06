@@ -41,6 +41,12 @@ import BossSeatModal from '../components/BossSeatModal';
 import SeatSettingsModal from '../components/SeatSettingsModal';
 import BroadcastModal from '../components/BroadcastModal';
 import FlyingBroadcastBanner from '../components/FlyingBroadcastBanner';
+import FlyingRoomJoinBanner from '../components/FlyingRoomJoinBanner';
+import LuckyPacketModal from '../components/LuckyPacketModal';
+import LuckyPacketWidget from '../components/LuckyPacketWidget';
+import LuckyPacketPasswordModal from '../components/LuckyPacketPasswordModal';
+import LuckyPacketResultModal from '../components/LuckyPacketResultModal';
+import FlyingLuckyPacketBanner from '../components/FlyingLuckyPacketBanner';
 import ChoosePkModeModal from '../components/ChoosePkModeModal';
 import InviteRoomPkModal from '../components/InviteRoomPkModal';
 import PkBattleFloatingWidget from '../components/PkBattleFloatingWidget';
@@ -127,6 +133,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [seatSettingsModalVisible, setSeatSettingsModalVisible] = useState(false);
   const [broadcastModalVisible, setBroadcastModalVisible] = useState(false);
   const [globalBroadcasts, setGlobalBroadcasts] = useState([]);
+  const [roomJoinBanners, setRoomJoinBanners] = useState([]);
+  const [luckyPacketModalVisible, setLuckyPacketModalVisible] = useState(false);
+  const [roomLuckyPackets, setRoomLuckyPackets] = useState([]);
+  const [globalLuckyPackets, setGlobalLuckyPackets] = useState([]);
+  const [luckyPasswordPacket, setLuckyPasswordPacket] = useState(null);
+  const [luckyClaimSubmitting, setLuckyClaimSubmitting] = useState(false);
+  const [luckyResult, setLuckyResult] = useState({ visible: false, wonCoins: 0 });
   const [myPeopleInitialTab, setMyPeopleInitialTab] = useState('Host');
   const [activeHostEmoji, setActiveHostEmoji] = useState(null);
   const [activeSeatEmojis, setActiveSeatEmojis] = useState({});
@@ -181,6 +194,132 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   const socketRef = useRef(null);
   const chatInputRef = useRef(null);
+  const chatListRef = useRef(null);
+  const chatScrollTimeoutRef = useRef(null);
+  const isChatAtBottomRef = useRef(true);
+
+  const scrollChatToLatest = () => {
+    if (!isChatAtBottomRef.current) return;
+    if (chatScrollTimeoutRef.current) {
+      clearTimeout(chatScrollTimeoutRef.current);
+    }
+    chatScrollTimeoutRef.current = setTimeout(() => {
+      chatListRef.current?.scrollToEnd({ animated: true });
+      isChatAtBottomRef.current = true;
+      chatScrollTimeoutRef.current = null;
+    }, 50);
+  };
+
+  const handleChatScroll = (event) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const distanceFromBottom =
+      contentSize.height - layoutMeasurement.height - contentOffset.y;
+    isChatAtBottomRef.current = distanceFromBottom <= 48;
+
+    if (!isChatAtBottomRef.current && chatScrollTimeoutRef.current) {
+      clearTimeout(chatScrollTimeoutRef.current);
+      chatScrollTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    scrollChatToLatest();
+  }, [messages]);
+
+  useEffect(() => () => {
+    if (chatScrollTimeoutRef.current) clearTimeout(chatScrollTimeoutRef.current);
+  }, []);
+
+  const upsertLuckyPacket = (packet) => {
+    if (!packet?.id) return;
+    const myId = currentUser?._id ? String(currentUser._id) : '';
+    const claimedByMe = Array.isArray(packet.claimedUserIds)
+      ? packet.claimedUserIds.some((id) => String(id) === myId)
+      : Boolean(packet.claimedByMe);
+    const normalized = { ...packet, claimedByMe };
+    setRoomLuckyPackets((prev) => {
+      const rest = prev.filter((p) => String(p.id) !== String(normalized.id));
+      return [normalized, ...rest].slice(0, 8);
+    });
+  };
+
+  const fetchRoomLuckyPackets = async () => {
+    try {
+      const res = await api.get(`/rooms/${roomId}/lucky-packets`);
+      if (res.data?.success) {
+        setRoomLuckyPackets(res.data.packets || []);
+      }
+    } catch (err) {
+      console.warn('Failed to load lucky packets', err?.message);
+    }
+  };
+
+  const claimLuckyPacket = async (packet, password) => {
+    if (!packet?.id) return;
+    setLuckyClaimSubmitting(true);
+    try {
+      const res = await api.post(`/rooms/${roomId}/lucky-packets/${packet.id}/claim`, {
+        password: password || undefined,
+      });
+      if (res.data?.success) {
+        if (res.data.packet) upsertLuckyPacket(res.data.packet);
+        if (currentUser && res.data.remainingCoins !== undefined) {
+          currentUser.coins = res.data.remainingCoins;
+        }
+        setLuckyPasswordPacket(null);
+        setLuckyResult({ visible: true, wonCoins: res.data.wonCoins || 0 });
+      } else {
+        showToast(t(res.data?.message || 'Failed to open lucky packet'), 'error');
+      }
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to open lucky packet';
+      showToast(t(errMsg), 'error');
+      if (err?.response?.data?.packet) upsertLuckyPacket(err.response.data.packet);
+    } finally {
+      setLuckyClaimSubmitting(false);
+    }
+  };
+
+  const handleLuckyGetPress = (packet) => {
+    if (!packet) return;
+    if (packet.claimedByMe) {
+      showToast(t('You have already opened this lucky packet'), 'info');
+      return;
+    }
+    if (packet.packetType === 'countdown' && packet.opensAt && new Date(packet.opensAt).getTime() > Date.now()) {
+      showToast(t('Lucky package will open in 5 minutes'), 'info');
+      return;
+    }
+    if (packet.packetType === 'password' || packet.hasPassword) {
+      setLuckyPasswordPacket(packet);
+      return;
+    }
+    claimLuckyPacket(packet);
+  };
+
+  const handleLuckyBannerPress = async (packetId) => {
+    const packet = roomLuckyPackets.find((item) => String(item.id) === String(packetId));
+    if (packet) {
+      handleLuckyGetPress(packet);
+      return;
+    }
+
+    try {
+      const res = await api.get(`/rooms/${roomId}/lucky-packets`);
+      const latestPacket = res.data?.packets?.find(
+        (item) => String(item.id) === String(packetId)
+      );
+      if (!latestPacket) {
+        showToast(t('This lucky packet is empty'), 'error');
+        return;
+      }
+      upsertLuckyPacket(latestPacket);
+      handleLuckyGetPress(latestPacket);
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to open lucky packet';
+      showToast(t(errMsg), 'error');
+    }
+  };
 
   // Fetch Room info from API
   const fetchRoomDetails = async () => {
@@ -206,6 +345,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           (s) => s.user && s.user._id === currentUser?._id
         );
         setMySeatIndex(mySeat !== -1 ? mySeat : null);
+        fetchRoomLuckyPackets();
       }
     } catch (err) {
       if (err.response?.data?.kicked) {
@@ -351,8 +491,24 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setMessages((prev) => [...prev, msg]);
     });
 
+    socket.on('lucky_number_received', (result) => {
+      if (
+        result &&
+        result.id &&
+        Number.isInteger(result.number) &&
+        result.number >= 1 &&
+        result.number <= 100
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          { _id: `lucky_${result.id}`, luckyNumber: result },
+        ]);
+      }
+    });
+
     socket.on('user_joined_room', ({ user, timestamp }) => {
-      const joinId = `join_${user._id}_${timestamp || ''}`;
+      if (!user?._id) return;
+      const joinId = `join_${user._id}_${timestamp || Date.now()}`;
       setRoom((prev) => {
         if (!prev) return prev;
         const exists = prev.activeMembers?.some(
@@ -366,17 +522,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }
         return prev;
       });
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last && last._joinId === joinId) return prev;
-        return [
-          ...prev,
-          {
-            system: true,
-            text: `✨ ${user.name} entered the room with ${user.activeFrame?.name || 'Starter Frame'}`,
-            _joinId: joinId,
-          },
-        ];
+      setRoomJoinBanners((prev) => {
+        if (prev.some((item) => item.id === joinId)) return prev;
+        return [...prev, { id: joinId, user }];
       });
     });
 
@@ -397,6 +545,20 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       if (broadcastData) {
         setGlobalBroadcasts((prev) => [...prev, broadcastData]);
       }
+    });
+
+    socket.on('global_lucky_packet_broadcast', (packetBroadcast) => {
+      if (packetBroadcast) {
+        setGlobalLuckyPackets((prev) => [...prev, packetBroadcast]);
+      }
+    });
+
+    socket.on('lucky_packet_created', (packet) => {
+      if (packet) upsertLuckyPacket(packet);
+    });
+
+    socket.on('lucky_packet_updated', (packet) => {
+      if (packet) upsertLuckyPacket(packet);
     });
 
     socket.on('room_emoji_received', (data) => {
@@ -1363,6 +1525,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           style={[styles.rightFloatingWidgets, { bottom: bottomBarHeight + 8 }]}
           pointerEvents="box-none"
         >
+          {/* Lucky Packets (right side, like other voice chat apps) */}
           {/* Roulette Wheel */}
           <TouchableOpacity style={styles.widgetBtn} activeOpacity={0.8} onPress={() => {}}>
             <LinearGradient colors={['#F43F5E', '#10B981']} style={styles.widgetWheelGrad}>
@@ -1389,6 +1552,16 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               <Text style={styles.widgetGameEmoji}>🕹️</Text>
             </View>
           </TouchableOpacity>
+
+          {roomLuckyPackets
+            .filter((p) => p && p.status !== 'exhausted')
+            .map((packet) => (
+              <LuckyPacketWidget
+                key={packet.id}
+                packet={packet}
+                onGetPress={handleLuckyGetPress}
+              />
+            ))}
         </View>
 
         {/* ══ 4. BOTTOM-LEFT NOTICE & CHAT OVERLAY ══ */}
@@ -1396,22 +1569,46 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           style={[styles.bottomLeftChatSection, { bottom: bottomBarHeight + 4 }]}
           pointerEvents="box-none"
         >
-          {/* Rules / Safety Notice Bubble (exact matching Screenshot) */}
-          <View style={styles.noticeBubble}>
-            <Text style={styles.noticeText}>
-              <T>Sexual and violent contents are not allowed. All violators will be banned from the chatroom. Please respect each other and do not expose your personal info.</T>
-            </Text>
-          </View>
-
-          {/* Inverted Live Chat / System messages */}
           <FlatList
-            data={[...messages].reverse()}
-            inverted
-            keyExtractor={(_, i) => `msg_${i}`}
+            ref={chatListRef}
+            data={messages}
+            keyExtractor={(item, i) => `${item._id || item.id || item.timestamp || 'msg'}_${i}`}
             style={styles.chatList}
+            contentContainerStyle={styles.chatContent}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) =>
-              item.system ? (
+            onScroll={handleChatScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={scrollChatToLatest}
+            ListHeaderComponent={
+              <View style={styles.noticeBubble}>
+                <Text style={styles.noticeText}>
+                  <T>Sexual and violent contents are not allowed. All violators will be banned from the chatroom. Please respect each other and do not expose your personal info.</T>
+                </Text>
+              </View>
+            }
+            renderItem={({ item }) => {
+              if (item.luckyNumber) {
+                const result = item.luckyNumber;
+                return (
+                  <View style={styles.luckyNumberCard}>
+                    <View style={styles.luckyNumberSenderRow}>
+                      {result.sender?.avatar ? (
+                        <Image
+                          source={{ uri: result.sender.avatar }}
+                          style={styles.luckyNumberAvatar}
+                        />
+                      ) : null}
+                      <Text style={styles.luckyNumberSender} numberOfLines={1}>
+                        Lv.{result.sender?.wealthLevel || 1} {result.sender?.name || 'User'}
+                      </Text>
+                    </View>
+                    <Text style={styles.luckyNumberLabel}><T>Lucky number</T></Text>
+                    <Text style={styles.luckyNumberValue}>{result.number}</Text>
+                  </View>
+                );
+              }
+
+              return item.system ? (
                 <View style={styles.systemMsgBox}>
                   <Text style={styles.systemMsgText} numberOfLines={2}>
                     {item.text}
@@ -1435,12 +1632,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                         source={{ uri: item.imageUrl }}
                         style={styles.chatImage}
                         resizeMode="cover"
+                        onLoad={scrollChatToLatest}
                       />
                     </TouchableOpacity>
                   ) : null}
                 </View>
-              )
-            }
+              );
+            }}
           />
         </View>
 
@@ -2100,6 +2298,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           } else if (tool?.id === 'broadcast') {
             setRoomToolsModalVisible(false);
             setBroadcastModalVisible(true);
+          } else if (tool?.id === 'lucky_packet') {
+            setRoomToolsModalVisible(false);
+            setLuckyPacketModalVisible(true);
+          } else if (tool?.id === 'lucky_number') {
+            setRoomToolsModalVisible(false);
+            socketRef.current?.emit('request_lucky_number', { roomId });
           } else if (tool?.id === 'room_pk') {
             if (toggledState) {
               setRoomToolsModalVisible(false);
@@ -2330,6 +2534,32 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
       />
 
+      <LuckyPacketModal
+        visible={luckyPacketModalVisible}
+        onClose={() => setLuckyPacketModalVisible(false)}
+        roomId={roomId}
+        currentUser={currentUser}
+        onPacketSent={(remainingCoins, packet) => {
+          if (currentUser && remainingCoins !== undefined) {
+            currentUser.coins = remainingCoins;
+          }
+          if (packet) upsertLuckyPacket(packet);
+        }}
+      />
+
+      <LuckyPacketPasswordModal
+        visible={Boolean(luckyPasswordPacket)}
+        onClose={() => setLuckyPasswordPacket(null)}
+        submitting={luckyClaimSubmitting}
+        onSubmit={(pwd) => claimLuckyPacket(luckyPasswordPacket, pwd)}
+      />
+
+      <LuckyPacketResultModal
+        visible={luckyResult.visible}
+        wonCoins={luckyResult.wonCoins}
+        onClose={() => setLuckyResult({ visible: false, wonCoins: 0 })}
+      />
+
       {/* ══ GLOBAL FLYING BROADCAST MESSAGES ACROSS ALL ROOMS (Top-most Touch Layer) ══ */}
       {globalBroadcasts.map((broadcastItem, bIdx) => (
         <View
@@ -2360,6 +2590,64 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             }}
             onFinished={(finishedId) => {
               setGlobalBroadcasts((prev) => prev.filter((item) => item.id !== finishedId));
+            }}
+          />
+        </View>
+      ))}
+
+      {globalLuckyPackets.map((packetItem, pIdx) => (
+        <View
+          key={packetItem.id || `lp_${pIdx}`}
+          style={{
+            position: 'absolute',
+            top: Math.max(16, insets.top) + 60 + (globalBroadcasts.length * 56) + (pIdx * 56),
+            left: 0,
+            right: 0,
+            height: 60,
+            zIndex: 99999,
+            elevation: 99999,
+          }}
+          pointerEvents="box-none"
+        >
+          <FlyingLuckyPacketBanner
+            broadcast={packetItem}
+            currentRoomId={roomId}
+            onPressPacket={handleLuckyBannerPress}
+            onPressRoom={(targetRoomId, targetRoomTitle) => {
+              showToast(t('Leaving current room & entering lucky packet room...'), 'info');
+              socketRef.current?.emit('leave_room', { roomId, userId: currentUser?._id });
+              navigation.replace('VoiceRoom', {
+                roomId: targetRoomId,
+                roomTitle: targetRoomTitle || 'Voice Room',
+              });
+            }}
+            onFinished={(finishedId) => {
+              setGlobalLuckyPackets((prev) => prev.filter((item) => item.id !== finishedId));
+            }}
+          />
+        </View>
+      ))}
+      {roomJoinBanners.map((joinBanner, joinIdx) => (
+        <View
+          key={joinBanner.id}
+          style={{
+            position: 'absolute',
+            top:
+              Math.max(16, insets.top) +
+              60 +
+              ((globalBroadcasts.length + globalLuckyPackets.length + joinIdx) * 56),
+            left: 0,
+            right: 0,
+            height: 48,
+            zIndex: 99999,
+            elevation: 99999,
+          }}
+          pointerEvents="none"
+        >
+          <FlyingRoomJoinBanner
+            user={joinBanner.user}
+            onFinished={() => {
+              setRoomJoinBanners((prev) => prev.filter((item) => item.id !== joinBanner.id));
             }}
           />
         </View>
@@ -2756,9 +3044,49 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
     width: '74%',
-    maxHeight: 180,
+    height: 180,
     zIndex: 15,
-    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  luckyNumberCard: {
+    alignSelf: 'flex-start',
+    minWidth: 168,
+    maxWidth: '100%',
+    backgroundColor: 'rgba(30, 30, 45, 0.68)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(253, 224, 71, 0.45)',
+  },
+  luckyNumberSenderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  luckyNumberAvatar: {
+    width: 23,
+    height: 23,
+    borderRadius: 12,
+    marginRight: 6,
+  },
+  luckyNumberSender: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  luckyNumberLabel: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  luckyNumberValue: {
+    color: '#FACC15',
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '900',
   },
   noticeBubble: {
     backgroundColor: 'rgba(0, 0, 0, 0.32)',
@@ -2776,7 +3104,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   chatList: {
-    maxHeight: 100,
+    flex: 1,
+  },
+  chatContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 2,
   },
   systemMsgBox: {
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
@@ -2802,6 +3135,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginVertical: 1.5,
     alignSelf: 'flex-start',
+    maxWidth: '92%',
   },
   chatSenderName: {
     color: '#FBBF24',
@@ -2811,6 +3145,7 @@ const styles = StyleSheet.create({
   chatMessageContent: {
     color: '#FFFFFF',
     fontSize: 11,
+    flexShrink: 1,
   },
 
   /* ── 5. Floating Translucent Bottom Control Bar ── */
