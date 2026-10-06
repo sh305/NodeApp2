@@ -29,6 +29,8 @@ const getAutoDetectedHost = () => {
       hardware.includes('ranchu') ||
       manufacturer.includes('genymotion'));
 
+  // Android apps use the emulator's loopback address. ADB forwards the
+  // host's port 5000 to localhost:5000 inside the emulator.
   if (isAndroidEmulator) {
     return '127.0.0.1';
   }

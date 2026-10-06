@@ -8,118 +8,62 @@ import {
   StyleSheet,
   FlatList,
   Animated,
-  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AudioModule, createAudioPlayer } from 'expo-audio';
 import { T } from './TranslatedText';
 import { useLanguage } from '../context/LanguageContext';
 
-// Try to load expo-audio
-let ExpoAudio = null;
-try {
-  ExpoAudio = require('expo-audio');
-} catch (e) {}
-
-// 10 Sound Effects — local bundled MP3 + PNG icon assets
+// 10 local sound effects with matching non-emoji icons and dedicated audio.
 const SOUND_EFFECTS = [
   {
-    id: 'cheer',
-    label: 'Cheer',
-    color: '#FF6B6B',
-    bgColor: 'rgba(255,107,107,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'cheer', label: 'Cheer', color: '#FF6B6B', bgColor: 'rgba(255,107,107,0.15)',
     asset: require('../../assets/sounds/cheer.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_cheer.png'),
   },
   {
-    id: 'clap',
-    label: 'Clap',
-    color: '#FFB347',
-    bgColor: 'rgba(255,179,71,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'clap', label: 'Clap', color: '#FFB347', bgColor: 'rgba(255,179,71,0.15)',
     asset: require('../../assets/sounds/clap.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_clap.png'),
   },
   {
-    id: 'win',
-    label: 'Win',
-    color: '#FFD700',
-    bgColor: 'rgba(255,215,0,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'win', label: 'Win', color: '#FFD700', bgColor: 'rgba(255,215,0,0.15)',
     asset: require('../../assets/sounds/win.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_win.png'),
   },
   {
-    id: 'awkward',
-    label: 'Awkward',
-    color: '#98D8C8',
-    bgColor: 'rgba(152,216,200,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'awkward', label: 'Awkward', color: '#98D8C8', bgColor: 'rgba(152,216,200,0.15)',
     asset: require('../../assets/sounds/awkward.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_awkward.png'),
   },
   {
-    id: 'laugh',
-    label: 'Laugh',
-    color: '#FFEB3B',
-    bgColor: 'rgba(255,235,59,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'laugh', label: 'Laugh', color: '#FFEB3B', bgColor: 'rgba(255,235,59,0.15)',
     asset: require('../../assets/sounds/laugh.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_laugh.png'),
   },
   {
-    id: 'mock',
-    label: 'Mock',
-    color: '#4CAF50',
-    bgColor: 'rgba(76,175,80,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'mock', label: 'Mock', color: '#4CAF50', bgColor: 'rgba(76,175,80,0.15)',
     asset: require('../../assets/sounds/mock.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_mock.png'),
   },
   {
-    id: 'horror',
-    label: 'Horror',
-    color: '#A78BFA',
-    bgColor: 'rgba(167,139,250,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'horror', label: 'Horror', color: '#A78BFA', bgColor: 'rgba(167,139,250,0.15)',
     asset: require('../../assets/sounds/horror.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_horror.png'),
   },
   {
-    id: 'wow',
-    label: 'Wow',
-    color: '#E040FB',
-    bgColor: 'rgba(224,64,251,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'wow', label: 'Wow', color: '#E040FB', bgColor: 'rgba(224,64,251,0.15)',
     asset: require('../../assets/sounds/wow.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_wow.png'),
   },
   {
-    id: 'cry',
-    label: 'Cry',
-    color: '#42A5F5',
-    bgColor: 'rgba(66,165,245,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'cry', label: 'Cry', color: '#42A5F5', bgColor: 'rgba(66,165,245,0.15)',
     asset: require('../../assets/sounds/cry.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_cry.png'),
   },
   {
-    id: 'love',
-    label: 'Love',
-    color: '#F06292',
-    bgColor: 'rgba(240,98,146,0.15)',
-    // eslint-disable-next-line global-require
+    id: 'love', label: 'Love', color: '#F06292', bgColor: 'rgba(240,98,146,0.15)',
     asset: require('../../assets/sounds/love.mp3'),
-    // eslint-disable-next-line global-require
     icon: require('../../assets/sounds/icon_love.png'),
   },
 ];
@@ -178,9 +122,11 @@ export default function SoundEffectsModal({ visible, onClose }) {
   const _stopCurrent = () => {
     if (playerRef.current) {
       try {
-        if (typeof playerRef.current.pause === 'function') playerRef.current.pause();
-        if (typeof playerRef.current.remove === 'function') playerRef.current.remove();
-      } catch (e) {}
+        playerRef.current.pause();
+        playerRef.current.remove();
+      } catch (e) {
+        console.log('[SoundFX] cleanup error:', e.message);
+      }
       playerRef.current = null;
     }
   };
@@ -198,50 +144,33 @@ export default function SoundEffectsModal({ visible, onClose }) {
     _stopCurrent();
     setPlayingId(item.id);
 
-    if (ExpoAudio && typeof ExpoAudio.createAudioPlayer === 'function') {
-      try {
-        // Activate audio session first
-        if (typeof ExpoAudio.setIsAudioActiveAsync === 'function') {
-          try { await ExpoAudio.setIsAudioActiveAsync(true); } catch (_e) {}
-        }
+    try {
+      await AudioModule.setAudioModeAsync({ playsSilentIOS: false });
+      const player = createAudioPlayer(item.asset);
+      playerRef.current = player;
 
-        const player = ExpoAudio.createAudioPlayer(item.asset);
-        playerRef.current = player;
-
-        // Listen for when audio is loaded, THEN play — avoids race condition
-        if (typeof player.addListener === 'function') {
-          const sub = player.addListener('playbackStatusUpdate', (status) => {
-            if (status && status.isLoaded && !status.playing) {
-              try { player.play(); } catch (_e) {}
-              sub.remove();
-            }
-          });
-        } else {
-          // Fallback: retry play() until it works (max 20 attempts × 100ms = 2s)
-          let attempts = 0;
-          const tryPlay = setInterval(() => {
-            attempts++;
-            try {
-              if (playerRef.current) {
-                playerRef.current.play();
-                clearInterval(tryPlay);
-              }
-            } catch (_e) {}
-            if (attempts >= 20) clearInterval(tryPlay);
-          }, 100);
+      const subscription = player.addListener('playbackStatusUpdate', (status) => {
+        if (status?.error) {
+          console.log('[SoundFX] playback status error:', status.error);
+          subscription.remove();
+          _stopCurrent();
+          setPlayingId(null);
         }
-      } catch (e) {
-        console.log('[SoundFX] error:', e.message);
-      }
-    } else {
-      console.log('[SoundFX] expo-audio not available');
+      });
+
+      player.play();
+    } catch (e) {
+      console.log('[SoundFX] playback error:', e.message);
+      _stopCurrent();
+      setPlayingId(null);
+      return;
     }
 
-    // Auto-stop after 4 seconds
+    // Stop after the generated sound finishes or after a safe timeout.
     stopTimerRef.current = setTimeout(() => {
       _stopCurrent();
       setPlayingId(null);
-    }, 2000);
+    }, 3000);
   };
 
   return (
