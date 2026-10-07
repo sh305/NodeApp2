@@ -17,7 +17,8 @@
         "backgroundColor": "#0F0F1A"
       },
       "package": "com.yoyo.voice",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "usesCleartextTraffic": true
     }
   }
 }

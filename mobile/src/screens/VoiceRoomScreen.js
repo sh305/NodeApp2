@@ -55,6 +55,7 @@ import PkBattleResultModal from '../components/PkBattleResultModal';
 import LocalMusicPlayerModal from '../components/LocalMusicPlayerModal';
 import MyMusicModal from '../components/MyMusicModal';
 import SoundEffectsModal from '../components/SoundEffectsModal';
+import PersonalTasksModal from '../components/PersonalTasksModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
@@ -122,6 +123,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [roomGoldContributed, setRoomGoldContributed] = useState(0);
   const [roomEmojiModalVisible, setRoomEmojiModalVisible] = useState(false);
   const [roomToolsModalVisible, setRoomToolsModalVisible] = useState(false);
+  const [personalTasksModalVisible, setPersonalTasksModalVisible] = useState(false);
+  const [hasClaimableTasks, setHasClaimableTasks] = useState(false);
+  const roomStaySecondsRef = useRef(0);
+  const seatedSecondsRef = useRef(0);
   const [localMusicPlayerVisible, setLocalMusicPlayerVisible] = useState(false);
   const [myMusicModalVisible, setMyMusicModalVisible] = useState(false);
   const [soundEffectsModalVisible, setSoundEffectsModalVisible] = useState(false);
@@ -170,6 +175,51 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       if (timer) clearInterval(timer);
     };
   }, [pkBattle, pkRemainingSeconds]);
+
+  // ══ DYNAMIC BADGE ON TASK ICON: Check if any task is completed & claimable ══
+  const checkTasksBadge = async () => {
+    try {
+      const res = await api.get('/tasks/status');
+      if (res.data?.success && Array.isArray(res.data.tasks)) {
+        const canClaim = res.data.tasks.some((t) => t.completed && !t.claimed);
+        setHasClaimableTasks(canClaim);
+      }
+    } catch (e) {
+      // Background check error ignored
+    }
+  };
+
+  useEffect(() => {
+    checkTasksBadge();
+  }, []);
+
+  // ══ TASK CRITERIA TIMER: Stay in room 5 mins & Seated 5 mins ══
+  useEffect(() => {
+    const taskTimer = setInterval(() => {
+      // 1. Room stay time
+      roomStaySecondsRef.current += 10;
+      if (roomStaySecondsRef.current >= 300) {
+        api.post('/tasks/progress', { taskId: 'stay_room_5_mins', progress: 300 })
+          .then(() => checkTasksBadge())
+          .catch(() => {});
+      }
+
+      // 2. Seated on mic time
+      if (mySeatIndex !== null) {
+        seatedSecondsRef.current += 10;
+        if (seatedSecondsRef.current >= 300) {
+          api.post('/tasks/progress', { taskId: 'seated_5_mins', progress: 300 })
+            .then(() => checkTasksBadge())
+            .catch(() => {});
+        }
+      }
+
+      // 3. Periodic check for task completion badge
+      checkTasksBadge();
+    }, 15000);
+
+    return () => clearInterval(taskTimer);
+  }, [mySeatIndex]);
 
   const roomOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
   const currentUserIdStr = currentUser?._id ? currentUser._id.toString() : '';
@@ -1084,6 +1134,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       await Share.share({
         message: `Join my live voice room "${roomTitle || 'Voice Room'}" on YoYo! Room ID: ${room?.roomId || roomId?.slice(-6) || '8181956'}`,
       });
+      // ══ TASK CRITERIA: Share 1 chatroom ══
+      api.post('/tasks/progress', { taskId: 'share_chatroom', increment: 1 })
+        .then(() => checkTasksBadge())
+        .catch(() => {});
     } catch (e) {
       // User dismissed
     }
@@ -1152,6 +1206,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     });
     setChatInput('');
     handleCloseChatInput();
+
+    // ══ TASK CRITERIA: Send comments in the room ══
+    api.post('/tasks/progress', { taskId: 'send_comments', increment: 1 })
+      .then(() => checkTasksBadge())
+      .catch(() => {});
   };
 
   const handlePickImage = async (shouldCrop = false) => {
@@ -1261,6 +1320,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       emoji: emojiItem.emoji,
       emojiData: payloadEmojiData,
     });
+
+    // ══ TASK CRITERIA: Like 5 posts / room reactions ══
+    api.post('/tasks/progress', { taskId: 'like_5_posts', increment: 1 })
+      .then(() => checkTasksBadge())
+      .catch(() => {});
   };
 
   const handleEmojiComplete = (target) => {
@@ -2285,6 +2349,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         visible={roomToolsModalVisible}
         onClose={() => setRoomToolsModalVisible(false)}
         roomPkActive={Boolean(pkBattle)}
+        hasClaimableTasks={hasClaimableTasks}
         onSelectTool={(tool, toggledState) => {
           if (tool?.id === 'members') {
             setRoomToolsModalVisible(false);
@@ -2325,6 +2390,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           } else if (tool?.id === 'sound_effect') {
             setRoomToolsModalVisible(false);
             setSoundEffectsModalVisible(true);
+          } else if (tool?.id === 'task') {
+            setRoomToolsModalVisible(false);
+            setPersonalTasksModalVisible(true);
           } else {
             console.log('Room tool selected:', tool.name, toggledState);
           }
@@ -2348,6 +2416,23 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       <SoundEffectsModal
         visible={soundEffectsModalVisible}
         onClose={() => setSoundEffectsModalVisible(false)}
+      />
+
+      {/* ══ PERSONAL TASKS MODAL (Daily tasks with diamond rewards - Matching Screenshot) ══ */}
+      <PersonalTasksModal
+        visible={personalTasksModalVisible}
+        onClose={() => {
+          setPersonalTasksModalVisible(false);
+          checkTasksBadge();
+        }}
+        roomStaySeconds={roomStaySecondsRef.current}
+        seatedSeconds={seatedSecondsRef.current}
+        onDiamondsClaimed={(newDiamonds) => {
+          if (currentUser && newDiamonds !== undefined) {
+            currentUser.diamonds = newDiamonds;
+          }
+          checkTasksBadge();
+        }}
       />
 
       {/* ══ ROOM MEMBERS MODAL (Applicants, On Seat, Participants - Matching Screenshot 2) ══ */}

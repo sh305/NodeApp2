@@ -25,6 +25,8 @@ import AvatarWithFrame from '../components/AvatarWithFrame';
 import UserLevelProgressBar from '../components/UserLevelProgressBar';
 import RoomLockModal from '../components/RoomLockModal';
 import GamingView from '../components/GamingView';
+import PersonalTasksModal from '../components/PersonalTasksModal';
+import MeProfileView from '../components/MeProfileView';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../components/Toast';
 
@@ -153,31 +155,27 @@ const NavMessageIcon = ({ active }) => {
   );
 };
 
-// Tab 5: Me (User Silhouette Avatar + Red Notification Badge Dot on Top-Right - matching original YoYo screenshot)
+// Tab 5: Me (Cute YoYo Mascot Silhouette Matching Screenshot)
 const NavMeIcon = ({ active }) => {
   const color = active ? '#00C853' : '#64748B';
   return (
-    <View style={{ width: 25, height: 25, position: 'relative' }}>
-      <Svg width={25} height={25} viewBox="0 0 28 28" fill="none">
-        <Circle
-          cx="14"
-          cy="9"
-          r="4.5"
-          fill={active ? '#00C853' : 'none'}
-          stroke={color}
-          strokeWidth="2"
-        />
-        <Path
-          d="M6 24C6 19 9.5 16 14 16C18.5 16 22 19 22 24"
-          fill={active ? '#00C853' : 'none'}
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </Svg>
-      {/* Red Notification Dot on Top Right of Me */}
-      <View style={styles.meBadgeDot} />
-    </View>
+    <Svg width={25} height={25} viewBox="0 0 28 28" fill="none">
+      <Circle
+        cx="14"
+        cy="9"
+        r="4.5"
+        fill={active ? '#00C853' : 'none'}
+        stroke={color}
+        strokeWidth="2"
+      />
+      <Path
+        d="M6 24C6 19 9.5 16 14 16C18.5 16 22 19 22 24"
+        fill={active ? '#00C853' : 'none'}
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </Svg>
   );
 };
 
@@ -222,15 +220,45 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
   useEffect(() => {
     if (bottomTab === 'Me') {
       fetchMyProfile();
+      checkTasksBadge();
     }
-  }, [bottomTab, currentUser?._id]);
+  }, [bottomTab, currentUser?._id, checkTasksBadge]);
 
   // Search query state
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Daily Check-in Modal
-  const [checkinClaimed, setCheckinClaimed] = useState(false);
+  // Personal Tasks Modal & Dynamic Claimable Badge
+  const [personalTasksModalVisible, setPersonalTasksModalVisible] = useState(false);
+  const [hasClaimableTasks, setHasClaimableTasks] = useState(false);
+
+  const checkTasksBadge = useCallback(async () => {
+    try {
+      const res = await api.get('/tasks/status');
+      if (res.data?.success && Array.isArray(res.data.tasks)) {
+        const canClaim = res.data.tasks.some((t) => t.completed && !t.claimed);
+        setHasClaimableTasks(canClaim);
+      }
+    } catch (e) {
+      // Ignore background error
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkTasksBadge();
+    }, [checkTasksBadge])
+  );
+
+  useEffect(() => {
+    if (bottomTab === 'Room' || bottomTab === 'Me') {
+      checkTasksBadge();
+      const interval = setInterval(() => {
+        checkTasksBadge();
+      }, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [bottomTab, checkTasksBadge]);
 
   // Rooms State
   const [rooms, setRooms] = useState([]);
@@ -397,12 +425,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
   };
 
   const handleDailyCheckin = () => {
-    if (checkinClaimed) {
-      showToast(t('Already Claimed Today! Come back tomorrow 🎉'), 'info');
-    } else {
-      setCheckinClaimed(true);
-      showToast(t('Check-in Successful! +100 Coins Claimed 🎉'), 'success');
-    }
+    setPersonalTasksModalVisible(true);
   };
 
   return (
@@ -453,10 +476,10 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
             </TouchableOpacity>
           </View>
         </View>
-      ) : bottomTab === 'Gaming' ? null : (
+      ) : (bottomTab === 'Gaming' || bottomTab === 'Me') ? null : (
         <View style={[styles.otherTopHeader, { paddingTop: Math.max(16, insets.top) }]}>
           <Text style={styles.otherTopHeaderTitle}>
-            {bottomTab === 'Me' ? t('My Profile') : t(bottomTab)}
+            {t(bottomTab)}
           </Text>
         </View>
       )}
@@ -467,6 +490,17 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           currentUser={currentUser}
           insets={insets}
           onNavigateTab={setBottomTab}
+        />
+      ) : bottomTab === 'Me' ? (
+        <MeProfileView
+          currentUser={currentUser}
+          myProfile={myProfile}
+          insets={insets}
+          onRefreshProfile={fetchMyProfile}
+          onOpenTasks={() => setPersonalTasksModalVisible(true)}
+          hasClaimableTasks={hasClaimableTasks}
+          navigation={navigation}
+          onLogout={handleConfirmLogout}
         />
       ) : (
         <ScrollView
@@ -755,82 +789,11 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
               {t('Coming soon')}
             </Text>
           </View>
-        ) : bottomTab === 'Me' ? (
-          /* ================= ME / USER PROFILE TAB ================= */
-          <View style={styles.meProfileWrap}>
-            <View style={styles.meProfileCard}>
-              <AvatarWithFrame
-                avatarUri={myProfile?.avatar || currentUser?.avatar}
-                level={myProfile?.wealthLevel || currentUser?.wealthLevel || 1}
-                size={90}
-              />
-              <Text style={styles.meProfileName}>
-                {myProfile?.name || currentUser?.name || t('User')}
-              </Text>
-              <Text style={styles.meProfileId}>
-                ID: {currentUser?._id ? currentUser._id.slice(-8) : '10001'}
-              </Text>
-
-              {/* Wallet Stats (Coins & Diamonds) */}
-              <View style={styles.meWalletRow}>
-                <View style={styles.meWalletPill}>
-                  <Text style={styles.meWalletIcon}>🪙</Text>
-                  <Text style={styles.meWalletValue}>
-                    {myProfile?.coins ?? currentUser?.coins ?? 1000}
-                  </Text>
-                  <Text style={styles.meWalletLabel}>{t('Coins')}</Text>
-                </View>
-                <View style={styles.meWalletPill}>
-                  <Text style={styles.meWalletIcon}>💎</Text>
-                  <Text style={styles.meWalletValue}>
-                    {myProfile?.diamonds ?? currentUser?.diamonds ?? 0}
-                  </Text>
-                  <Text style={styles.meWalletLabel}>{t('Diamonds')}</Text>
-                </View>
-              </View>
-
-              {/* Wealth & Charm Badges */}
-              <View style={styles.meBadgesRow}>
-                <View style={styles.meWealthBadge}>
-                  <Text style={styles.meBadgeText}>
-                    💰 {t('Wealth')} Lv.{myProfile?.wealthLevel || currentUser?.wealthLevel || 1}
-                  </Text>
-                </View>
-                <View style={styles.meCharmBadge}>
-                  <Text style={styles.meBadgeText}>
-                    💖 {t('Charm')} Lv.{myProfile?.charmLevel || currentUser?.charmLevel || 1}
-                  </Text>
-                </View>
-              </View>
-
-              {/* EXP Progress Bar & Level Info */}
-              <UserLevelProgressBar
-                exp={myProfile?.wealthExp ?? currentUser?.wealthExp ?? 0}
-                level={myProfile?.wealthLevel ?? currentUser?.wealthLevel ?? 1}
-              />
-
-              {/* Active Frame */}
-              <View style={styles.meFrameBadge}>
-                <Text style={styles.meFrameBadgeText}>
-                  🎖️ {t('Active Frame')}: Level {myProfile?.wealthLevel || currentUser?.wealthLevel || 1} Frame
-                </Text>
-              </View>
-
-              {/* Logout Button */}
-              <TouchableOpacity
-                style={styles.meLogoutBtn}
-                activeOpacity={0.8}
-                onPress={handleConfirmLogout}
-              >
-                <Text style={styles.meLogoutBtnText}>🚪 {t('Logout Account')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         ) : (
           <View style={styles.tabComingSoonWrap}>
             <View style={styles.tabComingSoonCircle}>
               <Text style={{ fontSize: 36 }}>
-                {bottomTab === 'Gaming' ? '🎮' : bottomTab === 'Discover' ? '🌍' : '💬'}
+                {bottomTab === 'Discover' ? '🌍' : '💬'}
               </Text>
             </View>
             <Text style={styles.tabComingSoonTitle}>{t(bottomTab)}</Text>
@@ -847,7 +810,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
         <TouchableOpacity
           style={[styles.floatingCheckinWidget, { bottom: 85 + insets.bottom }]}
           activeOpacity={0.85}
-          onPress={handleDailyCheckin}
+          onPress={() => setPersonalTasksModalVisible(true)}
         >
           <View style={styles.calendarIconContainer}>
             <Image
@@ -855,8 +818,8 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
               style={{ width: 48, height: 48 }}
               resizeMode="contain"
             />
-            {/* Red Notification Dot */}
-            {!checkinClaimed && <View style={styles.calendarRedDot} />}
+            {/* Red Notification Dot - Only shows when user has a completed unclaimed task */}
+            {hasClaimableTasks && <View style={styles.calendarRedDot} />}
           </View>
         </TouchableOpacity>
       )}
@@ -869,7 +832,10 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           activeOpacity={0.8}
           onPress={() => setBottomTab('Room')}
         >
-          <NavRoomIcon active={bottomTab === 'Room'} />
+          <View style={styles.navIconContainer}>
+            <NavRoomIcon active={bottomTab === 'Room'} />
+            {bottomTab === 'Room' && <View style={styles.tabActiveRedDot} />}
+          </View>
           <Text style={[styles.navLabel, bottomTab === 'Room' && styles.navLabelActive]}>
             {t('Room')}
           </Text>
@@ -881,7 +847,10 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           activeOpacity={0.8}
           onPress={() => setBottomTab('Gaming')}
         >
-          <NavGamingIcon active={bottomTab === 'Gaming'} />
+          <View style={styles.navIconContainer}>
+            <NavGamingIcon active={bottomTab === 'Gaming'} />
+            {bottomTab === 'Gaming' && <View style={styles.tabActiveRedDot} />}
+          </View>
           <Text style={[styles.navLabel, bottomTab === 'Gaming' && styles.navLabelActive]}>
             {t('Gaming')}
           </Text>
@@ -896,7 +865,10 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
             showToast(t('Discover New Friends & Events! 🌍'), 'info');
           }}
         >
-          <NavDiscoverIcon active={bottomTab === 'Discover'} />
+          <View style={styles.navIconContainer}>
+            <NavDiscoverIcon active={bottomTab === 'Discover'} />
+            {bottomTab === 'Discover' && <View style={styles.tabActiveRedDot} />}
+          </View>
           <Text style={[styles.navLabel, bottomTab === 'Discover' && styles.navLabelActive]}>
             {t('Discover')}
           </Text>
@@ -911,19 +883,25 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
             showToast(t('No new messages 💬'), 'info');
           }}
         >
-          <NavMessageIcon active={bottomTab === 'Message'} />
+          <View style={styles.navIconContainer}>
+            <NavMessageIcon active={bottomTab === 'Message'} />
+            {bottomTab === 'Message' && <View style={styles.tabActiveRedDot} />}
+          </View>
           <Text style={[styles.navLabel, bottomTab === 'Message' && styles.navLabelActive]}>
             {t('Message')}
           </Text>
         </TouchableOpacity>
 
-        {/* Tab 5: Me (Keeps user on the screen with bottom navigation bar intact!) */}
+        {/* Tab 5: Me */}
         <TouchableOpacity
           style={styles.navItem}
           activeOpacity={0.8}
           onPress={() => setBottomTab('Me')}
         >
-          <NavMeIcon active={bottomTab === 'Me'} />
+          <View style={styles.navIconContainer}>
+            <NavMeIcon active={bottomTab === 'Me'} />
+            {bottomTab === 'Me' && <View style={styles.tabActiveRedDot} />}
+          </View>
           <Text style={[styles.navLabel, bottomTab === 'Me' && styles.navLabelActive]}>
             {t('Me')}
           </Text>
@@ -940,7 +918,25 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
         />
       )}
 
-      {/* 6. CREATE ROOM MODAL */}
+      {/* 6. PERSONAL TASKS MODAL */}
+      <PersonalTasksModal
+        visible={personalTasksModalVisible}
+        onClose={() => {
+          setPersonalTasksModalVisible(false);
+          checkTasksBadge();
+        }}
+        onDiamondsClaimed={(newDiamonds) => {
+          if (myProfile) {
+            setMyProfile((prev) => (prev ? { ...prev, diamonds: newDiamonds } : prev));
+          }
+          if (currentUser) {
+            currentUser.diamonds = newDiamonds;
+          }
+          checkTasksBadge();
+        }}
+      />
+
+      {/* 7. CREATE ROOM MODAL */}
       <Modal visible={createModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -1736,14 +1732,21 @@ const styles = StyleSheet.create({
     color: '#00C853',
     fontWeight: '900',
   },
-  meBadgeDot: {
+  navIconContainer: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  tabActiveRedDot: {
     position: 'absolute',
-    top: 0,
-    right: 1,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#EF4444',
+    top: -1,
+    right: -2,
+    width: 7.5,
+    height: 7.5,
+    borderRadius: 4,
+    backgroundColor: '#FF2442',
     borderWidth: 1.2,
     borderColor: '#FFFFFF',
   },

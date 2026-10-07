@@ -67,6 +67,18 @@ const userSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    hasRecharged: {
+      type: Boolean,
+      default: false,
+    },
+    lastRechargeDate: {
+      type: String, // 'YYYY-MM-DD'
+      default: null,
+    },
+    totalRecharged: {
+      type: Number,
+      default: 0,
+    },
     // User Wealth & Charm EXP and Levels
     wealthExp: {
       type: Number,
@@ -141,11 +153,78 @@ const userSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    // Gifts & Profile Visitor Tracking
+    giftsSent: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    giftsReceived: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    visitors: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     // Recently Visited Rooms
     recentRooms: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Room',
+      },
+    ],
+    // Profile Bio & Personal Info
+    signature: {
+      type: String,
+      default: '',
+    },
+    birthday: {
+      type: String,
+      default: '1999-08-10',
+    },
+    country: {
+      type: String,
+      default: 'India',
+    },
+    coverImage: {
+      type: String,
+      default: '',
+    },
+    height: {
+      type: String,
+      default: '',
+    },
+    weight: {
+      type: String,
+      default: '',
+    },
+    occupation: {
+      type: String,
+      default: '',
+    },
+    // CP (Couple / Bestie) Relationships
+    cpRelationships: [
+      {
+        partner: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+        type: {
+          type: String,
+          default: 'Bestie',
+        },
+        level: {
+          type: Number,
+          default: 1,
+        },
+        points: {
+          type: Number,
+          default: 0,
+        },
       },
     ],
   },

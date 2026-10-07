@@ -71,7 +71,7 @@ const SECTIONS = [
     key: 'other_tools',
     title: 'Other tools',
     items: [
-      { id: 'task', name: 'Task', icon: ICONS.task, hasBadge: true },
+      { id: 'task', name: 'Task', icon: ICONS.task },
       { id: 'lucky_packet', name: 'Lucky Packet', icon: ICONS.lucky_packet },
       { id: 'lucky_number', name: 'Lucky number', icon: ICONS.lucky_number },
       { id: 'no_gift_effects', name: 'No gift effects', icon: ICONS.no_gift_effects, hasToggle: true },
@@ -86,6 +86,7 @@ export default function VoiceRoomToolsModal({
   onClose,
   onSelectTool,
   roomPkActive = false,
+  hasClaimableTasks = false,
 }) {
   const insets = useSafeAreaInsets();
 
@@ -181,8 +182,10 @@ export default function VoiceRoomToolsModal({
                             resizeMode="contain"
                           />
 
-                          {/* Red Notification Badge */}
-                          {item.hasBadge && <View style={styles.badgeDot} />}
+                          {/* Red Notification Badge (Only when task is completed & claimable, or item has badge) */}
+                          {Boolean(item.id === 'task' ? hasClaimableTasks : item.hasBadge) && (
+                            <View style={styles.badgeDot} />
+                          )}
 
                           {/* Toggle Switch Pill */}
                           {item.hasToggle && (

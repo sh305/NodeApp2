@@ -16,9 +16,11 @@ const {
   forfeitGame,
   refundGameBet,
   addTestExp,
+  updateProfile,
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
 
+router.put('/profile', protect, updateProfile);
 router.post('/add-test-exp', protect, addTestExp);
 router.get('/game-chest/status', protect, getGameChestStatus);
 router.post('/game-chest/claim', protect, claimGameChest);

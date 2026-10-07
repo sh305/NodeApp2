@@ -53,18 +53,20 @@ exports.sendGift = async (req, res) => {
       });
     }
 
-    // Deduct coins & add wealth exp
+    // Deduct coins & add wealth exp & increment giftsSent
     sender.coins -= totalCost;
+    sender.giftsSent = (sender.giftsSent || 0) + quantity;
     const senderLevelResult = addUserWealthExp(sender, totalExp);
     await sender.save();
 
-    // Receiver charm exp update
+    // Receiver charm exp update & increment giftsReceived
     let receiver = null;
     if (receiverId) {
       receiver = await User.findById(receiverId);
       if (receiver) {
         receiver.charmExp += totalExp;
         receiver.diamonds += Math.floor(totalCost * 0.5); // 50% diamonds reward to receiver
+        receiver.giftsReceived = (receiver.giftsReceived || 0) + quantity;
         await receiver.save();
       }
     }

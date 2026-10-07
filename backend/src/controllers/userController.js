@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const Room = require('../models/Room');
+const Transaction = require('../models/Transaction');
+const mongoose = require('mongoose');
 
 // @desc    Get User Profile by ID (Enforces Block Logic)
 // @route   GET /api/users/:id/profile
@@ -8,7 +10,10 @@ exports.getUserProfile = async (req, res) => {
     const targetUserId = req.params.id;
     const requesterId = req.user._id;
 
-    const targetUser = await User.findById(targetUserId).select('-phoneNumber -email');
+    const targetUser = await User.findById(targetUserId)
+      .select('-phoneNumber -email')
+      .populate('cpRelationships.partner', 'name avatar wealthLevel activeFrame gender');
+
     if (!targetUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -31,6 +36,69 @@ exports.getUserProfile = async (req, res) => {
       (bId) => bId.toString() === targetUserId.toString()
     );
 
+    // Track profile visitors when another user visits
+    if (requesterId && requesterId.toString() !== targetUserId.toString()) {
+      if (!targetUser.visitors) targetUser.visitors = [];
+      const alreadyVisited = targetUser.visitors.some(
+        (v) => v.toString() === requesterId.toString()
+      );
+      if (!alreadyVisited) {
+        targetUser.visitors.push(requesterId);
+        await targetUser.save();
+      }
+    }
+
+    // Top 3 Supporters who gifted to targetUser
+    let topSupporters = [];
+    try {
+      topSupporters = await Transaction.aggregate([
+        { $match: { receiver: new mongoose.Types.ObjectId(targetUserId) } },
+        {
+          $group: {
+            _id: '$sender',
+            totalCoins: { $sum: '$totalCoins' },
+            giftCount: { $sum: '$quantity' },
+          },
+        },
+        { $sort: { totalCoins: -1 } },
+        { $limit: 3 },
+        {
+          $lookup: {
+            from: 'users',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'senderInfo',
+          },
+        },
+        { $unwind: '$senderInfo' },
+        {
+          $project: {
+            _id: 1,
+            name: '$senderInfo.name',
+            avatar: '$senderInfo.avatar',
+            wealthLevel: '$senderInfo.wealthLevel',
+            totalCoins: 1,
+          },
+        },
+      ]);
+    } catch (aggErr) {
+      console.warn('Error aggregating top supporters:', aggErr.message);
+    }
+
+    // Total contributed (coins gifted by targetUser)
+    let totalContributed = targetUser.giftsSent || 0;
+    try {
+      const contAgg = await Transaction.aggregate([
+        { $match: { sender: new mongoose.Types.ObjectId(targetUserId) } },
+        { $group: { _id: null, total: { $sum: '$totalCoins' } } },
+      ]);
+      if (contAgg.length > 0 && contAgg[0].total > 0) {
+        totalContributed = contAgg[0].total;
+      }
+    } catch (cErr) {
+      // fallback to giftsSent
+    }
+
     return res.status(200).json({
       success: true,
       user: {
@@ -45,7 +113,22 @@ exports.getUserProfile = async (req, res) => {
         coins: targetUser.coins || 0,
         diamonds: targetUser.diamonds || 0,
         activeFrame: targetUser.activeFrame,
+        signature: targetUser.signature || '',
+        birthday: targetUser.birthday || '1999-08-10',
+        country: targetUser.country || 'India',
+        coverImage: targetUser.coverImage || '',
+        height: targetUser.height || '',
+        weight: targetUser.weight || '',
+        occupation: targetUser.occupation || '',
+        cpRelationships: targetUser.cpRelationships || [],
+        topSupporters: topSupporters || [],
+        totalContributed: totalContributed || 0,
         isBlockedByYou: isRequesterBlockedTarget,
+        followersCount: targetUser.followers ? targetUser.followers.length : 0,
+        followingCount: targetUser.following ? targetUser.following.length : 0,
+        giftsSent: targetUser.giftsSent || 0,
+        giftsReceived: targetUser.giftsReceived || 0,
+        visitorsCount: targetUser.visitors ? targetUser.visitors.length : 0,
       },
     });
   } catch (error) {
@@ -159,6 +242,33 @@ exports.toggleFollowUser = async (req, res) => {
       targetUser.followers.push(currentUserId);
       await currentUser.save();
       await targetUser.save();
+
+      // Auto update personal task: follow_1_person
+      try {
+        const UserTask = require('../models/UserTask');
+        const d = new Date();
+        const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        let followTask = await UserTask.findOne({ user: currentUserId, date: todayStr, taskId: 'follow_1_person' });
+        if (!followTask) {
+          followTask = new UserTask({
+            user: currentUserId,
+            date: todayStr,
+            taskId: 'follow_1_person',
+            progress: 1,
+            target: 1,
+            completed: true,
+            claimed: false,
+            reward: 50,
+          });
+          await followTask.save();
+        } else if (!followTask.claimed) {
+          followTask.progress = Math.max(followTask.progress, 1);
+          followTask.completed = true;
+          await followTask.save();
+        }
+      } catch (taskErr) {
+        console.warn('Error updating follow task:', taskErr.message);
+      }
 
       return res.status(200).json({
         success: true,
@@ -563,6 +673,52 @@ exports.addTestExp = async (req, res) => {
       message: result.leveledUp
         ? `Leveled up to Level ${user.wealthLevel}!`
         : `Added ${expToAdd} EXP`,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update Current User Profile (Bio, Signature, Gender, Birthday, Country)
+// @route   PUT /api/users/profile
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, signature, gender, birthday, country, avatar, coverImage, height, weight, occupation } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (name) user.name = name.trim();
+    if (signature !== undefined) user.signature = signature.trim();
+    if (gender && ['male', 'female', 'other', 'boy', 'girl'].includes(gender.toLowerCase())) {
+      user.gender = gender.toLowerCase() === 'girl' ? 'female' : 'male';
+    }
+    if (birthday) user.birthday = birthday;
+    if (country) user.country = country;
+    if (avatar) user.avatar = avatar;
+    if (coverImage !== undefined) user.coverImage = coverImage;
+    if (height !== undefined) user.height = height;
+    if (weight !== undefined) user.weight = weight;
+    if (occupation !== undefined) user.occupation = occupation;
+
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        avatar: user.avatar,
+        gender: user.gender,
+        signature: user.signature,
+        birthday: user.birthday,
+        country: user.country,
+        coverImage: user.coverImage,
+        height: user.height,
+        weight: user.weight,
+        occupation: user.occupation,
+      },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

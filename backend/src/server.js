@@ -14,6 +14,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const giftRoutes = require('./routes/giftRoutes');
 const translationRoutes = require('./routes/translationRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -43,6 +44,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/gifts', giftRoutes);
 app.use('/api/translations', translationRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {
@@ -84,6 +86,6 @@ if (process.env.MONGO_URI && !process.env.MONGO_URI.includes('<username>')) {
   console.log('ℹ️ Notice: Please update MONGO_URI in your .env file with your online MongoDB Atlas connection string.');
 }
 
-server.listen(PORT, () => {
-  console.log(`🚀 YoYo Voice Backend Server running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 YoYo Voice Backend Server running on port ${PORT} (0.0.0.0)`);
 });
