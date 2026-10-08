@@ -330,7 +330,7 @@ export default function MeProfileView({
         <TouchableOpacity
           style={styles.statItem}
           activeOpacity={0.75}
-          onPress={() => showToast(t('Followers: ') + (profile?.followersCount ?? profile?.followers?.length ?? 0), 'info')}
+          onPress={() => navigation?.navigate('UserRelations', { type: 'followers', userId: profile?._id })}
         >
           <Text style={styles.statNumber}>
             {formatStat(profile?.followersCount ?? profile?.followers?.length ?? 0)}
@@ -341,7 +341,7 @@ export default function MeProfileView({
         <TouchableOpacity
           style={styles.statItem}
           activeOpacity={0.75}
-          onPress={() => showToast(t('Following: ') + (profile?.followingCount ?? profile?.following?.length ?? 0), 'info')}
+          onPress={() => navigation?.navigate('UserRelations', { type: 'following', userId: profile?._id })}
         >
           <Text style={styles.statNumber}>
             {formatStat(profile?.followingCount ?? profile?.following?.length ?? 0)}
@@ -374,7 +374,7 @@ export default function MeProfileView({
         <TouchableOpacity
           style={styles.statItem}
           activeOpacity={0.75}
-          onPress={() => showToast(t('Profile Visitors: ') + (profile?.visitorsCount ?? profile?.visitors?.length ?? 0), 'info')}
+          onPress={() => navigation?.navigate('UserRelations', { type: 'visitors', userId: profile?._id })}
         >
           <Text style={styles.statNumber}>
             {formatStat(profile?.visitorsCount ?? profile?.visitors?.length ?? 0)}
@@ -514,31 +514,6 @@ export default function MeProfileView({
         <ChevronRight size={18} color="#4CAF50" />
       </TouchableOpacity>
 
-      {/* 7. GAMES SECTION (COLLAPSIBLE) */}
-      <View style={styles.sectionCard}>
-        {/* Header with Collapse Chevron */}
-        <TouchableOpacity
-          style={styles.gamesHeaderRow}
-          activeOpacity={0.7}
-          onPress={toggleGamesCollapse}
-        >
-          <Text style={styles.sectionHeaderTitle}>{t('Games')}</Text>
-          <ChevronToggle isUp={isGamesExpanded} size={20} color="#8E8E93" />
-        </TouchableOpacity>
-
-        {/* Games Section Content (Clean Coming Soon card until user specifies games) */}
-        {isGamesExpanded && (
-          <View style={styles.gamesEmptyContainer}>
-            <View style={styles.gamesEmptyIconCircle}>
-              <Text style={{ fontSize: 26 }}>🎮</Text>
-            </View>
-            <Text style={styles.gamesEmptyTitle}>{t('Games Coming Soon')}</Text>
-            <Text style={styles.gamesEmptySub}>
-              {t('Exciting mini-games will be available here soon')}
-            </Text>
-          </View>
-        )}
-      </View>
 
       {/* 8. LIST MENU CARD (VERIFICATION, STORE, BADGE, TOOLS, ETC.) */}
       <View style={styles.menuListCard}>

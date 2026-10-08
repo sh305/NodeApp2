@@ -17,6 +17,9 @@ const {
   refundGameBet,
   addTestExp,
   updateProfile,
+  getUserFollowers,
+  getUserFollowing,
+  getUserVisitors,
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -32,6 +35,9 @@ router.get('/blocked/list', protect, getBlockedUsers);
 router.get('/following/rooms', protect, getFollowingRooms);
 router.get('/recent-rooms', protect, getRecentRooms);
 router.post('/recent-rooms/:roomId', protect, recordRecentRoom);
+router.get('/:id/followers', protect, getUserFollowers);
+router.get('/:id/following', protect, getUserFollowing);
+router.get('/:id/visitors', protect, getUserVisitors);
 router.post('/:id/follow', protect, toggleFollowUser);
 router.get('/:id/profile', protect, getUserProfile);
 router.post('/:id/block', protect, blockUser);

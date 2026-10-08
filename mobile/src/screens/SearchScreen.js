@@ -18,6 +18,7 @@ import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
 import RoomLockModal from '../components/RoomLockModal';
 import Svg, { Path } from 'react-native-svg';
+import { getCountryEmoji } from '../constants/countries';
 
 export default function SearchScreen({ route, navigation, currentUser }) {
   const insets = useSafeAreaInsets();
@@ -287,7 +288,7 @@ export default function SearchScreen({ route, navigation, currentUser }) {
           {/* Badges line matching Screenshot 4 */}
           <View style={styles.roomBadgesRow}>
             {/* Country Flag */}
-            <Text style={styles.flagEmoji}>🇮🇳</Text>
+            <Text style={styles.flagEmoji}>{getCountryEmoji(item.country || item.host?.country, '🇮🇳')}</Text>
 
             {/* Room Level Diamond Badge */}
             <View style={styles.roomLevelBadge}>

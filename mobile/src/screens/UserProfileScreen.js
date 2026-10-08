@@ -21,6 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import api from '../api/client';
 import ReportModal from '../components/ReportModal';
+import CountryPickerModal from '../components/CountryPickerModal';
+import { getCountryEmoji } from '../constants/countries';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../components/Toast';
 
@@ -172,14 +174,15 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   // Edit form state
   const [editName, setEditName] = useState('');
   const [editSignature, setEditSignature] = useState('');
-  const [editGender, setEditGender] = useState('Boy');
-  const [editBirthday, setEditBirthday] = useState('1999-08-10');
+  const [editGender, setEditGender] = useState('');
+  const [editBirthday, setEditBirthday] = useState('');
   const [editCountry, setEditCountry] = useState('India');
   const [editAvatar, setEditAvatar] = useState('');
   const [editCover, setEditCover] = useState('');
   const [editHeight, setEditHeight] = useState('');
   const [editWeight, setEditWeight] = useState('');
   const [editOccupation, setEditOccupation] = useState('');
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
 
   // Interactive field edit sub-modal
   const [activeField, setActiveField] = useState(null); // 'nickname' | 'bio' | 'gender' | 'birthday' | 'height' | 'weight' | 'occupation' | 'country' | 'avatar' | 'cover' | 'avatarUrl' | 'coverUrl'
@@ -188,18 +191,27 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   const wheelListRef = useRef(null);
 
   const calculateAge = (birthday) => {
-    if (!birthday) return 24;
+    if (
+      !birthday ||
+      typeof birthday !== 'string' ||
+      birthday === 'yyyy-MM-DD' ||
+      birthday === '1999-08-10' ||
+      !birthday.trim()
+    ) {
+      return null;
+    }
     try {
       const birthDate = new Date(birthday);
+      if (isNaN(birthDate.getTime())) return null;
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
       const m = today.getMonth() - birthDate.getMonth();
       if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
-      return age > 0 ? age : 24;
+      return age > 0 ? age : null;
     } catch (e) {
-      return 24;
+      return null;
     }
   };
 
@@ -211,8 +223,18 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
         setIsFollowing(res.data.user.isFollowing || false);
         setEditName(res.data.user.name || '');
         setEditSignature(res.data.user.signature || '');
-        setEditGender(res.data.user.gender === 'female' ? 'Girl' : 'Boy');
-        setEditBirthday(res.data.user.birthday || '1999-08-10');
+        setEditGender(
+          res.data.user.gender === 'female'
+            ? 'Girl'
+            : res.data.user.gender === 'male'
+            ? 'Boy'
+            : ''
+        );
+        setEditBirthday(
+          res.data.user.birthday && res.data.user.birthday !== '1999-08-10'
+            ? res.data.user.birthday
+            : ''
+        );
         setEditCountry(res.data.user.country || 'India');
         setEditAvatar(res.data.user.avatar || '');
         setEditCover(res.data.user.coverImage || '');
@@ -268,10 +290,13 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   const handleSaveProfile = async (overrides = {}) => {
     setSavingEdit(true);
     try {
+      const chosenGender = overrides.gender !== undefined ? overrides.gender : editGender;
+      const mappedGender = chosenGender === 'Girl' ? 'female' : chosenGender === 'Boy' ? 'male' : '';
+
       const payload = {
         name: overrides.name !== undefined ? overrides.name : editName,
         signature: overrides.signature !== undefined ? overrides.signature : editSignature,
-        gender: (overrides.gender !== undefined ? overrides.gender : editGender) === 'Girl' ? 'female' : 'male',
+        gender: mappedGender,
         birthday: overrides.birthday !== undefined ? overrides.birthday : editBirthday,
         country: overrides.country !== undefined ? overrides.country : editCountry,
         avatar: overrides.avatar !== undefined ? overrides.avatar : editAvatar,
@@ -677,13 +702,10 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
       isMultiline = true;
     } else if (activeField === 'birthday') {
       title = t('Birthday');
-      placeholder = 'YYYY-MM-DD (e.g. 1999-08-10)';
+      placeholder = 'yyyy-MM-DD (e.g. 2000-05-15)';
     } else if (activeField === 'occupation') {
       title = t('Occupation');
       placeholder = 'e.g. Student, Designer';
-    } else if (activeField === 'country') {
-      title = t('Country or Region');
-      placeholder = 'e.g. India';
     } else if (activeField === 'avatarUrl') {
       title = t('Enter Image URL');
       placeholder = 'https://...';
@@ -713,20 +735,6 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               multiline={isMultiline}
               autoFocus
             />
-
-            {activeField === 'country' && (
-              <View style={styles.quickPresetsWrap}>
-                {['India', 'Pakistan', 'Bangladesh', 'USA', 'UAE', 'Nepal'].map((c) => (
-                  <TouchableOpacity
-                    key={c}
-                    style={styles.presetPill}
-                    onPress={() => setTempFieldValue(c)}
-                  >
-                    <Text style={styles.presetPillText}>{c}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
 
             <View style={styles.dialogActionsRow}>
               <TouchableOpacity
@@ -916,22 +924,41 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
 
             {/* Badges Row (Gender pill, VIP, Wealth, Charm) */}
             <View style={styles.heroBadgesRow}>
-              {/* Gender Pill with dynamic calculated age */}
-              <View
-                style={[
-                  styles.genderBadge,
-                  { backgroundColor: profile.gender === 'female' ? '#FF6584' : '#4C6EF5' },
-                ]}
-              >
-                <Text style={styles.genderBadgeText}>
-                  {profile.gender === 'female' ? '♀️' : '♂️'} {calculateAge(profile.birthday)}
-                </Text>
-              </View>
+              {/* Gender Pill with dynamic calculated age - Only when gender is selected! */}
+              {(() => {
+                const hasGender = !!(
+                  profile.gender &&
+                  (profile.gender === 'female' || profile.gender === 'male')
+                );
+                if (!hasGender) return null;
 
-              {/* VIP Badge */}
-              <View style={styles.vipBadge}>
-                <Text style={styles.vipBadgeText}>👑 {t('VIP')}</Text>
-              </View>
+                const userAge = calculateAge(profile.birthday);
+                const hasAge = userAge !== null;
+
+                return (
+                  <View
+                    style={[
+                      styles.genderBadge,
+                      {
+                        backgroundColor:
+                          profile.gender === 'female' ? '#FF6584' : '#4C6EF5',
+                      },
+                    ]}
+                  >
+                    <Text style={styles.genderBadgeText}>
+                      {profile.gender === 'female' ? '♀️' : '♂️'}
+                      {hasAge ? ` ${userAge}` : ''}
+                    </Text>
+                  </View>
+                );
+              })()}
+
+              {/* VIP Badge - Only when user has VIP! */}
+              {!!(profile.isVip || (profile.vipLevel && profile.vipLevel > 0)) && (
+                <View style={styles.vipBadge}>
+                  <Text style={styles.vipBadgeText}>👑 {t('VIP')}</Text>
+                </View>
+              )}
 
               {/* Wealth Level */}
               <View style={styles.wealthBadge}>
@@ -960,7 +987,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
           <TouchableOpacity
             style={styles.statItem}
             activeOpacity={0.75}
-            onPress={() => showToast(t('Followers: ') + (profile.followersCount || 0), 'info')}
+            onPress={() => navigation.push('UserRelations', { type: 'followers', userId: profile._id || userId })}
           >
             <Text style={styles.statNumber}>{formatStat(profile.followersCount || 0)}</Text>
             <Text style={styles.statLabel}>{t('Followers')}</Text>
@@ -969,7 +996,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
           <TouchableOpacity
             style={styles.statItem}
             activeOpacity={0.75}
-            onPress={() => showToast(t('Following: ') + (profile.followingCount || 0), 'info')}
+            onPress={() => navigation.push('UserRelations', { type: 'following', userId: profile._id || userId })}
           >
             <Text style={styles.statNumber}>{formatStat(profile.followingCount || 0)}</Text>
             <Text style={styles.statLabel}>{t('Following')}</Text>
@@ -1141,77 +1168,18 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
 
             <View style={styles.infoPillItem}>
               <Text style={styles.infoPillLabel}>{t('birthday')}</Text>
-              <Text style={styles.infoPillValue}>{profile.birthday || '1999-08-10'}</Text>
+              <Text style={styles.infoPillValue}>
+                {profile.birthday && profile.birthday !== '1999-08-10'
+                  ? profile.birthday
+                  : 'yyyy-MM-DD'}
+              </Text>
             </View>
 
             <View style={styles.infoPillItem}>
               <Text style={styles.infoPillLabel}>{t('Country or Region')}</Text>
-              <Text style={styles.infoPillValue}>{profile.country || 'India'}</Text>
+              <Text style={styles.infoPillValue}>{getCountryEmoji(profile.country)} {profile.country || 'India'}</Text>
             </View>
           </View>
-        </View>
-
-        {/* 8. GAMES SECTION (Matching Screenshot 3) */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>{t('Games')}</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.gamesRow}
-          >
-            {/* + Add Button */}
-            <TouchableOpacity
-              style={styles.gameAddBtn}
-              activeOpacity={0.75}
-              onPress={() => showToast(t('Add Game feature coming soon'), 'info')}
-            >
-              <Text style={styles.gameAddBtnText}>+ {t('Add')}</Text>
-            </TouchableOpacity>
-
-            {/* Mobile Legends Card */}
-            <TouchableOpacity
-              style={styles.gameCardItem}
-              activeOpacity={0.85}
-              onPress={() => showToast('Mobile Legends Master', 'info')}
-            >
-              <LinearGradient
-                colors={['#7E57C2', '#5E35B1']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gameCardGradient}
-              >
-                <View style={styles.gameIconWrap}>
-                  <Text style={{ fontSize: 20 }}>⚔️</Text>
-                </View>
-                <View style={styles.gameInfoWrap}>
-                  <Text style={styles.gameTitleText} numberOfLines={1}>Mobile Legends</Text>
-                  <Text style={styles.gameSubText}>Master</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* LUDO Card */}
-            <TouchableOpacity
-              style={styles.gameCardItem}
-              activeOpacity={0.85}
-              onPress={() => showToast('LUDO: 94/296', 'info')}
-            >
-              <LinearGradient
-                colors={['#3B82F6', '#1E40AF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gameCardGradient}
-              >
-                <View style={styles.gameIconWrap}>
-                  <Text style={{ fontSize: 20 }}>🎲</Text>
-                </View>
-                <View style={styles.gameInfoWrap}>
-                  <Text style={styles.gameTitleText} numberOfLines={1}>LUDO</Text>
-                  <Text style={styles.gameSubText}>🏆 94/296</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          </ScrollView>
         </View>
 
         {/* 9. TOP SUPPORTERS SECTION (TOP 1, TOP 2, TOP 3) */}
@@ -1453,7 +1421,11 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               >
                 <Text style={styles.rowLabelText}>{t('Birthday')}</Text>
                 <View style={styles.rowRightGroup}>
-                  <Text style={styles.rowValueText}>{editBirthday || '1999-08-10'}</Text>
+                  <Text style={styles.rowValueText}>
+                    {editBirthday && editBirthday !== '1999-08-10'
+                      ? editBirthday
+                      : 'yyyy-MM-DD'}
+                  </Text>
                   <ChevronRight size={18} color="#C4C4C6" />
                 </View>
               </TouchableOpacity>
@@ -1493,7 +1465,11 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
                 </View>
                 <View style={styles.rowRightGroup}>
                   <Text style={styles.rowGrayValueText}>
-                    {editGender === 'Girl' ? t('Girl') : t('Boy')}
+                    {editGender
+                      ? editGender === 'Girl'
+                        ? t('Girl')
+                        : t('Boy')
+                      : t('Select Gender')}
                   </Text>
                   <ChevronRight size={18} color="#C4C4C6" />
                 </View>
@@ -1570,17 +1546,16 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               <TouchableOpacity
                 style={styles.infoRow}
                 activeOpacity={0.75}
-                onPress={() => {
-                  setTempFieldValue(editCountry);
-                  setActiveField('country');
-                }}
+                onPress={() => setCountryPickerVisible(true)}
               >
                 <View style={styles.rowLeftGroup}>
                   <GlobeIcon size={22} color="#2C2C2E" />
                   <Text style={styles.rowLabelText}>{t('Country or Region')}</Text>
                 </View>
                 <View style={styles.rowRightGroup}>
-                  <Text style={styles.rowValueText}>🇮🇳 {editCountry || 'India'}</Text>
+                  <Text style={styles.rowValueText}>
+                    {getCountryEmoji(editCountry)} {editCountry || 'India'}
+                  </Text>
                   <ChevronRight size={18} color="#C4C4C6" />
                 </View>
               </TouchableOpacity>
@@ -1589,6 +1564,16 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
 
           {/* Sub-Editor Modal for interactive field edit */}
           {renderFieldEditorModal()}
+
+          {/* Country or Region Picker Modal */}
+          <CountryPickerModal
+            visible={countryPickerVisible}
+            selectedCountry={editCountry}
+            onClose={() => setCountryPickerVisible(false)}
+            onSelectCountry={(countryName) => {
+              setEditCountry(countryName);
+            }}
+          />
         </View>
       </Modal>
 

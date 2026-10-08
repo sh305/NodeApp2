@@ -87,7 +87,7 @@ exports.getTasksStatus = async (req, res) => {
     const taskMap = new Map();
     userTasks.forEach((t) => taskMap.set(t.taskId, t));
 
-    // Ensure all defined tasks exist in DB for today
+    // Ensure all defined tasks exist in DB for today safely (atomic upsert to prevent E11000 duplicate race condition)
     const tasksOutput = [];
     for (const def of TASK_DEFINITIONS) {
       let taskDoc = taskMap.get(def.id);
@@ -100,22 +100,38 @@ exports.getTasksStatus = async (req, res) => {
           isAutoCompleted = Boolean(user.lastRechargeDate === today);
         }
 
-        taskDoc = await UserTask.create({
-          user: userId,
-          date: today,
-          taskId: def.id,
-          progress: isAutoCompleted ? def.target : 0,
-          target: def.target,
-          completed: isAutoCompleted,
-          claimed: false,
-          reward: def.reward,
-        });
+        try {
+          taskDoc = await UserTask.findOneAndUpdate(
+            { user: userId, date: today, taskId: def.id },
+            {
+              $setOnInsert: {
+                user: userId,
+                date: today,
+                taskId: def.id,
+                progress: isAutoCompleted ? def.target : 0,
+                target: def.target,
+                completed: isAutoCompleted,
+                claimed: false,
+                reward: def.reward,
+              },
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+        } catch (dupErr) {
+          if (dupErr.code === 11000) {
+            taskDoc = await UserTask.findOne({ user: userId, date: today, taskId: def.id });
+          } else {
+            console.error(`Task upsert error for ${def.id}:`, dupErr);
+          }
+        }
       } else if (def.id === 'finish_recharge' && !taskDoc.claimed && user.lastRechargeDate !== today) {
         // Reset recharge task if user has not recharged today
         if (taskDoc.completed || taskDoc.progress > 0) {
           taskDoc.completed = false;
           taskDoc.progress = 0;
-          await taskDoc.save();
+          try {
+            await taskDoc.save();
+          } catch (saveErr) {}
         }
       }
 
@@ -125,9 +141,9 @@ exports.getTasksStatus = async (req, res) => {
         reward: def.reward,
         target: def.target,
         unit: def.unit,
-        progress: taskDoc.progress || 0,
-        completed: Boolean(taskDoc.completed),
-        claimed: Boolean(taskDoc.claimed),
+        progress: taskDoc ? (taskDoc.progress || 0) : 0,
+        completed: Boolean(taskDoc && taskDoc.completed),
+        claimed: Boolean(taskDoc && taskDoc.claimed),
       });
     }
 
@@ -158,16 +174,26 @@ exports.updateTaskProgress = async (req, res) => {
 
     let taskDoc = await UserTask.findOne({ user: userId, date: today, taskId });
     if (!taskDoc) {
-      taskDoc = new UserTask({
-        user: userId,
-        date: today,
-        taskId,
-        progress: 0,
-        target: def.target,
-        completed: false,
-        claimed: false,
-        reward: def.reward,
-      });
+      try {
+        taskDoc = await UserTask.findOneAndUpdate(
+          { user: userId, date: today, taskId },
+          {
+            $setOnInsert: {
+              user: userId,
+              date: today,
+              taskId,
+              progress: 0,
+              target: def.target,
+              completed: false,
+              claimed: false,
+              reward: def.reward,
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      } catch (dupErr) {
+        taskDoc = await UserTask.findOne({ user: userId, date: today, taskId });
+      }
     }
 
     // Don't update if already completed and claimed

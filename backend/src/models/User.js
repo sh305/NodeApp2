@@ -41,8 +41,8 @@ const userSchema = new mongoose.Schema(
     },
     gender: {
       type: String,
-      enum: ['male', 'female', 'other'],
-      default: 'male',
+      enum: ['male', 'female', 'other', ''],
+      default: '',
     },
     coins: {
       type: Number,
@@ -166,8 +166,7 @@ const userSchema = new mongoose.Schema(
     },
     visitors: [
       {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        type: mongoose.Schema.Types.Mixed,
       },
     ],
     // Recently Visited Rooms
@@ -184,7 +183,7 @@ const userSchema = new mongoose.Schema(
     },
     birthday: {
       type: String,
-      default: '1999-08-10',
+      default: '',
     },
     country: {
       type: String,

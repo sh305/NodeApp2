@@ -36,16 +36,25 @@ exports.getUserProfile = async (req, res) => {
       (bId) => bId.toString() === targetUserId.toString()
     );
 
-    // Track profile visitors when another user visits
+    // Track profile visitors when another user visits (with timestamp)
     if (requesterId && requesterId.toString() !== targetUserId.toString()) {
       if (!targetUser.visitors) targetUser.visitors = [];
-      const alreadyVisited = targetUser.visitors.some(
-        (v) => v.toString() === requesterId.toString()
-      );
-      if (!alreadyVisited) {
-        targetUser.visitors.push(requesterId);
-        await targetUser.save();
+      const existingIdx = targetUser.visitors.findIndex((v) => {
+        const vid = v && (v.user ? v.user.toString() : v.toString());
+        return vid === requesterId.toString();
+      });
+      if (existingIdx >= 0) {
+        targetUser.visitors[existingIdx] = {
+          user: requesterId,
+          visitedAt: new Date(),
+        };
+      } else {
+        targetUser.visitors.unshift({
+          user: requesterId,
+          visitedAt: new Date(),
+        });
       }
+      await targetUser.save();
     }
 
     // Top 3 Supporters who gifted to targetUser
@@ -105,16 +114,21 @@ exports.getUserProfile = async (req, res) => {
         _id: targetUser._id,
         name: targetUser.name,
         avatar: targetUser.avatar,
-        gender: targetUser.gender,
+        gender: targetUser.gender || '',
         wealthLevel: targetUser.wealthLevel || 1,
         wealthExp: targetUser.wealthExp || 0,
         charmLevel: targetUser.charmLevel || 1,
         charmExp: targetUser.charmExp || 0,
         coins: targetUser.coins || 0,
         diamonds: targetUser.diamonds || 0,
+        isVip: targetUser.isVip || false,
+        vipLevel: targetUser.vipLevel || 0,
         activeFrame: targetUser.activeFrame,
         signature: targetUser.signature || '',
-        birthday: targetUser.birthday || '1999-08-10',
+        birthday:
+          targetUser.birthday && targetUser.birthday !== '1999-08-10'
+            ? targetUser.birthday
+            : '',
         country: targetUser.country || 'India',
         coverImage: targetUser.coverImage || '',
         height: targetUser.height || '',
@@ -719,6 +733,201 @@ exports.updateProfile = async (req, res) => {
         weight: user.weight,
         occupation: user.occupation,
       },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get followers of a user with mutual follow status
+// @route   GET /api/users/:id/followers
+// @access  Private
+exports.getUserFollowers = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const currentUserId = req.user._id;
+
+    const targetUser = await User.findById(targetUserId).populate({
+      path: 'followers',
+      select: 'name avatar wealthLevel charmLevel signature gender customId followers following',
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const currentUser = await User.findById(currentUserId).select('following');
+    const myFollowingSet = new Set((currentUser?.following || []).map((id) => id.toString()));
+
+    const list = (targetUser.followers || []).map((u) => {
+      if (!u) return null;
+      const uId = u._id.toString();
+      const isFollowing = myFollowingSet.has(uId);
+      const theirFollowingSet = new Set((u.following || []).map((id) => id.toString()));
+      const isFollowedBy = theirFollowingSet.has(currentUserId.toString());
+      const isMutual = isFollowing && isFollowedBy;
+
+      return {
+        _id: u._id,
+        name: u.name,
+        avatar: u.avatar,
+        signature: u.signature || '',
+        wealthLevel: u.wealthLevel || 1,
+        charmLevel: u.charmLevel || 1,
+        gender: u.gender || 'male',
+        customId: u.customId || '',
+        isFollowing,
+        isFollowedBy,
+        isMutual,
+      };
+    }).filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      users: list,
+      count: list.length,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get users that target user is following with mutual follow status
+// @route   GET /api/users/:id/following
+// @access  Private
+exports.getUserFollowing = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const currentUserId = req.user._id;
+
+    const targetUser = await User.findById(targetUserId).populate({
+      path: 'following',
+      select: 'name avatar wealthLevel charmLevel signature gender customId followers following',
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const currentUser = await User.findById(currentUserId).select('following');
+    const myFollowingSet = new Set((currentUser?.following || []).map((id) => id.toString()));
+
+    const list = (targetUser.following || []).map((u) => {
+      if (!u) return null;
+      const uId = u._id.toString();
+      const isFollowing = myFollowingSet.has(uId);
+      const theirFollowingSet = new Set((u.following || []).map((id) => id.toString()));
+      const isFollowedBy = theirFollowingSet.has(currentUserId.toString());
+      const isMutual = isFollowing && isFollowedBy;
+
+      return {
+        _id: u._id,
+        name: u.name,
+        avatar: u.avatar,
+        signature: u.signature || '',
+        wealthLevel: u.wealthLevel || 1,
+        charmLevel: u.charmLevel || 1,
+        gender: u.gender || 'male',
+        customId: u.customId || '',
+        isFollowing,
+        isFollowedBy,
+        isMutual,
+      };
+    }).filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      users: list,
+      count: list.length,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get visitors within 15 days of a user
+// @route   GET /api/users/:id/visitors
+// @access  Private
+exports.getUserVisitors = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const currentUserId = req.user._id;
+
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const currentUser = await User.findById(currentUserId).select('following');
+    const myFollowingSet = new Set((currentUser?.following || []).map((id) => id.toString()));
+
+    const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+
+    // Normalize visitors array
+    const rawVisitors = targetUser.visitors || [];
+    const normalized = [];
+
+    for (const v of rawVisitors) {
+      if (!v) continue;
+      const visitorId = v.user ? v.user : v;
+      const visitedAt = v.visitedAt ? new Date(v.visitedAt) : new Date();
+
+      if (visitedAt >= fifteenDaysAgo) {
+        normalized.push({
+          userId: visitorId,
+          visitedAt,
+        });
+      }
+    }
+
+    // Sort newest first
+    normalized.sort((a, b) => new Date(b.visitedAt) - new Date(a.visitedAt));
+
+    // Populate user info
+    const visitorUserIds = normalized.map((item) => item.userId);
+    const populatedUsers = await User.find({
+      _id: { $in: visitorUserIds },
+    }).select('name avatar wealthLevel charmLevel signature gender customId followers following');
+
+    const userMap = new Map();
+    populatedUsers.forEach((u) => userMap.set(u._id.toString(), u));
+
+    const list = [];
+    const seen = new Set();
+
+    for (const item of normalized) {
+      const uIdStr = item.userId.toString();
+      if (seen.has(uIdStr)) continue; // Keep only most recent visit per user
+      seen.add(uIdStr);
+
+      const u = userMap.get(uIdStr);
+      if (!u) continue;
+
+      const isFollowing = myFollowingSet.has(uIdStr);
+      const theirFollowingSet = new Set((u.following || []).map((id) => id.toString()));
+      const isFollowedBy = theirFollowingSet.has(currentUserId.toString());
+      const isMutual = isFollowing && isFollowedBy;
+
+      list.push({
+        _id: u._id,
+        name: u.name,
+        avatar: u.avatar,
+        signature: u.signature || '',
+        wealthLevel: u.wealthLevel || 1,
+        charmLevel: u.charmLevel || 1,
+        gender: u.gender || 'male',
+        customId: u.customId || '',
+        visitedAt: item.visitedAt,
+        isFollowing,
+        isFollowedBy,
+        isMutual,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      visitors: list,
+      count: list.length,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
