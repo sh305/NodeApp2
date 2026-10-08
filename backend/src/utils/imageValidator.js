@@ -1,7 +1,14 @@
-const jsQR = require('jsqr');
-const jpeg = require('jpeg-js');
-const { PNG } = require('pngjs');
-const Tesseract = require('tesseract.js');
+let jsQR = null;
+try { jsQR = require('jsqr'); } catch (e) { console.warn('⚠️ [imageValidator] jsqr not available:', e.message); }
+
+let jpeg = null;
+try { jpeg = require('jpeg-js'); } catch (e) { console.warn('⚠️ [imageValidator] jpeg-js not available:', e.message); }
+
+let PNG = null;
+try { PNG = require('pngjs').PNG; } catch (e) { console.warn('⚠️ [imageValidator] pngjs not available:', e.message); }
+
+let Tesseract = null;
+try { Tesseract = require('tesseract.js'); } catch (e) { console.warn('⚠️ [imageValidator] tesseract.js not available:', e.message); }
 
 /**
  * Decode Base64 string to Buffer and extract raw RGBA pixels

@@ -12,23 +12,27 @@ import {
   Dimensions,
   Animated,
   Linking,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 import io from 'socket.io-client';
 import api, { BASE_URL } from '../api/client';
 import PersonalTasksModal from '../components/PersonalTasksModal';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
+import { PhonePeIcon, GooglePayIcon, PaytmIcon, BhimUpiIcon } from '../components/PaymentBrandIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Owner Official UPI Details
+// Owner Official Payment Details
+const OWNER_MOBILE_NUMBER = '7982720270';
 const OWNER_UPI_ID = '7982720270@ybl';
-const OWNER_PAYEE_NAME = 'fun maja voice chat';
+const OWNER_PAYEE_NAME = 'Shivam Rai';
 
 // Asset Icons
 const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
@@ -172,6 +176,8 @@ export default function WalletScreen({ navigation, currentUser }) {
   const [uploadingRefundQr, setUploadingRefundQr] = useState(false);
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
   const [utrNumber, setUtrNumber] = useState('');
+  const [copiedNumber, setCopiedNumber] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   // Live Socket Listener for recharge approvals and rejections
   useEffect(() => {
@@ -210,32 +216,80 @@ export default function WalletScreen({ navigation, currentUser }) {
     };
   }, [currentUser, fetchRechargeStatus, fetchWalletBalances, showToast, t]);
 
-  // Launch Installed UPI App Directly (PhonePe / GPay / Paytm / BHIM)
+  // Copy Mobile Number to Clipboard (Primary - Zero Error Method)
+  const handleCopyMobileNumber = async () => {
+    try {
+      await Clipboard.setStringAsync(OWNER_MOBILE_NUMBER);
+      setCopiedNumber(true);
+      showToast(
+        t('Mobile number copied: ') +
+        OWNER_MOBILE_NUMBER +
+        t('. Paste in "To Mobile Number" in PhonePe/Paytm to pay.'),
+        'success'
+      );
+      setTimeout(() => setCopiedNumber(false), 2500);
+    } catch (e) {
+      showToast(t('Failed to copy mobile number'), 'error');
+    }
+  };
+
+  // Copy UPI ID to Clipboard (Method 1)
+  const handleCopyUpiId = async () => {
+    try {
+      await Clipboard.setStringAsync(OWNER_UPI_ID);
+      setCopiedUpi(true);
+      showToast(t('UPI ID copied to clipboard: ') + OWNER_UPI_ID, 'success');
+      setTimeout(() => setCopiedUpi(false), 2500);
+    } catch (e) {
+      showToast(t('Failed to copy UPI ID'), 'error');
+    }
+  };
+
+  // Launch Specific Installed App (PhonePe, Paytm, Google Pay) with Mobile Number copied
+  const handleLaunchPaymentApp = async (appType) => {
+    // 1. Always copy Mobile Number to clipboard automatically
+    await handleCopyMobileNumber();
+
+    const rawPrice = selectedPackage?.price ? selectedPackage.price.replace(/[^0-9.]/g, '') : '22.2';
+    const numericAmount = parseFloat(rawPrice) || 22.2;
+    const commonParams = `pa=${OWNER_UPI_ID}&pn=${encodeURIComponent(OWNER_PAYEE_NAME)}&am=${numericAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Gold Coins Recharge')}`;
+
+    // App-specific UPI schemes
+    let appUrl = '';
+    if (appType === 'phonepe') {
+      appUrl = `phonepe://pay?${commonParams}`;
+    } else if (appType === 'paytm') {
+      appUrl = `paytmmp://pay?${commonParams}`;
+    } else if (appType === 'gpay') {
+      appUrl = `tez://upi/pay?${commonParams}`;
+    }
+
+    if (appUrl) {
+      try {
+        await Linking.openURL(appUrl);
+        return;
+      } catch (err) {
+        // App specific scheme not supported or not installed, fallback to generic upi://
+      }
+    }
+
+    // Fallback: Launch generic UPI chooser
+    await handleOpenUpiApp();
+  };
+
+  // Launch Installed UPI App Directly via standard UPI intent (PhonePe / GPay / Paytm / BHIM)
   const handleOpenUpiApp = async () => {
     if (!selectedPackage) return;
     try {
       const rawPrice = selectedPackage.price.replace(/[^0-9.]/g, '');
       const numericAmount = parseFloat(rawPrice) || 22.2;
 
-      // Standard NPCI UPI URI
+      // Standard NPCI UPI URI with verified payee name
       const upiUrl = `upi://pay?pa=${OWNER_UPI_ID}&pn=${encodeURIComponent(OWNER_PAYEE_NAME)}&am=${numericAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Gold Coins Recharge')}`;
 
-      const supported = await Linking.canOpenURL(upiUrl);
-      if (supported) {
-        await Linking.openURL(upiUrl);
-      } else {
-        // Fallback: Attempt openURL directly
-        try {
-          await Linking.openURL(upiUrl);
-        } catch (err) {
-          showToast(
-            t('No UPI app found on your phone. Please scan the QR code to pay.'),
-            'info'
-          );
-        }
-      }
+      await Linking.openURL(upiUrl);
     } catch (e) {
-      showToast(t('Could not launch UPI app. Please scan the QR code to pay.'), 'info');
+      showToast(t('Could not launch UPI app. Please copy UPI ID or scan QR code.'), 'info');
     }
   };
 
@@ -1362,38 +1416,86 @@ export default function WalletScreen({ navigation, currentUser }) {
                 </TouchableOpacity>
               </View>
             ) : (
-              /* CASE 4: Normal Direct UPI & QR Code Payment Flow */
+              /* CASE 4: Normal Direct Mobile Number & UPI Payment Flow */
               <View style={styles.rechargePaymentCard}>
-                {/* 1. Direct Pay via UPI App (PhonePe, GPay, Paytm) */}
-                <TouchableOpacity
-                  style={styles.directUpiBtn}
-                  activeOpacity={0.85}
-                  onPress={handleOpenUpiApp}
-                >
-                  <LinearGradient
-                    colors={['#4F46E5', '#6366F1']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.directUpiGradient}
-                  >
-                    <Text style={styles.directUpiIcon}>⚡</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.directUpiTitle}>
-                        <T>Pay via UPI App</T>
+                {/* 1. Recommended Method: Pay via Mobile Number (Zero Error) */}
+                <View style={styles.mobilePayCard}>
+                  <View style={styles.mobilePayBadgeRow}>
+                    <View style={styles.recommendedPill}>
+                      <Text style={styles.recommendedPillText}>★ <T>RECOMMENDED • ZERO ERROR</T></Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.mobilePayMainRow}>
+                    <View style={styles.mobilePayLeft}>
+                      <Text style={styles.mobilePayLabel}>
+                        <T>Official Payment Mobile Number</T>
                       </Text>
-                      <Text style={styles.directUpiSub}>
-                        PhonePe • Google Pay • Paytm • BHIM
+                      <Text style={styles.mobilePayNumber}>{OWNER_MOBILE_NUMBER}</Text>
+                      <Text style={styles.mobilePayName}>
+                        <T>Verified Name:</T> {OWNER_PAYEE_NAME}
                       </Text>
                     </View>
-                    <Text style={styles.directUpiArrow}>➔</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.copyNumberBtn, copiedNumber && styles.copyNumberBtnSuccess]}
+                      activeOpacity={0.8}
+                      onPress={handleCopyMobileNumber}
+                    >
+                      <Text style={styles.copyNumberBtnText}>
+                        {copiedNumber ? '✓ ' + t('Copied!') : '📋 ' + t('Copy Number')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                {/* Divider: OR SCAN QR CODE */}
+                  {/* 2 Simple Steps */}
+                  <View style={styles.instructionsBox}>
+                    <Text style={styles.instructionLine}>
+                      1️⃣ <T>Copy number above</T>
+                    </Text>
+                    <Text style={styles.instructionLine}>
+                      2️⃣ <T>Open PhonePe or Paytm, select "To Mobile Number", paste 7982720270, and pay. Then enter UTR below.</T>
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Quick App Openers (Copies Mobile Number & Opens Selected App with Authentic Icons) */}
+                <View style={styles.quickAppsSection}>
+                  <Text style={styles.quickAppsSectionLabel}>
+                    <T>Copy Number & Open Payment App:</T>
+                  </Text>
+                  <View style={styles.quickAppsGrid}>
+                    <TouchableOpacity
+                      style={styles.quickAppChip}
+                      activeOpacity={0.8}
+                      onPress={() => handleLaunchPaymentApp('phonepe')}
+                    >
+                      <PhonePeIcon size={24} />
+                      <Text style={styles.quickAppChipText}>PhonePe</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.quickAppChip}
+                      activeOpacity={0.8}
+                      onPress={() => handleLaunchPaymentApp('gpay')}
+                    >
+                      <GooglePayIcon size={24} />
+                      <Text style={styles.quickAppChipText}>Google Pay</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.quickAppChip}
+                      activeOpacity={0.8}
+                      onPress={() => handleLaunchPaymentApp('paytm')}
+                    >
+                      <PaytmIcon size={24} />
+                      <Text style={styles.quickAppChipText}>Paytm</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Divider: OR SCAN QR / PAY VIA UPI ID */}
                 <View style={styles.orDividerRow}>
                   <View style={styles.orDividerLine} />
                   <Text style={styles.orDividerText}>
-                    <T>OR SCAN QR CODE</T>
+                    <T>OR SCAN QR / UPI ID</T>
                   </Text>
                   <View style={styles.orDividerLine} />
                 </View>
@@ -1405,16 +1507,21 @@ export default function WalletScreen({ navigation, currentUser }) {
                     style={styles.rechargeQrImg}
                     resizeMode="contain"
                   />
-                  <View style={styles.upiIdTagWrap}>
-                    <Text style={styles.upiIdTagLabel}><T>UPI ID:</T></Text>
-                    <Text style={styles.upiIdTagValue}>{OWNER_UPI_ID}</Text>
-                  </View>
+                  <TouchableOpacity
+                    style={[styles.qrCopyTagBtn, copiedUpi && styles.qrCopyTagBtnSuccess]}
+                    activeOpacity={0.8}
+                    onPress={handleCopyUpiId}
+                  >
+                    <Text style={styles.qrCopyTagText}>
+                      📋 {OWNER_UPI_ID} {copiedUpi ? '✓' : ''}
+                    </Text>
+                  </TouchableOpacity>
                   <Text style={styles.payeeNameHint}>
                     ({OWNER_PAYEE_NAME})
                   </Text>
                 </View>
 
-                {/* Mode of Payment Selector */}
+                {/* Mode of Payment Selector with Brand Icons */}
                 <View style={styles.paymentMethodSection}>
                   <Text style={styles.paymentMethodLabel}>
                     <T>Select Payment App Used:</T>
@@ -1432,6 +1539,10 @@ export default function WalletScreen({ navigation, currentUser }) {
                           activeOpacity={0.8}
                           onPress={() => setSelectedPaymentMethod(mode)}
                         >
+                          {mode === 'PhonePe' && <PhonePeIcon size={18} />}
+                          {mode === 'Google Pay' && <GooglePayIcon size={18} />}
+                          {mode === 'Paytm' && <PaytmIcon size={18} />}
+                          {mode === 'Other UPI' && <BhimUpiIcon size={18} />}
                           <Text
                             style={[
                               styles.paymentMethodChipText,
@@ -2438,6 +2549,245 @@ const styles = StyleSheet.create({
     height: 210,
     marginBottom: 10,
   },
+  // Mobile Pay Card (Recommended)
+  mobilePayCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#10B981',
+    width: '100%',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  mobilePayBadgeRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  recommendedPill: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  recommendedPillText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#059669',
+    letterSpacing: 0.5,
+  },
+  mobilePayMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  mobilePayLeft: {
+    flex: 1,
+    marginRight: 10,
+  },
+  mobilePayLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  mobilePayNumber: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+    marginVertical: 2,
+  },
+  mobilePayName: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  copyNumberBtn: {
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  copyNumberBtnSuccess: {
+    backgroundColor: '#059669',
+  },
+  copyNumberBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  instructionsBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 4,
+  },
+  instructionLine: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#334155',
+    lineHeight: 16,
+  },
+  // Security Tip
+  upiSecurityTipCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    gap: 8,
+    width: '100%',
+  },
+  upiSecurityTipIcon: {
+    fontSize: 16,
+  },
+  upiSecurityTipText: {
+    fontSize: 11.5,
+    color: '#1E40AF',
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 16,
+  },
+  // Copy UPI Card
+  copyUpiCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    width: '100%',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  copyUpiLeft: {
+    flex: 1,
+    marginRight: 10,
+  },
+  copyUpiLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  copyUpiIdText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1E293B',
+    marginTop: 2,
+    letterSpacing: 0.2,
+  },
+  copyUpiNameText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  copyUpiActionBtn: {
+    backgroundColor: '#4F46E5',
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  copyUpiActionBtnSuccess: {
+    backgroundColor: '#10B981',
+  },
+  copyUpiActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  // Quick Apps Section
+  quickAppsSection: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  quickAppsSectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 8,
+  },
+  quickAppsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  quickAppChip: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    flexDirection: 'column',
+    gap: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickAppChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1E293B',
+    textAlign: 'center',
+  },
+  // QR Copy Tag
+  qrCopyTagBtn: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  qrCopyTagBtnSuccess: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  qrCopyTagText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#4338CA',
+  },
   upiIdTagWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2481,8 +2831,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   paymentMethodChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     borderWidth: 1.5,
