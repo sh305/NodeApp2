@@ -12,6 +12,8 @@ import VoiceRoomScreen from './src/screens/VoiceRoomScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
 import SearchScreen from './src/screens/SearchScreen';
 import UserRelationsScreen from './src/screens/UserRelationsScreen';
+import WalletScreen from './src/screens/WalletScreen';
+import ConfirmMoneyScreen from './src/screens/ConfirmMoneyScreen';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { ToastProvider } from './src/context/ToastContext';
 
@@ -111,6 +113,22 @@ export default function App() {
                   <Stack.Screen name="UserRelations">
                     {(props) => (
                       <UserRelationsScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Wallet">
+                    {(props) => (
+                      <WalletScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="ConfirmMoney">
+                    {(props) => (
+                      <ConfirmMoneyScreen
                         {...props}
                         currentUser={currentUser}
                       />

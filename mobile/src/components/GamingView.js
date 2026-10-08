@@ -44,6 +44,7 @@ export default function GamingView({
   currentUser,
   insets,
   onNavigateTab,
+  navigation,
 }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
@@ -1297,12 +1298,16 @@ export default function GamingView({
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.walletCoinPill}
-          onPress={() =>
-            showToast(
-              t(`Main Wallet Coins: ${walletCoins} 🪙. (Use Game Coins to play games)`),
-              'info'
-            )
-          }
+          onPress={() => {
+            if (navigation?.navigate) {
+              navigation.navigate('Wallet');
+            } else {
+              showToast(
+                t(`Main Wallet Coins: ${walletCoins} 🪙. (Use Game Coins to play games)`),
+                'info'
+              );
+            }
+          }}
         >
           <Image
             source={GOLD_COIN_IMG}

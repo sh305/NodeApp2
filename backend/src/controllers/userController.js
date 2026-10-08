@@ -121,6 +121,7 @@ exports.getUserProfile = async (req, res) => {
         charmExp: targetUser.charmExp || 0,
         coins: targetUser.coins || 0,
         diamonds: targetUser.diamonds || 0,
+        gameCoins: targetUser.gameCoins || 0,
         isVip: targetUser.isVip || false,
         vipLevel: targetUser.vipLevel || 0,
         activeFrame: targetUser.activeFrame,
@@ -638,6 +639,66 @@ exports.refundGameBet = async (req, res) => {
       message: `${bet} Game Coins refunded. Reason: ${reason}.`,
       gameCoins: user.gameCoins,
       refundedAmount: bet,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get user wallet balances
+// @route   GET /api/users/wallet/balance
+exports.getWalletBalance = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('coins diamonds gameCoins');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    return res.status(200).json({
+      success: true,
+      coins: user.coins || 0,
+      diamonds: user.diamonds || 0,
+      gameCoins: user.gameCoins || 0,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Exchange Gold Coins to Game Coins (1 Gold Coin = 10 Game Coins)
+// @route   POST /api/users/wallet/exchange-game-coins
+exports.exchangeGameCoins = async (req, res) => {
+  try {
+    const { goldCoins } = req.body;
+    const amount = parseInt(goldCoins, 10);
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid coin amount' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient gold coins balance',
+      });
+    }
+
+    const gameCoinsGained = amount * 10;
+    user.coins = (user.coins || 0) - amount;
+    user.gameCoins = (user.gameCoins || 0) + gameCoinsGained;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      coins: user.coins,
+      gameCoins: user.gameCoins,
+      diamonds: user.diamonds || 0,
+      exchangedGoldCoins: amount,
+      receivedGameCoins: gameCoinsGained,
+      message: `Successfully exchanged ${amount} gold coins for ${gameCoinsGained} game coins!`,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

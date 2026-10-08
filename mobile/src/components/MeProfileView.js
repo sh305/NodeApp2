@@ -188,6 +188,14 @@ const MenuIcon = ({ type, color = '#2C3E50', size = 22 }) => {
           />
         </Svg>
       );
+    case 'confirmMoney':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Rect x="2" y="5" width="20" height="14" rx="3" stroke={color} strokeWidth="1.8" />
+          <Circle cx="12" cy="12" r="3.5" stroke={color} strokeWidth="1.8" />
+          <Path d="M6 12H6.01M18 12H18.01" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+        </Svg>
+      );
     default:
       return null;
   }
@@ -256,6 +264,14 @@ export default function MeProfileView({
     }
     if (menuKey === 'task') {
       if (onOpenTasks) onOpenTasks();
+      return;
+    }
+    if (menuKey === 'confirmMoney') {
+      if (navigation?.navigate) {
+        navigation.navigate('ConfirmMoney');
+      } else {
+        showToast(t('Confirm Money'), 'info');
+      }
       return;
     }
     // Generic polite feedback for other items as requested by user
@@ -387,7 +403,7 @@ export default function MeProfileView({
       <TouchableOpacity
         style={styles.walletCard}
         activeOpacity={0.8}
-        onPress={() => showToast(t('Wallet balance: ') + (profile?.coins ?? currentUser?.coins ?? 0), 'info')}
+        onPress={() => navigation?.navigate('Wallet')}
       >
         <View style={styles.walletLeftGroup}>
           <Text style={styles.walletIconEmoji}>👝</Text>
@@ -527,6 +543,7 @@ export default function MeProfileView({
           { key: 'coupon', title: 'Coupon', icon: 'coupon' },
           { key: 'help', title: 'Help', icon: 'help' },
           { key: 'setting', title: 'Setting', icon: 'setting' },
+          { key: 'confirmMoney', title: 'Confirm Money', icon: 'confirmMoney' },
         ].map((item, index, arr) => (
           <React.Fragment key={item.key}>
             <TouchableOpacity

@@ -20,8 +20,13 @@ const {
   getUserFollowers,
   getUserFollowing,
   getUserVisitors,
+  getWalletBalance,
+  exchangeGameCoins,
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
+
+router.get('/wallet/balance', protect, getWalletBalance);
+router.post('/wallet/exchange-game-coins', protect, exchangeGameCoins);
 
 router.put('/profile', protect, updateProfile);
 router.post('/add-test-exp', protect, addTestExp);

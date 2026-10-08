@@ -226,6 +226,11 @@ const userSchema = new mongoose.Schema(
         },
       },
     ],
+    // Timestamp when user last opened/viewed their notifications tab
+    notificationsLastSeenAt: {
+      type: Date,
+      default: () => new Date(),
+    },
   },
   {
     timestamps: true,

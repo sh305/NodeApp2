@@ -25,6 +25,7 @@ import CountryPickerModal from '../components/CountryPickerModal';
 import { getCountryEmoji } from '../constants/countries';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../components/Toast';
+import DirectChatModal from '../components/DirectChatModal';
 
 // 1. Top Icons
 const BackIcon = ({ size = 24, color = '#FFFFFF' }) => (
@@ -170,6 +171,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [directChatVisible, setDirectChatVisible] = useState(false);
 
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -1299,6 +1301,14 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={styles.bottomChatBtn}
+            activeOpacity={0.85}
+            onPress={() => setDirectChatVisible(true)}
+          >
+            <Text style={styles.bottomChatBtnText}>💬 {t('Message')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.bottomReportBtn}
             activeOpacity={0.85}
             onPress={() => setReportModalVisible(true)}
@@ -1306,6 +1316,16 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
             <Text style={styles.bottomReportBtnText}>🚩 {t('Report')}</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* Direct Chat Modal */}
+      {!isSelf && profile && (
+        <DirectChatModal
+          visible={directChatVisible}
+          onClose={() => setDirectChatVisible(false)}
+          partnerUser={profile}
+          currentUser={currentUser}
+        />
       )}
 
       {/* 12. BASIC INFORMATION SCREEN (Matching User Screenshot) */}
@@ -2253,6 +2273,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#64748B',
   },
   bottomFollowBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  bottomChatBtn: {
+    flex: 2,
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomChatBtnText: {
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 14,

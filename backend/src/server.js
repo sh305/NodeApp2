@@ -15,6 +15,9 @@ const giftRoutes = require('./routes/giftRoutes');
 const translationRoutes = require('./routes/translationRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const rechargeRoutes = require('./routes/rechargeRoutes');
+const directMessageRoutes = require('./routes/directMessageRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,8 +36,8 @@ app.set('io', io);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -45,6 +48,9 @@ app.use('/api/gifts', giftRoutes);
 app.use('/api/translations', translationRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/recharge', rechargeRoutes);
+app.use('/api/messages', directMessageRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {

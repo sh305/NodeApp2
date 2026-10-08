@@ -20,13 +20,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Rect, G, Ellipse } from 'react-native-svg';
-import api from '../api/client';
+import api, { BASE_URL } from '../api/client';
+import io from 'socket.io-client';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import UserLevelProgressBar from '../components/UserLevelProgressBar';
 import RoomLockModal from '../components/RoomLockModal';
 import GamingView from '../components/GamingView';
 import PersonalTasksModal from '../components/PersonalTasksModal';
 import MeProfileView from '../components/MeProfileView';
+import MessageView from '../components/MessageView';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../components/Toast';
 
@@ -260,6 +262,50 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
     }
   }, [bottomTab, checkTasksBadge]);
 
+  // Unread Messages Badge state
+  const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
+
+  const fetchUnreadBadgeCount = useCallback(async () => {
+    try {
+      const res = await api.get('/notifications/unread-count');
+      if (res.data?.success) {
+        setTotalUnreadMessages(res.data.totalUnread || 0);
+      }
+    } catch (e) {
+      // quiet
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadBadgeCount();
+    let socket = null;
+    try {
+      socket = io(BASE_URL, {
+        transports: ['websocket'],
+        reconnection: true,
+      });
+      if (currentUser?._id) {
+        socket.emit('join_user_room', { userId: currentUser._id });
+      }
+      socket.on('new_direct_message', () => {
+        fetchUnreadBadgeCount();
+      });
+      socket.on('recharge_status_updated', () => {
+        fetchUnreadBadgeCount();
+      });
+    } catch (err) {}
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [currentUser?._id, fetchUnreadBadgeCount]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadBadgeCount();
+    }, [fetchUnreadBadgeCount])
+  );
+
   // Rooms State
   const [rooms, setRooms] = useState([]);
   const [myRoom, setMyRoom] = useState(null);
@@ -476,7 +522,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
             </TouchableOpacity>
           </View>
         </View>
-      ) : (bottomTab === 'Gaming' || bottomTab === 'Me') ? null : (
+      ) : (bottomTab === 'Gaming' || bottomTab === 'Me' || bottomTab === 'Message') ? null : (
         <View style={[styles.otherTopHeader, { paddingTop: Math.max(16, insets.top) }]}>
           <Text style={styles.otherTopHeaderTitle}>
             {t(bottomTab)}
@@ -490,6 +536,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           currentUser={currentUser}
           insets={insets}
           onNavigateTab={setBottomTab}
+          navigation={navigation}
         />
       ) : bottomTab === 'Me' ? (
         <MeProfileView
@@ -501,6 +548,12 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           hasClaimableTasks={hasClaimableTasks}
           navigation={navigation}
           onLogout={handleConfirmLogout}
+        />
+      ) : bottomTab === 'Message' ? (
+        <MessageView
+          currentUser={currentUser}
+          navigation={navigation}
+          onUnreadCountChange={(count) => setTotalUnreadMessages(count)}
         />
       ) : (
         <ScrollView
@@ -880,12 +933,19 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           activeOpacity={0.8}
           onPress={() => {
             setBottomTab('Message');
-            showToast(t('No new messages 💬'), 'info');
           }}
         >
           <View style={styles.navIconContainer}>
             <NavMessageIcon active={bottomTab === 'Message'} />
-            {bottomTab === 'Message' && <View style={styles.tabActiveRedDot} />}
+            {totalUnreadMessages > 0 ? (
+              <View style={styles.navUnreadBadge}>
+                <Text style={styles.navUnreadBadgeText}>
+                  {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+                </Text>
+              </View>
+            ) : bottomTab === 'Message' ? (
+              <View style={styles.tabActiveRedDot} />
+            ) : null}
           </View>
           <Text style={[styles.navLabel, bottomTab === 'Message' && styles.navLabelActive]}>
             {t('Message')}
@@ -1749,6 +1809,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF2442',
     borderWidth: 1.2,
     borderColor: '#FFFFFF',
+  },
+  navUnreadBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#FF2442',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.2,
+    borderColor: '#FFFFFF',
+  },
+  navUnreadBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '900',
   },
 
   // 6. Create Room Modal
