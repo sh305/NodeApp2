@@ -15,6 +15,7 @@ import UserRelationsScreen from './src/screens/UserRelationsScreen';
 import WalletScreen from './src/screens/WalletScreen';
 import ConfirmMoneyScreen from './src/screens/ConfirmMoneyScreen';
 import UserProblemScreen from './src/screens/UserProblemScreen';
+import StoreScreen from './src/screens/StoreScreen';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { ToastProvider } from './src/context/ToastContext';
 
@@ -138,6 +139,14 @@ export default function App() {
                   <Stack.Screen name="UserProblem">
                     {(props) => (
                       <UserProblemScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Store">
+                    {(props) => (
+                      <StoreScreen
                         {...props}
                         currentUser={currentUser}
                       />

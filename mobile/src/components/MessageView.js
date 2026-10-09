@@ -277,13 +277,16 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
       if (unreadRes.data?.success) {
         setUnreadNotificationsCount(unreadRes.data.unreadNotificationsCount || 0);
         setUnreadFollowersCount(unreadRes.data.unreadFollowersCount || 0);
+        if (onUnreadCountChange) {
+          onUnreadCountChange(unreadRes.data.totalUnread || 0);
+        }
       }
     } catch (err) {
       console.error('Error fetching system notifications:', err);
     } finally {
       setLoadingNotifications(false);
     }
-  }, []);
+  }, [onUnreadCountChange]);
 
   // Fetch follower notifications
   const fetchFollowerNotifications = useCallback(async () => {
@@ -401,9 +404,8 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
       fetchConversations(),
       fetchSystemNotifications(),
       fetchUnreadBadge(),
-      fetchFollowerNotifications(),
     ]).finally(() => setLoadingChats(false));
-  }, [fetchConversations, fetchSystemNotifications, fetchUnreadBadge, fetchFollowerNotifications]);
+  }, [fetchConversations, fetchSystemNotifications, fetchUnreadBadge]);
 
   // Real-time socket listener for incoming DMs, recharge updates, and new followers
   useEffect(() => {
@@ -432,9 +434,30 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
 
       socket.on('new_follower_notification', (data) => {
         if (!data || !data.targetUserId || data.targetUserId === currentUser?._id?.toString()) {
-          fetchFollowerNotifications();
           fetchUnreadBadge();
+          if (activeView === 'followers') {
+            fetchFollowerNotifications();
+          }
           showToast(t('New follower!'), 'info');
+        }
+      });
+
+      socket.on('follower_removed_notification', (data) => {
+        if (!data || !data.targetUserId || data.targetUserId === currentUser?._id?.toString()) {
+          fetchUnreadBadge();
+          if (activeView === 'followers') {
+            fetchFollowerNotifications();
+          }
+        }
+      });
+
+      socket.on('user_relationship_updated', (data) => {
+        const myId = currentUser?._id?.toString();
+        if (data && (data.targetUserId === myId || data.followerId === myId)) {
+          fetchUnreadBadge();
+          if (activeView === 'followers') {
+            fetchFollowerNotifications();
+          }
         }
       });
     } catch (err) {
@@ -444,16 +467,19 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [currentUser?._id, fetchConversations, fetchSystemNotifications, fetchUnreadBadge, fetchFollowerNotifications]);
+  }, [currentUser?._id, activeView, fetchConversations, fetchSystemNotifications, fetchUnreadBadge, fetchFollowerNotifications]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
+    const tasks = [
       fetchConversations(),
       fetchSystemNotifications(),
       fetchUnreadBadge(),
-      fetchFollowerNotifications(),
-    ]);
+    ];
+    if (activeView === 'followers') {
+      tasks.push(fetchFollowerNotifications());
+    }
+    await Promise.all(tasks);
     setRefreshing(false);
   };
 

@@ -259,6 +259,12 @@ export default function MeProfileView({
   };
 
   useEffect(() => {
+    if (myProfile) {
+      setProfile(myProfile);
+    }
+  }, [myProfile]);
+
+  useEffect(() => {
     fetchProfile();
     fetchProblemCount();
 
@@ -274,12 +280,45 @@ export default function MeProfileView({
       socket.on('user_problem_resolved', () => {
         fetchProblemCount();
       });
+
+      // Real-time Follow / Unfollow updates for instant followers and following counts
+      socket.on('user_relationship_updated', (data) => {
+        const myId = (currentUser?._id || currentUser?.id)?.toString();
+        if (data && (data.targetUserId === myId || data.followerId === myId)) {
+          fetchProfile();
+          if (onRefreshProfile) onRefreshProfile();
+        }
+      });
+      socket.on('new_follower_notification', (data) => {
+        const myId = (currentUser?._id || currentUser?.id)?.toString();
+        if (!data || !data.targetUserId || data.targetUserId === myId) {
+          fetchProfile();
+          if (onRefreshProfile) onRefreshProfile();
+        }
+      });
+      socket.on('follower_removed_notification', (data) => {
+        const myId = (currentUser?._id || currentUser?.id)?.toString();
+        if (!data || !data.targetUserId || data.targetUserId === myId) {
+          fetchProfile();
+          if (onRefreshProfile) onRefreshProfile();
+        }
+      });
     } catch (e) {}
 
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [currentUser?._id, currentUser?.id]);
+  }, [currentUser?._id, currentUser?.id, onRefreshProfile]);
+
+  // Re-fetch profile when returning from UserRelations or other sub-screens
+  useEffect(() => {
+    if (!navigation?.addListener) return;
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchProfile();
+      if (onRefreshProfile) onRefreshProfile();
+    });
+    return unsubscribe;
+  }, [navigation, onRefreshProfile]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -325,6 +364,14 @@ export default function MeProfileView({
         navigation.navigate('UserProblem');
       } else {
         showToast(t('User Problems'), 'info');
+      }
+      return;
+    }
+    if (menuKey === 'store') {
+      if (navigation?.navigate) {
+        navigation.navigate('Store');
+      } else {
+        showToast(t('Store'), 'info');
       }
       return;
     }

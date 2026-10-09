@@ -248,9 +248,26 @@ exports.toggleFollowUser = async (req, res) => {
         await FollowNotification.deleteOne({ user: targetUserId, follower: currentUserId });
       } catch (fErr) {}
 
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('user_relationship_updated', {
+          action: 'unfollow',
+          followerId: currentUserId.toString(),
+          targetUserId: targetUserId.toString(),
+          targetFollowersCount: targetUser.followers ? targetUser.followers.length : 0,
+          actorFollowingCount: currentUser.following ? currentUser.following.length : 0,
+        });
+        io.emit('follower_removed_notification', {
+          targetUserId: targetUserId.toString(),
+          followerId: currentUserId.toString(),
+        });
+      }
+
       return res.status(200).json({
         success: true,
         following: false,
+        followersCount: targetUser.followers ? targetUser.followers.length : 0,
+        followingCount: currentUser.following ? currentUser.following.length : 0,
         message: `Unfollowed ${targetUser.name}`,
       });
     } else {
@@ -281,6 +298,13 @@ exports.toggleFollowUser = async (req, res) => {
               name: currentUser.name,
               avatar: currentUser.avatar,
             },
+          });
+          io.emit('user_relationship_updated', {
+            action: 'follow',
+            followerId: currentUserId.toString(),
+            targetUserId: targetUserId.toString(),
+            targetFollowersCount: targetUser.followers ? targetUser.followers.length : 0,
+            actorFollowingCount: currentUser.following ? currentUser.following.length : 0,
           });
         }
       } catch (fErr) {
@@ -1067,12 +1091,6 @@ exports.getFollowerNotifications = async (req, res) => {
 
     // Sort by createdAt desc
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    // Auto-mark notifications as read when fetched
-    await FollowNotification.updateMany(
-      { user: currentUserId, isRead: false },
-      { $set: { isRead: true } }
-    );
 
     return res.status(200).json({
       success: true,

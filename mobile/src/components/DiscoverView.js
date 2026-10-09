@@ -100,6 +100,35 @@ const ImageIcon = ({ size = 24, color = '#00C853' }) => (
   </Svg>
 );
 
+const ImagePlusIcon = ({ size = 38, color = '#757575' }) => (
+  <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+    {/* Outer rounded box */}
+    <Rect
+      x="3.5"
+      y="3.5"
+      width="21"
+      height="21"
+      rx="5.5"
+      stroke={color}
+      strokeWidth="2"
+      fill="none"
+    />
+    {/* Top Right Plus Sign */}
+    <Path
+      d="M17 5.5v5M14.5 8h5"
+      stroke={color}
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Filled double-hill mountains */}
+    <Path
+      d="M5.5 21c0-1.2.6-2.2 1.5-3.6l1.8-2.8c.8-1.2 2.6-1.2 3.4 0l1.6 2.5c.5.8 1.5 1 2.2.4l.6-.5c.8-.7 2-.5 2.6.4l2.5 3.6z"
+      fill={color}
+    />
+  </Svg>
+);
+
 const SendIcon = ({ size = 20, color = '#00C853' }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
@@ -1170,24 +1199,28 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
           </View>
 
           <ScrollView style={styles.createFamilyBody} keyboardShouldPersistTaps="handled">
-            {/* Top Avatar Picker */}
+            {/* Top Avatar Picker matching Screenshot */}
             <View style={styles.familyAvatarPickerSection}>
-              <View style={styles.familyAvatarBox}>
-                {familyAvatar ? (
-                  <Image source={{ uri: familyAvatar }} style={styles.familyAvatarPreview} />
-                ) : (
-                  <View style={styles.familyAvatarPlaceholder}>
-                    <ImageIcon size={32} color="#94A3B8" />
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={styles.familyAvatarChangeBtn}
-                  activeOpacity={0.8}
-                  onPress={handlePickFamilyAvatar}
-                >
+              <TouchableOpacity
+                style={styles.familyAvatarCardTouch}
+                activeOpacity={0.8}
+                onPress={handlePickFamilyAvatar}
+              >
+                <View style={styles.familyAvatarTopArea}>
+                  {familyAvatar ? (
+                    <Image
+                      source={{ uri: familyAvatar }}
+                      style={styles.familyAvatarPreview}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <ImagePlusIcon size={38} color="#757575" />
+                  )}
+                </View>
+                <View style={styles.familyAvatarBottomBar}>
                   <Text style={styles.familyAvatarChangeText}><T>Change</T></Text>
-                </TouchableOpacity>
-              </View>
+                </View>
+              </TouchableOpacity>
             </View>
 
             {/* Field 1: Family Name * */}
@@ -1961,36 +1994,47 @@ const styles = StyleSheet.create({
   },
   familyAvatarPickerSection: {
     alignItems: 'center',
+    marginTop: 8,
     marginBottom: 20,
   },
-  familyAvatarBox: {
+  familyAvatarCardTouch: {
+    width: 80,
+    height: 84,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  familyAvatarPlaceholder: {
-    width: 76,
-    height: 76,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+  familyAvatarTopArea: {
+    flex: 1,
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
   },
   familyAvatarPreview: {
-    width: 76,
-    height: 76,
-    borderRadius: 16,
-    marginBottom: 8,
+    width: '100%',
+    height: '100%',
   },
-  familyAvatarChangeBtn: {
-    backgroundColor: '#64748B',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderRadius: 12,
+  familyAvatarBottomBar: {
+    width: '100%',
+    backgroundColor: '#737373',
+    paddingVertical: 5.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   familyAvatarChangeText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 12.5,
+    fontWeight: '600',
   },
   familyFieldGroup: {
     marginBottom: 16,

@@ -903,7 +903,13 @@ export default function WalletScreen({ navigation, currentUser }) {
         <TouchableOpacity
           style={styles.actionPillButton}
           activeOpacity={0.85}
-          onPress={() => showToast(t('Store coming soon'), 'info')}
+          onPress={() => {
+            if (navigation?.navigate) {
+              navigation.navigate('Store');
+            } else {
+              showToast(t('Store'), 'info');
+            }
+          }}
         >
           <View style={styles.actionPillLeft}>
             <View style={styles.actionIconBox}>

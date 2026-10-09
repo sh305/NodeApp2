@@ -296,6 +296,20 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
       });
       socket.on('new_follower_notification', (data) => {
         if (!data || !data.targetUserId || data.targetUserId === currentUser?._id?.toString()) {
+          fetchMyProfile();
+          fetchUnreadBadgeCount();
+        }
+      });
+      socket.on('follower_removed_notification', (data) => {
+        if (!data || !data.targetUserId || data.targetUserId === currentUser?._id?.toString()) {
+          fetchMyProfile();
+          fetchUnreadBadgeCount();
+        }
+      });
+      socket.on('user_relationship_updated', (data) => {
+        const myId = currentUser?._id?.toString();
+        if (data && (data.targetUserId === myId || data.followerId === myId)) {
+          fetchMyProfile();
           fetchUnreadBadgeCount();
         }
       });
@@ -967,7 +981,10 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
         <TouchableOpacity
           style={styles.navItem}
           activeOpacity={0.8}
-          onPress={() => setBottomTab('Me')}
+          onPress={() => {
+            fetchMyProfile();
+            setBottomTab('Me');
+          }}
         >
           <View style={styles.navIconContainer}>
             <NavMeIcon active={bottomTab === 'Me'} />
