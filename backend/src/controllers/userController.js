@@ -243,6 +243,11 @@ exports.toggleFollowUser = async (req, res) => {
       await currentUser.save();
       await targetUser.save();
 
+      try {
+        const FollowNotification = require('../models/FollowNotification');
+        await FollowNotification.deleteOne({ user: targetUserId, follower: currentUserId });
+      } catch (fErr) {}
+
       return res.status(200).json({
         success: true,
         following: false,
@@ -257,6 +262,30 @@ exports.toggleFollowUser = async (req, res) => {
       targetUser.followers.push(currentUserId);
       await currentUser.save();
       await targetUser.save();
+
+      // Create or update FollowNotification
+      try {
+        const FollowNotification = require('../models/FollowNotification');
+        await FollowNotification.findOneAndUpdate(
+          { user: targetUserId, follower: currentUserId },
+          { isRead: false, updatedAt: new Date() },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('new_follower_notification', {
+            targetUserId: targetUserId.toString(),
+            follower: {
+              _id: currentUser._id,
+              name: currentUser.name,
+              avatar: currentUser.avatar,
+            },
+          });
+        }
+      } catch (fErr) {
+        console.warn('Error recording follow notification:', fErr.message);
+      }
 
       // Auto update personal task: follow_1_person
       try {
@@ -994,4 +1023,84 @@ exports.getUserVisitors = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Get follower notifications for current user (matching Followers message tab)
+// @route   GET /api/users/follower-notifications
+// @access  Private
+exports.getFollowerNotifications = async (req, res) => {
+  try {
+    const currentUserId = req.user._id || req.user.id;
+    const FollowNotification = require('../models/FollowNotification');
+
+    // 1. Fetch from FollowNotification collection
+    let notifs = await FollowNotification.find({ user: currentUserId })
+      .populate('follower', 'name avatar wealthLevel charmLevel signature gender customId following')
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(60);
+
+    const currentUser = await User.findById(currentUserId).select('following followers updatedAt');
+    const myFollowingSet = new Set((currentUser?.following || []).map((id) => id.toString()));
+
+    let results = [];
+    const seenFollowerIds = new Set();
+
+    for (const n of notifs) {
+      if (!n.follower) continue;
+      const fId = n.follower._id.toString();
+      seenFollowerIds.add(fId);
+
+      results.push({
+        _id: n._id.toString(),
+        follower: {
+          _id: n.follower._id,
+          name: n.follower.name,
+          avatar: n.follower.avatar,
+          wealthLevel: n.follower.wealthLevel || 1,
+          charmLevel: n.follower.charmLevel || 1,
+          gender: n.follower.gender || 'male',
+          customId: n.follower.customId || '',
+          isFollowing: myFollowingSet.has(fId),
+        },
+        createdAt: n.createdAt || n.updatedAt,
+      });
+    }
+
+    // Sort by createdAt desc
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Auto-mark notifications as read when fetched
+    await FollowNotification.updateMany(
+      { user: currentUserId, isRead: false },
+      { $set: { isRead: true } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      notifications: results,
+      count: results.length,
+    });
+  } catch (error) {
+    console.error('Error in getFollowerNotifications:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Mark all follower notifications as read
+// @route   POST /api/users/mark-followers-read
+exports.markFollowersRead = async (req, res) => {
+  try {
+    const currentUserId = req.user._id || req.user.id;
+    const FollowNotification = require('../models/FollowNotification');
+    await FollowNotification.updateMany(
+      { user: currentUserId, isRead: false },
+      { $set: { isRead: true } }
+    );
+    return res.status(200).json({ success: true, message: 'Follower notifications marked as read' });
+  } catch (error) {
+    console.error('Error marking follower notifications as read:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
 

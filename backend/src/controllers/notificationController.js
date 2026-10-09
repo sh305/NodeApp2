@@ -1,6 +1,7 @@
 const RechargeRequest = require('../models/RechargeRequest');
 const DirectMessage = require('../models/DirectMessage');
 const User = require('../models/User');
+const FollowNotification = require('../models/FollowNotification');
 
 // Get all system notifications for current user (including recharge rejected/approved/resolved)
 exports.getSystemNotifications = async (req, res) => {
@@ -11,7 +12,7 @@ exports.getSystemNotifications = async (req, res) => {
     // Fetch recharge requests for user that represent notifications
     const recharges = await RechargeRequest.find({
       user: currentUserId,
-      status: { $in: ['rejected', 'proof_submitted', 'approved', 'resolved'] },
+      status: { $in: ['pending', 'rejected', 'proof_submitted', 'approved', 'resolved', 'problem'] },
     })
       .sort({ updatedAt: -1 })
       .limit(40);
@@ -19,7 +20,40 @@ exports.getSystemNotifications = async (req, res) => {
     const systemNotifications = [];
 
     for (const r of recharges) {
-      if (r.status === 'rejected') {
+      if (r.status === 'pending') {
+        systemNotifications.push({
+          id: `recharge_pending_${r._id}`,
+          type: 'recharge_pending',
+          title: 'Recharge Request Pending',
+          body: `Your recharge request of ₹${r.amount} for ${r.coins} coins is pending owner confirmation.`,
+          amount: r.amount,
+          coins: r.coins,
+          paymentMethod: r.paymentMethod,
+          utrNumber: r.utrNumber,
+          rechargeId: r._id,
+          rechargeStatus: r.status,
+          paymentProofImage: r.paymentProofImage,
+          createdAt: r.createdAt,
+        });
+      } else if (r.status === 'problem') {
+        systemNotifications.push({
+          id: `recharge_problem_${r._id}`,
+          type: 'recharge_problem',
+          title: 'Query Under Review',
+          body: `Your query for ₹${r.amount} has been submitted: "${r.disputeReason || 'Query under review'}"`,
+          disputeReason: r.disputeReason,
+          disputeProofImage: r.disputeProofImage,
+          rejectionReason: r.rejectionReason,
+          amount: r.amount,
+          coins: r.coins,
+          paymentMethod: r.paymentMethod,
+          utrNumber: r.utrNumber,
+          rechargeId: r._id,
+          rechargeStatus: r.status,
+          isAcknowledged: r.isAcknowledged,
+          createdAt: r.disputedAt || r.updatedAt || r.createdAt,
+        });
+      } else if (r.status === 'rejected') {
         const rejectTime = new Date(r.rejectedAt || r.updatedAt || r.createdAt);
         // Exclude rejection notifications older than 24 hours
         if (rejectTime < twentyFourHoursAgo) {
@@ -99,19 +133,50 @@ exports.getSystemNotifications = async (req, res) => {
           createdAt: r.updatedAt || r.createdAt,
         });
       } else if (r.status === 'approved') {
+        // If user already acknowledged or expired, skip
+        if (r.isAcknowledged) {
+          continue;
+        }
+
+        // 5 Minutes auto-expiry logic after user first viewed it
+        const fiveMinutes = 5 * 60 * 1000;
+        if (r.approvalViewedAt) {
+          const viewedTime = new Date(r.approvalViewedAt).getTime();
+          if (Date.now() - viewedTime >= fiveMinutes) {
+            // Expired after 5 minutes! Mark permanently acknowledged and discard so it disappears forever
+            r.isAcknowledged = true;
+            await r.save();
+            continue;
+          }
+        } else {
+          // First time user is opening/viewing this approve notification: Start 5 minute countdown!
+          r.approvalViewedAt = new Date();
+          await r.save();
+        }
+
+        const coinsAwarded = r.approvedCoins || r.coins;
+        const remarksText = r.approvalRemarks || r.adminNote || '';
+        const bodyText = `Your payment was approved! ${coinsAwarded} Coins added to your wallet.` + (remarksText ? ` Remarks: ${remarksText}` : '');
+
         systemNotifications.push({
           id: `recharge_approved_${r._id}`,
           type: 'recharge_approved',
           title: 'Recharge Approved',
-          body: `Your payment of ₹${r.amount} was approved! ${r.coins} Gold Coins added to your wallet.`,
+          body: bodyText,
           amount: r.amount,
-          coins: r.coins,
+          coins: coinsAwarded,
+          remarks: remarksText,
           rechargeId: r._id,
           rechargeStatus: r.status,
+          approvalViewedAt: r.approvalViewedAt,
+          isAcknowledged: r.isAcknowledged,
           createdAt: r.approvedAt || r.updatedAt || r.createdAt,
         });
       }
     }
+
+    // Sort notifications with newest on top
+    systemNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return res.json({
       success: true,
@@ -144,6 +209,17 @@ exports.getTotalUnreadBadgeCount = async (req, res) => {
       { $set: { isAcknowledged: true } }
     );
 
+    // Auto-acknowledge expired approved requests (older than 5 min since viewed)
+    await RechargeRequest.updateMany(
+      {
+        user: currentUserId,
+        status: 'approved',
+        approvalViewedAt: { $ne: null, $lt: fiveMinutesAgo },
+        isAcknowledged: false,
+      },
+      { $set: { isAcknowledged: true } }
+    );
+
     // Auto-acknowledge expired rejected requests (older than 24 hours)
     await RechargeRequest.updateMany(
       {
@@ -165,7 +241,15 @@ exports.getTotalUnreadBadgeCount = async (req, res) => {
       isRead: false,
     });
 
-    // 2. Unread Recharge Rejections (within 24 hours, unacknowledged, newer than lastSeenTime)
+    // 2. Unread Pending Recharge Requests (unacknowledged, newer than lastSeenTime)
+    const unreadPending = await RechargeRequest.countDocuments({
+      user: currentUserId,
+      status: { $in: ['pending', 'proof_submitted'] },
+      isAcknowledged: false,
+      createdAt: { $gt: lastSeenTime },
+    });
+
+    // 3. Unread Recharge Rejections (within 24 hours, unacknowledged, newer than lastSeenTime)
     const unreadRejections = await RechargeRequest.countDocuments({
       user: currentUserId,
       status: 'rejected',
@@ -173,15 +257,19 @@ exports.getTotalUnreadBadgeCount = async (req, res) => {
       updatedAt: { $gte: twentyFourHoursAgo, $gt: lastSeenTime },
     });
 
-    // 3. Unread Recharge Approvals (unacknowledged, newer than lastSeenTime)
+    // 4. Unread Recharge Approvals (within 5 minutes, unacknowledged, newer than lastSeenTime)
     const unreadApprovals = await RechargeRequest.countDocuments({
       user: currentUserId,
       status: 'approved',
       isAcknowledged: false,
       updatedAt: { $gt: lastSeenTime },
+      $or: [
+        { approvalViewedAt: null },
+        { approvalViewedAt: { $gte: fiveMinutesAgo } },
+      ],
     });
 
-    // 4. Unread Resolution Notifications (within 5 minutes, unacknowledged, newer than lastSeenTime)
+    // 5. Unread Resolution Notifications (within 5 minutes, unacknowledged, newer than lastSeenTime)
     const unreadResolutions = await RechargeRequest.countDocuments({
       user: currentUserId,
       status: 'resolved',
@@ -193,20 +281,37 @@ exports.getTotalUnreadBadgeCount = async (req, res) => {
       ],
     });
 
-    // Total System & Family Notifications
-    const unreadNotificationsCount = unreadRejections + unreadApprovals + unreadResolutions;
+    // 6. Unread User Problems under review
+    const unreadProblems = await RechargeRequest.countDocuments({
+      user: currentUserId,
+      status: 'problem',
+      isAcknowledged: false,
+      updatedAt: { $gt: lastSeenTime },
+    });
 
-    // Grand total for bottom bar Message badge (DMs + Notifications)
-    const totalUnread = unreadMessagesCount + unreadNotificationsCount;
+    // Total System & Family Notifications
+    const unreadNotificationsCount = unreadPending + unreadRejections + unreadApprovals + unreadResolutions + unreadProblems;
+
+    // 7. Unread Follower Notifications
+    const unreadFollowersCount = await FollowNotification.countDocuments({
+      user: currentUserId,
+      isRead: false,
+    });
+
+    // Grand total for bottom bar Message badge (DMs + Notifications + Followers)
+    const totalUnread = unreadMessagesCount + unreadNotificationsCount + unreadFollowersCount;
 
     return res.json({
       success: true,
       totalUnread,
       unreadMessagesCount,
       unreadNotificationsCount,
+      unreadFollowersCount,
+      unreadPending,
       unreadRejections,
       unreadApprovals,
       unreadResolutions,
+      unreadProblems,
     });
   } catch (err) {
     console.error('Error fetching total unread badge count:', err);
@@ -230,14 +335,15 @@ exports.markNotificationsSeen = async (req, res) => {
       notificationsLastSeenAt: now,
     });
 
-    // 2. Acknowledge rejections and approvals so they never falsely recount
+    // 2. Start 5-minute timer for any approved recharge notifications viewed
     await RechargeRequest.updateMany(
       {
         user: currentUserId,
-        status: { $in: ['rejected', 'approved'] },
+        status: 'approved',
         isAcknowledged: false,
+        approvalViewedAt: null,
       },
-      { $set: { isAcknowledged: true } }
+      { $set: { approvalViewedAt: now } }
     );
 
     // 3. Start 5-minute timer for any resolved dispute notifications viewed

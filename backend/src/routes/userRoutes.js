@@ -22,11 +22,15 @@ const {
   getUserVisitors,
   getWalletBalance,
   exchangeGameCoins,
+  getFollowerNotifications,
+  markFollowersRead,
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
 
 router.get('/wallet/balance', protect, getWalletBalance);
 router.post('/wallet/exchange-game-coins', protect, exchangeGameCoins);
+router.get('/follower-notifications', protect, getFollowerNotifications);
+router.post('/mark-followers-read', protect, markFollowersRead);
 
 router.put('/profile', protect, updateProfile);
 router.post('/add-test-exp', protect, addTestExp);

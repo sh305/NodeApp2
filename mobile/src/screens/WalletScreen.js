@@ -19,6 +19,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { RECHARGE_QR_BASE64 } from '../constants/rechargeQrAsset';
 import io from 'socket.io-client';
 import api, { BASE_URL } from '../api/client';
 import PersonalTasksModal from '../components/PersonalTasksModal';
@@ -170,11 +174,15 @@ export default function WalletScreen({ navigation, currentUser }) {
   // Recharge Methods Modal State
   const [rechargeModalVisible, setRechargeModalVisible] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState(RECHARGE_PACKAGES[0]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('PhonePe');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('UPI QR');
   const [submittingRecharge, setSubmittingRecharge] = useState(false);
   const [rechargeStatus, setRechargeStatus] = useState(null);
   const [uploadingRefundQr, setUploadingRefundQr] = useState(false);
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
+  const [selectedProofImage, setSelectedProofImage] = useState(null);
+  const [validatingProof, setValidatingProof] = useState(false);
+  const [proofSourceModalVisible, setProofSourceModalVisible] = useState(false);
+  const [downloadingQr, setDownloadingQr] = useState(false);
   const [utrNumber, setUtrNumber] = useState('');
   const [copiedNumber, setCopiedNumber] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -216,7 +224,7 @@ export default function WalletScreen({ navigation, currentUser }) {
     };
   }, [currentUser, fetchRechargeStatus, fetchWalletBalances, showToast, t]);
 
-  // Copy Mobile Number to Clipboard (Primary - Zero Error Method)
+  // Copy Mobile Number to Clipboard (Fallback)
   const handleCopyMobileNumber = async () => {
     try {
       await Clipboard.setStringAsync(OWNER_MOBILE_NUMBER);
@@ -233,26 +241,189 @@ export default function WalletScreen({ navigation, currentUser }) {
     }
   };
 
-  // Copy UPI ID to Clipboard (Method 1)
-  const handleCopyUpiId = async () => {
+  // Copy UPI ID to Clipboard (Primary Method)
+  const handleCopyUpiId = async (showToastFeedback = true) => {
     try {
       await Clipboard.setStringAsync(OWNER_UPI_ID);
       setCopiedUpi(true);
-      showToast(t('UPI ID copied to clipboard: ') + OWNER_UPI_ID, 'success');
+      if (showToastFeedback) {
+        showToast(t('UPI ID copied to clipboard: ') + OWNER_UPI_ID, 'success');
+      }
       setTimeout(() => setCopiedUpi(false), 2500);
     } catch (e) {
-      showToast(t('Failed to copy UPI ID'), 'error');
+      if (showToastFeedback) {
+        showToast(t('Failed to copy UPI ID'), 'error');
+      }
     }
   };
 
-  // Launch Specific Installed App (PhonePe, Paytm, Google Pay) with Mobile Number copied
-  const handleLaunchPaymentApp = async (appType) => {
-    // 1. Always copy Mobile Number to clipboard automatically
-    await handleCopyMobileNumber();
+  // Download QR Code to Gallery
+  const handleDownloadQrCode = async () => {
+    try {
+      setDownloadingQr(true);
 
-    const rawPrice = selectedPackage?.price ? selectedPackage.price.replace(/[^0-9.]/g, '') : '22.2';
+      // Web platform handling
+      if (Platform.OS === 'web') {
+        if (typeof document !== 'undefined') {
+          const link = document.createElement('a');
+          link.href = `data:image/png;base64,${RECHARGE_QR_BASE64}`;
+          link.download = 'yoyo_recharge_qr.png';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          showToast(t('QR code downloaded successfully!'), 'success');
+        }
+        return;
+      }
+
+      // Mobile (Android / iOS):
+      // 1. Write the guaranteed base64 to a local PNG file in cacheDirectory
+      const localFilePath = `${FileSystem.cacheDirectory}yoyo_recharge_qr.png`;
+      await FileSystem.writeAsStringAsync(localFilePath, RECHARGE_QR_BASE64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // 2. Request MediaLibrary write permissions (works in standalone APK / dev builds)
+      let permGranted = false;
+      try {
+        const { status } = await MediaLibrary.requestPermissionsAsync(true);
+        permGranted = status === 'granted';
+      } catch (pErr) {
+        // Expo Go sandbox does not support MediaLibrary; smoothly falls back to Sharing.shareAsync below
+      }
+
+      // 3. Try saving directly into the Gallery
+      let isSaved = false;
+      if (permGranted) {
+        try {
+          const createdAsset = await MediaLibrary.createAssetAsync(localFilePath);
+          if (createdAsset) {
+            try {
+              const album = await MediaLibrary.getAlbumAsync('YoYo');
+              if (!album) {
+                await MediaLibrary.createAlbumAsync('YoYo', createdAsset, false);
+              } else {
+                await MediaLibrary.addAssetsToAlbumAsync([createdAsset], album, false);
+              }
+            } catch (_) { }
+            isSaved = true;
+            showToast(t('QR code saved to gallery successfully!'), 'success');
+          }
+        } catch (saveErr) {
+          console.warn('createAssetAsync failed, trying fallback sharing:', saveErr);
+        }
+      }
+
+      // 4. If permissions were restricted or direct save failed (common on Android 13+ Scoped Storage),
+      // seamlessly open native Share/Save dialog so user can tap "Save image" or share to WhatsApp/UPI
+      if (!isSaved) {
+        const isSharingAvailable = await Sharing.isAvailableAsync();
+        if (isSharingAvailable) {
+          await Sharing.shareAsync(localFilePath, {
+            mimeType: 'image/png',
+            dialogTitle: t('Save or Share QR Code'),
+            UTI: 'public.png',
+          });
+          showToast(t('Select Save Image to save QR code to your phone'), 'info');
+        } else {
+          showToast(t('Permission to save image to gallery was denied'), 'error');
+        }
+      }
+    } catch (err) {
+      console.error('Error saving QR code:', err);
+      showToast(t('Failed to save QR code to gallery'), 'error');
+    } finally {
+      setDownloadingQr(false);
+    }
+  };
+
+  // Open source chooser (Camera or Gallery)
+  const handleOpenProofPicker = () => {
+    setProofSourceModalVisible(true);
+  };
+
+  // Pick payment proof / QR code with selected source and instantly verify
+  const handlePickPaymentProofWithSource = async (sourceType) => {
+    setProofSourceModalVisible(false);
+    try {
+      let result;
+      if (sourceType === 'camera') {
+        const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!camPerm.granted) {
+          showToast(t('Permission to access camera is required'), 'error');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          quality: 0.8,
+          base64: true,
+        });
+      } else {
+        const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!libPerm.granted) {
+          showToast(t('Permission to access photos is required'), 'error');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          quality: 0.8,
+          base64: true,
+        });
+      }
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64Data = `data:image/jpeg;base64,${asset.base64}`;
+
+        setValidatingProof(true);
+        try {
+          const valRes = await api.post('/recharge/validate-proof', {
+            proofImage: base64Data,
+          });
+
+          if (valRes.data?.isValid) {
+            setSelectedProofImage(base64Data);
+            showToast(
+              t('Valid payment QR code / receipt attached successfully!'),
+              'success'
+            );
+          } else {
+            setSelectedProofImage(null);
+            showToast(
+              t(valRes.data?.message || 'Invalid image! Only valid payment QR code or transaction screenshot is accepted. Random photos are not allowed.'),
+              'error'
+            );
+          }
+        } catch (valErr) {
+          const errMsg = valErr?.response?.data?.message || valErr?.message || 'Invalid image: Only QR code or payment receipt allowed.';
+          setSelectedProofImage(null);
+          showToast(t(errMsg), 'error');
+        } finally {
+          setValidatingProof(false);
+        }
+      }
+    } catch (err) {
+      setValidatingProof(false);
+      showToast(t('Failed to process image'), 'error');
+    }
+  };
+
+  // Helper to build standard NPCI compliant UPI query params
+  const buildUpiQueryParams = () => {
+    const rawPrice = selectedPackage?.price ? selectedPackage.price.replace(/[^0-9.]/g, '') : '22.20';
     const numericAmount = parseFloat(rawPrice) || 22.2;
-    const commonParams = `pa=${OWNER_UPI_ID}&pn=${encodeURIComponent(OWNER_PAYEE_NAME)}&am=${numericAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Gold Coins Recharge')}`;
+    const formattedAmount = numericAmount.toFixed(2);
+    const trId = `TXT${Date.now()}`;
+    return `pa=${OWNER_UPI_ID}&pn=${encodeURIComponent(OWNER_PAYEE_NAME)}&mc=0000&tr=${trId}&mode=02&purpose=00&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent('Gold Coins Recharge')}`;
+  };
+
+  // Launch Specific Installed App (PhonePe, Paytm, Google Pay) with UPI ID copied
+  const handleLaunchPaymentApp = async (appType) => {
+    // 1. Always copy UPI ID to clipboard automatically
+    await handleCopyUpiId(false);
+
+    const commonParams = buildUpiQueryParams();
 
     // App-specific UPI schemes
     let appUrl = '';
@@ -281,15 +452,13 @@ export default function WalletScreen({ navigation, currentUser }) {
   const handleOpenUpiApp = async () => {
     if (!selectedPackage) return;
     try {
-      const rawPrice = selectedPackage.price.replace(/[^0-9.]/g, '');
-      const numericAmount = parseFloat(rawPrice) || 22.2;
-
-      // Standard NPCI UPI URI with verified payee name
-      const upiUrl = `upi://pay?pa=${OWNER_UPI_ID}&pn=${encodeURIComponent(OWNER_PAYEE_NAME)}&am=${numericAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Gold Coins Recharge')}`;
+      await handleCopyUpiId(false);
+      const commonParams = buildUpiQueryParams();
+      const upiUrl = `upi://pay?${commonParams}`;
 
       await Linking.openURL(upiUrl);
     } catch (e) {
-      showToast(t('Could not launch UPI app. Please copy UPI ID or scan QR code.'), 'info');
+      showToast(t('Could not launch UPI app. UPI ID copied to clipboard: ') + OWNER_UPI_ID, 'info');
     }
   };
 
@@ -352,36 +521,19 @@ export default function WalletScreen({ navigation, currentUser }) {
   // Handle Package Card Click
   const handlePackageClick = (pkg) => {
     setSelectedPackage(pkg);
+    setSelectedProofImage(null);
     setUtrNumber('');
-    // If pending or proof_submitted request exists, user cannot make another purchase until approved
-    if (rechargeStatus && (rechargeStatus.status === 'pending' || rechargeStatus.status === 'proof_submitted')) {
-      setRechargeModalVisible(true);
-      showToast(
-        t('Your recharge request is pending approval. You cannot make another purchase until this order is confirmed.'),
-        'info'
-      );
-      return;
-    }
-    // If rejected, acknowledge and clear rejected status so user can purchase coins again
-    if (rechargeStatus && rechargeStatus.status === 'rejected') {
-      if (rechargeStatus._id) {
-        api.post(`/recharge/${rechargeStatus._id}/acknowledge`).catch(() => { });
-      }
-      setRechargeStatus(null);
-    }
-    setSelectedPaymentMethod('PhonePe');
+    setSelectedPaymentMethod('UPI QR');
     setRechargeModalVisible(true);
   };
 
-  // Handle Submit Recharge
+  // Handle Submit Recharge with Payment Proof Screenshot
   const handleSubmitRecharge = async () => {
     if (!selectedPackage) return;
 
-    // Strict 12-Digit UTR Validation
-    const cleanUtr = utrNumber.trim();
-    if (!cleanUtr || cleanUtr.length !== 12 || !/^\d{12}$/.test(cleanUtr)) {
+    if (!selectedProofImage) {
       showToast(
-        t('Please enter valid 12-digit UTR / UPI Reference Number from payment receipt'),
+        t('Please upload your payment proof screenshot or QR code'),
         'error'
       );
       return;
@@ -399,17 +551,19 @@ export default function WalletScreen({ navigation, currentUser }) {
         amount: numericAmount,
         currency: 'INR',
         priceDisplay: `${selectedPackage.price} INR`,
-        paymentMethod: selectedPaymentMethod,
-        utrNumber: cleanUtr,
+        paymentMethod: 'UPI QR',
+        proofImage: selectedProofImage,
       });
 
       if (res.data?.success) {
         showToast(
-          t('Recharge request submitted successfully. Please wait for confirmation.'),
+          t('Payment proof submitted successfully! Check System Notifications for status.'),
           'success'
         );
-        setRechargeStatus(res.data.request);
+        setSelectedProofImage(null);
         setUtrNumber('');
+        setRechargeModalVisible(false);
+        fetchWalletBalances(true);
       } else {
         showToast(t(res.data?.message || 'Submission failed'), 'error');
       }
@@ -673,26 +827,6 @@ export default function WalletScreen({ navigation, currentUser }) {
         </Text>
         <RefreshIcon size={15} color="#FFFFFF" />
       </TouchableOpacity>
-
-      {/* Pending Recharge Notification Banner */}
-      {rechargeStatus && rechargeStatus.status === 'pending' && (
-        <TouchableOpacity
-          style={styles.pendingRechargeBanner}
-          activeOpacity={0.85}
-          onPress={() => setRechargeModalVisible(true)}
-        >
-          <Text style={styles.pendingBannerIcon}>⌛</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.pendingBannerTitle}>
-              <T>Recharge Pending Confirmation</T>
-            </Text>
-            <Text style={styles.pendingBannerSub}>
-              {rechargeStatus.priceDisplay} • <T>Please wait for confirmation</T>
-            </Text>
-          </View>
-          <ChevronRight size={18} color="#F59E0B" />
-        </TouchableOpacity>
-      )}
 
       {/* 2-Column Grid of Coin Packages */}
       <View style={styles.packagesGrid}>
@@ -1157,448 +1291,138 @@ export default function WalletScreen({ navigation, currentUser }) {
               </View>
             </View>
 
-            {/* CASE 1: Pending Order State */}
-            {rechargeStatus && rechargeStatus.status === 'pending' ? (
-              <View style={styles.statusBoxPending}>
-                <Text style={styles.statusBoxIcon}>⌛</Text>
-                <Text style={styles.statusBoxTitle}>
-                  <T>Please wait for confirmation</T>
-                </Text>
-                <Text style={styles.statusBoxSub}>
-                  <T>Your payment of</T> {rechargeStatus.priceDisplay} <T>is being verified by admin. You cannot make another purchase until this order is confirmed.</T>
-                </Text>
-
-                <View style={styles.statusDetailsCard}>
-                  <View style={styles.statusDetailsRow}>
-                    <Text style={styles.statusDetailsLabel}><T>Order Amount:</T></Text>
-                    <Text style={styles.statusDetailsVal}>₹{rechargeStatus.amount}</Text>
-                  </View>
-                  <View style={styles.statusDetailsRow}>
-                    <Text style={styles.statusDetailsLabel}><T>Payment App:</T></Text>
-                    <Text style={styles.statusDetailsVal}>{rechargeStatus.paymentMethod}</Text>
-                  </View>
-                  {rechargeStatus.utrNumber ? (
-                    <View style={styles.statusDetailsRow}>
-                      <Text style={styles.statusDetailsLabel}><T>UTR No.:</T></Text>
-                      <Text style={[styles.statusDetailsVal, { color: '#38BDF8', letterSpacing: 0.5 }]}>
-                        {rechargeStatus.utrNumber}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <View style={styles.statusDetailsRow}>
-                    <Text style={styles.statusDetailsLabel}><T>Status:</T></Text>
-                    <Text style={[styles.statusDetailsVal, { color: '#F59E0B' }]}>
-                      <T>Pending Approval</T>
-                    </Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.refreshStatusBtn}
-                  activeOpacity={0.8}
-                  onPress={async () => {
-                    await fetchRechargeStatus();
-                    showToast(t('Status refreshed'), 'info');
-                  }}
-                >
-                  <Text style={styles.refreshStatusBtnText}>
-                    <T>Refresh Status</T>
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : rechargeStatus && rechargeStatus.status === 'proof_submitted' ? (
-              /* CASE 2: Payment Proof Submitted State (Under Review) */
-              <View style={styles.statusBoxProofSubmitted}>
-                <Text style={styles.statusBoxIcon}>🧾</Text>
-                <Text style={styles.statusBoxTitleProof}>
-                  <T>Payment Proof Submitted</T>
-                </Text>
-                <Text style={styles.statusBoxSubProof}>
-                  <T>Your payment receipt is under review by owner. Coins will be credited to your wallet once verified.</T>
-                </Text>
-
-                <View style={styles.statusDetailsCard}>
-                  <View style={styles.statusDetailsRow}>
-                    <Text style={styles.statusDetailsLabel}><T>Order Amount:</T></Text>
-                    <Text style={styles.statusDetailsVal}>₹{rechargeStatus.amount}</Text>
-                  </View>
-                  <View style={styles.statusDetailsRow}>
-                    <Text style={styles.statusDetailsLabel}><T>Payment App:</T></Text>
-                    <Text style={styles.statusDetailsVal}>{rechargeStatus.paymentMethod}</Text>
-                  </View>
-                  {rechargeStatus.utrNumber ? (
-                    <View style={styles.statusDetailsRow}>
-                      <Text style={styles.statusDetailsLabel}><T>UTR No.:</T></Text>
-                      <Text style={[styles.statusDetailsVal, { color: '#38BDF8', letterSpacing: 0.5 }]}>
-                        {rechargeStatus.utrNumber}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <View style={styles.statusDetailsRow}>
-                    <Text style={styles.statusDetailsLabel}><T>Status:</T></Text>
-                    <Text style={[styles.statusDetailsVal, { color: '#38BDF8', fontWeight: '800' }]}>
-                      <T>Under Review</T>
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Uploaded Payment Proof Thumbnail Preview */}
-                {rechargeStatus.paymentProofImage ? (
-                  <View style={styles.proofPreviewWrap}>
-                    <Image
-                      source={{ uri: rechargeStatus.paymentProofImage }}
-                      style={styles.proofPreviewImg}
-                      resizeMode="contain"
-                    />
-                    <Text style={styles.proofUploadedNoticeText}>
-                      ✓ <T>Receipt uploaded. Please wait for owner confirmation.</T>
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.reuploadBtn}
-                      activeOpacity={0.8}
-                      onPress={() => handlePickPaymentProof(rechargeStatus._id)}
-                      disabled={uploadingPaymentProof}
-                    >
-                      <Text style={styles.reuploadBtnText}>
-                        <T>Change Payment Proof</T>
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-
-                <TouchableOpacity
-                  style={[styles.refreshStatusBtn, { marginTop: 14 }]}
-                  activeOpacity={0.8}
-                  onPress={async () => {
-                    await fetchRechargeStatus();
-                    showToast(t('Status refreshed'), 'info');
-                  }}
-                >
-                  <Text style={styles.refreshStatusBtnText}>
-                    <T>Refresh Status</T>
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.statusDoneBtn, { backgroundColor: '#475569', marginTop: 10 }]}
-                  activeOpacity={0.85}
-                  onPress={() => setRechargeModalVisible(false)}
-                >
-                  <Text style={styles.statusDoneBtnText}>
-                    <T>Close</T>
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : rechargeStatus && rechargeStatus.status === 'approved' && !rechargeStatus.isAcknowledged ? (
-              /* CASE 3: Approved Order State */
-              <View style={styles.statusBoxApproved}>
-                <Text style={styles.statusBoxIcon}>✅</Text>
-                <Text style={styles.statusBoxTitleApproved}>
-                  <T>Payment approved successfully for amount</T> ₹{rechargeStatus.amount}!
-                </Text>
-                <Text style={styles.statusBoxSub}>
-                  <T>Your gold coins have been added to your wallet balance successfully.</T>
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.statusDoneBtn}
-                  activeOpacity={0.85}
-                  onPress={() => handleAcknowledgeRecharge(rechargeStatus._id)}
-                >
-                  <Text style={styles.statusDoneBtnText}>
-                    <T>Got It</T>
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : rechargeStatus && rechargeStatus.status === 'rejected' && !rechargeStatus.isAcknowledged ? (
-              /* CASE 4: Rejected Order State (with Proof upload & Refund QR upload) */
-              <View style={styles.statusBoxRejected}>
-                <Text style={styles.statusBoxIcon}>❌</Text>
-                <Text style={styles.statusBoxTitleRejected}>
-                  <T>Payment rejected for amount</T> ₹{rechargeStatus.amount}
-                </Text>
-
-                {/* Rejection Reason Display from Owner */}
-                {(rechargeStatus.rejectionReason || rechargeStatus.adminNote) ? (
-                  <View style={styles.rejectionReasonCard}>
-                    <Text style={styles.rejectionReasonTitle}>
-                      ⚠️ <T>Reason for Rejection:</T>
-                    </Text>
-                    <Text style={styles.rejectionReasonBody}>
-                      {rechargeStatus.rejectionReason || rechargeStatus.adminNote}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {/* 1. DISPUTE / PROOF SUBMISSION: If user paid successfully, upload proof */}
-                <View style={styles.disputeSectionCard}>
-                  <Text style={styles.disputeSectionTitle}>
-                    ❓ <T>If you have any query about this rejection then upload payment proof or if you want a refund then upload your refund QR code</T>
-                  </Text>
-                  <Text style={styles.disputeSectionSub}>
-                    <T>Upload your payment screenshot below so owner can verify and approve your coins.</T>
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.uploadPaymentProofBtn}
-                    activeOpacity={0.85}
-                    onPress={() => handlePickPaymentProof(rechargeStatus._id)}
-                    disabled={uploadingPaymentProof}
-                  >
-                    {uploadingPaymentProof ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.uploadPaymentProofBtnText}>
-                        🧾 📷 <T>Upload Payment Proof (Receipt)</T>
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Divider between Proof and Refund */}
-                <Text style={styles.rejectedOrDivider}>
-                  ── <T>OR Request Refund Below</T> ──
-                </Text>
-
-                {/* 2. REFUND QR: If user agrees with rejection and wants refund */}
-                {rechargeStatus.refundQrImage ? (
-                  <View style={styles.refundPreviewWrap}>
-                    <Image
-                      source={{ uri: rechargeStatus.refundQrImage }}
-                      style={styles.refundPreviewImg}
-                      resizeMode="contain"
-                    />
-                    <Text style={styles.refundUploadedText}>
-                      ✓ <T>Refund QR code uploaded. Admin will refund shortly.</T>
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.reuploadBtn}
-                      activeOpacity={0.8}
-                      onPress={() => handlePickRefundQr(rechargeStatus._id)}
-                      disabled={uploadingRefundQr}
-                    >
-                      <Text style={styles.reuploadBtnText}>
-                        <T>Change QR Code</T>
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.uploadRefundQrBtn}
-                    activeOpacity={0.85}
-                    onPress={() => handlePickRefundQr(rechargeStatus._id)}
-                    disabled={uploadingRefundQr}
-                  >
-                    {uploadingRefundQr ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.uploadRefundQrBtnText}>
-                        📷 <T>Upload Your Refund QR Code</T>
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[styles.statusDoneBtn, { backgroundColor: '#64748B', marginTop: 14 }]}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    if (rechargeStatus?._id) {
-                      handleAcknowledgeRecharge(rechargeStatus._id);
-                    } else {
-                      setRechargeStatus(null);
-                      setRechargeModalVisible(false);
-                    }
-                  }}
-                >
-                  <Text style={styles.statusDoneBtnText}>
-                    <T>Close</T>
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              /* CASE 4: Normal Direct Mobile Number & UPI Payment Flow */
-              <View style={styles.rechargePaymentCard}>
-                {/* 1. Recommended Method: Pay via Mobile Number (Zero Error) */}
-                <View style={styles.mobilePayCard}>
-                  <View style={styles.mobilePayBadgeRow}>
-                    <View style={styles.recommendedPill}>
-                      <Text style={styles.recommendedPillText}>★ <T>RECOMMENDED • ZERO ERROR</T></Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.mobilePayMainRow}>
-                    <View style={styles.mobilePayLeft}>
-                      <Text style={styles.mobilePayLabel}>
-                        <T>Official Payment Mobile Number</T>
-                      </Text>
-                      <Text style={styles.mobilePayNumber}>{OWNER_MOBILE_NUMBER}</Text>
-                      <Text style={styles.mobilePayName}>
-                        <T>Verified Name:</T> {OWNER_PAYEE_NAME}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.copyNumberBtn, copiedNumber && styles.copyNumberBtnSuccess]}
-                      activeOpacity={0.8}
-                      onPress={handleCopyMobileNumber}
-                    >
-                      <Text style={styles.copyNumberBtnText}>
-                        {copiedNumber ? '✓ ' + t('Copied!') : '📋 ' + t('Copy Number')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* 2 Simple Steps */}
-                  <View style={styles.instructionsBox}>
-                    <Text style={styles.instructionLine}>
-                      1️⃣ <T>Copy number above</T>
-                    </Text>
-                    <Text style={styles.instructionLine}>
-                      2️⃣ <T>Open PhonePe or Paytm, select "To Mobile Number", paste 7982720270, and pay. Then enter UTR below.</T>
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Quick App Openers (Copies Mobile Number & Opens Selected App with Authentic Icons) */}
-                <View style={styles.quickAppsSection}>
-                  <Text style={styles.quickAppsSectionLabel}>
-                    <T>Copy Number & Open Payment App:</T>
-                  </Text>
-                  <View style={styles.quickAppsGrid}>
-                    <TouchableOpacity
-                      style={styles.quickAppChip}
-                      activeOpacity={0.8}
-                      onPress={() => handleLaunchPaymentApp('phonepe')}
-                    >
-                      <PhonePeIcon size={24} />
-                      <Text style={styles.quickAppChipText}>PhonePe</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.quickAppChip}
-                      activeOpacity={0.8}
-                      onPress={() => handleLaunchPaymentApp('gpay')}
-                    >
-                      <GooglePayIcon size={24} />
-                      <Text style={styles.quickAppChipText}>Google Pay</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.quickAppChip}
-                      activeOpacity={0.8}
-                      onPress={() => handleLaunchPaymentApp('paytm')}
-                    >
-                      <PaytmIcon size={24} />
-                      <Text style={styles.quickAppChipText}>Paytm</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Divider: OR SCAN QR / PAY VIA UPI ID */}
-                <View style={styles.orDividerRow}>
-                  <View style={styles.orDividerLine} />
-                  <Text style={styles.orDividerText}>
-                    <T>OR SCAN QR / UPI ID</T>
-                  </Text>
-                  <View style={styles.orDividerLine} />
-                </View>
-
-                {/* QR Code Container */}
+            {/* Direct QR Payment & Proof Upload Flow */}
+            <View style={styles.rechargePaymentCard}>
+                {/* 1. Official QR Code Display */}
                 <View style={styles.qrDisplayBox}>
-                  <Image
-                    source={RECHARGE_QR_IMG}
-                    style={styles.rechargeQrImg}
-                    resizeMode="contain"
-                  />
-                  <TouchableOpacity
-                    style={[styles.qrCopyTagBtn, copiedUpi && styles.qrCopyTagBtnSuccess]}
-                    activeOpacity={0.8}
-                    onPress={handleCopyUpiId}
-                  >
-                    <Text style={styles.qrCopyTagText}>
-                      📋 {OWNER_UPI_ID} {copiedUpi ? '✓' : ''}
-                    </Text>
-                  </TouchableOpacity>
+                  <Text style={styles.qrSectionHeaderTitle}>
+                    <T>Scan & Pay via UPI QR Code</T>
+                  </Text>
+                  <Text style={styles.qrSectionHeaderSub}>
+                    <T>Scan using any UPI app (PhonePe, GPay, Paytm) to complete payment</T>
+                  </Text>
+
+                  <View style={styles.qrImageFrame}>
+                    <Image
+                      source={RECHARGE_QR_IMG}
+                      style={styles.rechargeQrImg}
+                      resizeMode="contain"
+                    />
+                  </View>
+
+                  {/* UPI ID Copy & Download QR Buttons Row */}
+                  <View style={styles.qrActionButtonsRow}>
+                    <TouchableOpacity
+                      style={[styles.qrCopyTagBtn, copiedUpi && styles.qrCopyTagBtnSuccess]}
+                      activeOpacity={0.8}
+                      onPress={() => handleCopyUpiId(true)}
+                    >
+                      <Text style={styles.qrCopyTagText}>
+                        📋 {OWNER_UPI_ID} {copiedUpi ? '✓' : ''}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.qrDownloadBtn}
+                      activeOpacity={0.8}
+                      onPress={handleDownloadQrCode}
+                      disabled={downloadingQr}
+                    >
+                      {downloadingQr ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.qrDownloadBtnText}>
+                          📥 <T>Download QR</T>
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
                   <Text style={styles.payeeNameHint}>
-                    ({OWNER_PAYEE_NAME})
+                    <T>Verified Name:</T> {OWNER_PAYEE_NAME}
                   </Text>
                 </View>
 
-                {/* Mode of Payment Selector with Brand Icons */}
-                <View style={styles.paymentMethodSection}>
-                  <Text style={styles.paymentMethodLabel}>
-                    <T>Select Payment App Used:</T>
+                {/* 2. Payment Proof Upload Section (Replaces 12-Digit UTR) */}
+                <View style={styles.proofUploadSection}>
+                  <View style={styles.proofHeaderRow}>
+                    <Text style={styles.proofSectionTitle}>
+                      <T>Upload Payment Proof (Receipt)</T> <Text style={{ color: '#EF4444' }}>*</Text>
+                    </Text>
+                    {selectedProofImage && (
+                      <View style={styles.proofReadyBadge}>
+                        <Text style={styles.proofReadyBadgeText}>✓ <T>Attached</T></Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <Text style={styles.proofSectionSub}>
+                    <T>Take a screenshot of your payment receipt after paying and upload it here.</T>
                   </Text>
-                  <View style={styles.paymentMethodsGrid}>
-                    {['PhonePe', 'Google Pay', 'Paytm', 'Amazon Pay', 'Other UPI'].map((mode) => {
-                      const isSelected = selectedPaymentMethod === mode;
-                      return (
+
+                  {validatingProof ? (
+                    <View style={styles.validatingProofCard}>
+                      <ActivityIndicator size="small" color="#10B981" />
+                      <Text style={styles.validatingProofText}>
+                        <T>Verifying QR code / payment proof...</T>
+                      </Text>
+                      <Text style={styles.validatingProofSub}>
+                        <T>Checking for valid payment QR matrix or transaction receipt</T>
+                      </Text>
+                    </View>
+                  ) : selectedProofImage ? (
+                    <View style={styles.selectedProofCard}>
+                      <Image
+                        source={{ uri: selectedProofImage }}
+                        style={styles.selectedProofPreviewImg}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.selectedProofInfo}>
+                        <Text style={styles.selectedProofNotice}>
+                          ✓ <T>Receipt attached successfully</T>
+                        </Text>
                         <TouchableOpacity
-                          key={mode}
-                          style={[
-                            styles.paymentMethodChip,
-                            isSelected && styles.paymentMethodChipActive,
-                          ]}
+                          style={styles.changeProofBtn}
                           activeOpacity={0.8}
-                          onPress={() => setSelectedPaymentMethod(mode)}
+                          onPress={handleOpenProofPicker}
                         >
-                          {mode === 'PhonePe' && <PhonePeIcon size={18} />}
-                          {mode === 'Google Pay' && <GooglePayIcon size={18} />}
-                          {mode === 'Paytm' && <PaytmIcon size={18} />}
-                          {mode === 'Other UPI' && <BhimUpiIcon size={18} />}
-                          <Text
-                            style={[
-                              styles.paymentMethodChipText,
-                              isSelected && styles.paymentMethodChipTextActive,
-                            ]}
-                          >
-                            {mode}
+                          <Text style={styles.changeProofBtnText}>
+                            📷 <T>Change Screenshot</T>
                           </Text>
                         </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.uploadProofTriggerBtn}
+                      activeOpacity={0.85}
+                      onPress={handleOpenProofPicker}
+                    >
+                      <View style={styles.uploadProofIconCircle}>
+                        <Text style={{ fontSize: 26 }}>📷</Text>
+                      </View>
+                      <Text style={styles.uploadProofTriggerTitle}>
+                        <T>Select Payment Proof Screenshot</T>
+                      </Text>
+                      <Text style={styles.uploadProofTriggerSub}>
+                        <T>Upload QR code or payment transaction screenshot</T>
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                {/* Mandatory 12-Digit UTR Input Section */}
-                <View style={styles.utrInputSection}>
-                  <View style={styles.utrHeaderRow}>
-                    <Text style={styles.utrInputLabel}>
-                      <T>12-Digit UTR / UPI Ref Number</T> <Text style={{ color: '#EF4444' }}>*</Text>
-                    </Text>
-                    <Text style={[styles.utrCounterText, utrNumber.length === 12 && styles.utrCounterTextValid]}>
-                      {utrNumber.length}/12
-                    </Text>
-                  </View>
-                  <Text style={styles.utrInputSubHint}>
-                    <T>Mandatory: Found in your UPI app receipt after payment</T>
-                  </Text>
-                  <View style={[styles.utrInputWrap, utrNumber.length === 12 && styles.utrInputWrapValid]}>
-                    <Text style={styles.utrIconPrefix}>🔢</Text>
-                    <TextInput
-                      style={styles.utrTextInput}
-                      placeholder={t('Enter 12-digit UTR (e.g. 429182746192)')}
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="numeric"
-                      value={utrNumber}
-                      onChangeText={(val) => setUtrNumber(val.replace(/[^0-9]/g, ''))}
-                      maxLength={12}
-                    />
-                    {utrNumber.length === 12 && (
-                      <Text style={styles.utrCheckmark}>✓</Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* Submit Payment Request Button */}
+                {/* 3. Submit Payment Request Button */}
                 <TouchableOpacity
                   style={[
                     styles.submitPaymentBtn,
-                    utrNumber.length !== 12 && styles.submitPaymentBtnDisabled,
+                    (!selectedProofImage || validatingProof) && styles.submitPaymentBtnDisabled,
                   ]}
                   activeOpacity={0.85}
                   onPress={handleSubmitRecharge}
-                  disabled={submittingRecharge}
+                  disabled={submittingRecharge || validatingProof || !selectedProofImage}
                 >
                   <LinearGradient
-                    colors={utrNumber.length === 12 ? ['#10B981', '#059669'] : ['#94A3B8', '#64748B']}
+                    colors={selectedProofImage && !validatingProof ? ['#10B981', '#059669'] : ['#94A3B8', '#64748B']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.submitPaymentGradient}
@@ -1607,13 +1431,12 @@ export default function WalletScreen({ navigation, currentUser }) {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <Text style={styles.submitPaymentText}>
-                        <T>Submit Payment Request</T>
+                        <T>Submit Payment Proof</T>
                       </Text>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
-            )}
 
             {/* Footer Support Info (Exact from Screenshot 1) */}
             <View style={styles.rechargeFooterWrap}>
@@ -1623,6 +1446,75 @@ export default function WalletScreen({ navigation, currentUser }) {
             </View>
           </ScrollView>
         </View>
+
+        {/* Source Chooser Modal for Payment Proof (Gallery vs Camera) */}
+        <Modal
+          visible={proofSourceModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setProofSourceModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.sourceModalOverlay}
+            activeOpacity={1}
+            onPress={() => setProofSourceModalVisible(false)}
+          >
+            <View style={styles.sourceModalContent}>
+              <Text style={styles.sourceModalTitle}>
+                <T>Choose Upload Option</T>
+              </Text>
+              <Text style={styles.sourceModalSub}>
+                <T>Only valid QR codes or payment receipts are accepted. Random photos cannot be uploaded.</T>
+              </Text>
+
+              <TouchableOpacity
+                style={styles.sourceOptionBtn}
+                activeOpacity={0.8}
+                onPress={() => handlePickPaymentProofWithSource('gallery')}
+              >
+                <View style={styles.sourceOptionIconWrap}>
+                  <Text style={styles.sourceOptionIcon}>🖼️</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sourceOptionText}>
+                    <T>Select QR Code / Receipt from Gallery</T>
+                  </Text>
+                  <Text style={styles.sourceOptionSubtext}>
+                    <T>Choose downloaded QR or payment receipt from phone</T>
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sourceOptionBtn}
+                activeOpacity={0.8}
+                onPress={() => handlePickPaymentProofWithSource('camera')}
+              >
+                <View style={styles.sourceOptionIconWrap}>
+                  <Text style={styles.sourceOptionIcon}>📷</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sourceOptionText}>
+                    <T>Scan QR Code with Camera</T>
+                  </Text>
+                  <Text style={styles.sourceOptionSubtext}>
+                    <T>Snap a photo of the QR code or payment screen</T>
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sourceCancelBtn}
+                activeOpacity={0.8}
+                onPress={() => setProofSourceModalVisible(false)}
+              >
+                <Text style={styles.sourceCancelText}>
+                  <T>Cancel</T>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </Modal>
     </LinearGradient>
   );
@@ -2528,10 +2420,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   // QR Container
+  // QR Container & Streamlined Layout
   qrDisplayBox: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     alignItems: 'center',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
@@ -2539,245 +2432,53 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     width: '100%',
-    maxWidth: 290,
-    marginBottom: 18,
+    marginBottom: 16,
+  },
+  qrSectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 3,
+  },
+  qrSectionHeaderSub: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  qrImageFrame: {
+    padding: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
   },
   rechargeQrImg: {
-    width: 210,
-    height: 210,
-    marginBottom: 10,
+    width: 220,
+    height: 220,
   },
-  // Mobile Pay Card (Recommended)
-  mobilePayCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#10B981',
-    width: '100%',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  mobilePayBadgeRow: {
+  qrActionButtonsRow: {
     flexDirection: 'row',
-    marginBottom: 10,
-  },
-  recommendedPill: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  recommendedPillText: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    color: '#059669',
-    letterSpacing: 0.5,
-  },
-  mobilePayMainRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  mobilePayLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  mobilePayLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  mobilePayNumber: {
-    fontSize: 19,
-    fontWeight: '900',
-    color: '#0F172A',
-    letterSpacing: 0.5,
-    marginVertical: 2,
-  },
-  mobilePayName: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  copyNumberBtn: {
-    backgroundColor: '#10B981',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  copyNumberBtnSuccess: {
-    backgroundColor: '#059669',
-  },
-  copyNumberBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: '800',
-  },
-  instructionsBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 4,
-  },
-  instructionLine: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#334155',
-    lineHeight: 16,
-  },
-  // Security Tip
-  upiSecurityTipCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    gap: 8,
-    width: '100%',
-  },
-  upiSecurityTipIcon: {
-    fontSize: 16,
-  },
-  upiSecurityTipText: {
-    fontSize: 11.5,
-    color: '#1E40AF',
-    fontWeight: '600',
-    flex: 1,
-    lineHeight: 16,
-  },
-  // Copy UPI Card
-  copyUpiCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    width: '100%',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  copyUpiLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  copyUpiLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  copyUpiIdText: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#1E293B',
-    marginTop: 2,
-    letterSpacing: 0.2,
-  },
-  copyUpiNameText: {
-    fontSize: 11,
-    color: '#94A3B8',
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  copyUpiActionBtn: {
-    backgroundColor: '#4F46E5',
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  copyUpiActionBtnSuccess: {
-    backgroundColor: '#10B981',
-  },
-  copyUpiActionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  // Quick Apps Section
-  quickAppsSection: {
-    width: '100%',
-    marginBottom: 12,
-  },
-  quickAppsSectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: 8,
-  },
-  quickAppsGrid: {
-    flexDirection: 'row',
-    gap: 8,
-    width: '100%',
-  },
-  quickAppChip: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    flexDirection: 'column',
-    gap: 6,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: 10,
+    width: '100%',
+    marginBottom: 8,
   },
-  quickAppChipText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#1E293B',
-    textAlign: 'center',
-  },
-  // QR Copy Tag
   qrCopyTagBtn: {
+    flex: 1,
     backgroundColor: '#EEF2FF',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: '#C7D2FE',
-    marginTop: 4,
-    marginBottom: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   qrCopyTagBtnSuccess: {
     backgroundColor: '#ECFDF5',
@@ -2788,135 +2489,141 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#4338CA',
   },
-  upiIdTagWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+  qrDownloadBtn: {
+    flex: 1,
+    backgroundColor: '#4F46E5',
     paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-    gap: 6,
-    marginBottom: 4,
+    paddingVertical: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  upiIdTagLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  upiIdTagValue: {
-    fontSize: 13,
+  qrDownloadBtnText: {
+    fontSize: 12.5,
     fontWeight: '800',
-    color: '#4F46E5',
-    letterSpacing: 0.3,
+    color: '#FFFFFF',
   },
   payeeNameHint: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '600',
     color: '#64748B',
     marginTop: 2,
   },
-  paymentMethodSection: {
+
+  // Payment Proof Upload Section
+  proofUploadSection: {
     width: '100%',
-    marginBottom: 18,
-  },
-  paymentMethodLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#334155',
-    marginBottom: 8,
-  },
-  paymentMethodsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  paymentMethodChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-  },
-  paymentMethodChipActive: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#10B981',
-  },
-  paymentMethodChipText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  paymentMethodChipTextActive: {
-    color: '#059669',
-  },
-  // 12-Digit UTR Section
-  utrInputSection: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
+    padding: 16,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     marginBottom: 18,
   },
-  utrHeaderRow: {
+  proofHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4,
+  },
+  proofSectionTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  proofReadyBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  proofReadyBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  proofSectionSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  uploadProofTriggerBtn: {
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  uploadProofIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  uploadProofTriggerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#4F46E5',
     marginBottom: 3,
   },
-  utrInputLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  utrCounterText: {
+  uploadProofTriggerSub: {
     fontSize: 11.5,
-    fontWeight: '800',
-    color: '#94A3B8',
-  },
-  utrCounterTextValid: {
-    color: '#10B981',
-  },
-  utrInputSubHint: {
-    fontSize: 11,
     color: '#64748B',
-    marginBottom: 10,
   },
-  utrInputWrap: {
+  selectedProofCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    paddingHorizontal: 12,
-    height: 48,
-    gap: 8,
-  },
-  utrInputWrapValid: {
-    borderColor: '#10B981',
     backgroundColor: '#F0FDF4',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    gap: 14,
   },
-  utrIconPrefix: {
-    fontSize: 16,
+  selectedProofPreviewImg: {
+    width: 70,
+    height: 70,
+    borderRadius: 10,
+    backgroundColor: '#E2E8F0',
   },
-  utrTextInput: {
+  selectedProofInfo: {
     flex: 1,
-    fontSize: 14,
-    color: '#0F172A',
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    paddingVertical: 0,
+    justifyContent: 'center',
   },
-  utrCheckmark: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#10B981',
+  selectedProofNotice: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#15803D',
+    marginBottom: 6,
+  },
+  changeProofBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+  },
+  changeProofBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
   },
   // Submit Button
   submitPaymentBtn: {
@@ -2957,5 +2664,101 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     fontWeight: '500',
+  },
+
+  // Validating Proof State
+  validatingProofCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#93C5FD',
+    borderStyle: 'dashed',
+    gap: 6,
+  },
+  validatingProofText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginTop: 4,
+  },
+  validatingProofSub: {
+    fontSize: 11.5,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+
+  // Source Chooser Modal
+  sourceModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  sourceModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 32,
+    gap: 12,
+  },
+  sourceModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+  sourceModalSub: {
+    fontSize: 12.5,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  sourceOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 14,
+  },
+  sourceOptionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sourceOptionIcon: {
+    fontSize: 22,
+  },
+  sourceOptionText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  sourceOptionSubtext: {
+    fontSize: 11.5,
+    color: '#64748B',
+  },
+  sourceCancelBtn: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sourceCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748B',
   },
 });

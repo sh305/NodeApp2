@@ -18,6 +18,8 @@ const taskRoutes = require('./routes/taskRoutes');
 const rechargeRoutes = require('./routes/rechargeRoutes');
 const directMessageRoutes = require('./routes/directMessageRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const postRoutes = require('./routes/postRoutes');
+const familyRoutes = require('./routes/familyRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -51,6 +53,8 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/recharge', rechargeRoutes);
 app.use('/api/messages', directMessageRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/families', familyRoutes);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {

@@ -29,6 +29,7 @@ import GamingView from '../components/GamingView';
 import PersonalTasksModal from '../components/PersonalTasksModal';
 import MeProfileView from '../components/MeProfileView';
 import MessageView from '../components/MessageView';
+import DiscoverView from '../components/DiscoverView';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../components/Toast';
 
@@ -293,6 +294,11 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
       socket.on('recharge_status_updated', () => {
         fetchUnreadBadgeCount();
       });
+      socket.on('new_follower_notification', (data) => {
+        if (!data || !data.targetUserId || data.targetUserId === currentUser?._id?.toString()) {
+          fetchUnreadBadgeCount();
+        }
+      });
     } catch (err) {}
 
     return () => {
@@ -522,7 +528,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
             </TouchableOpacity>
           </View>
         </View>
-      ) : (bottomTab === 'Gaming' || bottomTab === 'Me' || bottomTab === 'Message') ? null : (
+      ) : (bottomTab === 'Gaming' || bottomTab === 'Me' || bottomTab === 'Message' || bottomTab === 'Discover') ? null : (
         <View style={[styles.otherTopHeader, { paddingTop: Math.max(16, insets.top) }]}>
           <Text style={styles.otherTopHeaderTitle}>
             {t(bottomTab)}
@@ -554,6 +560,12 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           currentUser={currentUser}
           navigation={navigation}
           onUnreadCountChange={(count) => setTotalUnreadMessages(count)}
+        />
+      ) : bottomTab === 'Discover' ? (
+        <DiscoverView
+          currentUser={currentUser}
+          insets={insets}
+          navigation={navigation}
         />
       ) : (
         <ScrollView
@@ -915,7 +927,6 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           activeOpacity={0.8}
           onPress={() => {
             setBottomTab('Discover');
-            showToast(t('Discover New Friends & Events! 🌍'), 'info');
           }}
         >
           <View style={styles.navIconContainer}>

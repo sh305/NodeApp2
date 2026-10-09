@@ -43,7 +43,7 @@ const rechargeRequestSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected', 'proof_submitted', 'resolved'],
+      enum: ['pending', 'approved', 'rejected', 'proof_submitted', 'resolved', 'problem'],
       default: 'pending',
     },
     adminNote: {
@@ -53,6 +53,18 @@ const rechargeRequestSchema = new mongoose.Schema(
     rejectionReason: {
       type: String,
       default: '',
+    },
+    disputeReason: {
+      type: String,
+      default: '',
+    },
+    disputeProofImage: {
+      type: String,
+      default: null,
+    },
+    disputedAt: {
+      type: Date,
+      default: null,
     },
     resolveMessage: {
       type: String,
@@ -67,6 +79,18 @@ const rechargeRequestSchema = new mongoose.Schema(
       default: null,
     },
     approvedAt: {
+      type: Date,
+      default: null,
+    },
+    approvalRemarks: {
+      type: String,
+      default: '',
+    },
+    approvedCoins: {
+      type: Number,
+      default: null,
+    },
+    approvalViewedAt: {
       type: Date,
       default: null,
     },

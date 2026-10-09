@@ -161,13 +161,16 @@ const PAYMENT_KEYWORDS = [
   'split',
   'fun maja',
   '7982720270',
+  '7982720270@ybl',
+  'shivam rai',
 ];
 
 /**
- * Validates whether an uploaded image is a legitimate payment receipt using OCR and optional UTR match
+ * Validates whether an uploaded image is a legitimate payment receipt using OCR and strict multi-factor checks
+ * Prevents uploading fake/irrelevant photos (selfies, memes, landscapes, random objects)
  * @param {string} base64Data
- * @param {string} [expectedUtr] - 12-digit UTR submitted by the user
- * @returns {Promise<{ isValid: boolean, matchedKeywords?: string[], utrMatched?: boolean, message?: string }>}
+ * @param {string} [expectedUtr] - optional 12-digit UTR submitted by the user
+ * @returns {Promise<{ isValid: boolean, extractedUtr?: string | null, score?: number, matchedKeywords?: string[], message?: string }>}
  */
 exports.validatePaymentProofImage = async (base64Data, expectedUtr = '') => {
   try {
@@ -175,7 +178,15 @@ exports.validatePaymentProofImage = async (base64Data, expectedUtr = '') => {
     if (!buffer || buffer.length === 0) {
       return {
         isValid: false,
-        message: 'Invalid image data provided',
+        message: 'Invalid image data provided. Please upload a clear screenshot.',
+      };
+    }
+
+    // Minimum sanity check on image byte size (valid receipts are at least a few KB)
+    if (buffer.length < 5000) {
+      return {
+        isValid: false,
+        message: 'Image file is too small or corrupted. Please upload a full screenshot.',
       };
     }
 
@@ -184,60 +195,163 @@ exports.validatePaymentProofImage = async (base64Data, expectedUtr = '') => {
     const rawText = ocrResult?.data?.text || '';
     const normalizedText = rawText.toLowerCase().replace(/[\r\n\t]+/g, ' ');
 
-    // 1. Check for expected UTR match if available
-    let utrMatched = false;
+    console.log('📸 [OCR Text Length]:', rawText.length);
+    console.log('📸 [OCR Text Sample]:', normalizedText.slice(0, 150));
+
+    // If image has virtually no text (e.g. photo of face, scenery, food, pet)
+    if (normalizedText.trim().length < 8) {
+      return {
+        isValid: false,
+        message: 'Invalid image: No transaction or receipt text found. Please upload a clear screenshot of your payment receipt.',
+      };
+    }
+
+    // 1. Owner Details match (Strongest signal: 7982720270, 7982720270@ybl, Shivam Rai)
+    const hasOwnerMatch =
+      normalizedText.includes('7982720270') ||
+      normalizedText.includes('shivam rai') ||
+      (normalizedText.includes('shivam') && normalizedText.includes('rai'));
+
+    // 2. Transaction Status Indicators (Must indicate a finished transaction)
+    const hasStatus = /\b(successful|success|succes|completed|complete|paid|transferred|transfer|sent|debited|credited|received)\b/i.test(normalizedText);
+
+    // 3. 12-digit UTR or Reference / Txn ID
+    const utr12Match = normalizedText.match(/\b\d{12}\b/);
+    const utrSpacedMatch = normalizedText.match(/\b\d{4}\s*\d{4}\s*\d{4}\b/);
+    const hasGeneralRefNumber = /\b\d{10,16}\b/.test(normalizedText);
+    const hasUtrNumber = !!(utr12Match || utrSpacedMatch || hasGeneralRefNumber);
+
+    const hasTxnIndicator = /\b(utr|upi ref|reference|ref no|transaction id|txn id|txn|rrn|order id|payment id)\b/i.test(normalizedText);
+
+    // 4. Payment Provider / Channel Branding
+    const hasProvider = /\b(phonepe|google pay|gpay|paytm|bhim|upi|bank|ybl|axis|sbi|hdfc|icici|kotak|cred|amazon pay|rupay)\b/i.test(normalizedText);
+
+    // 5. Currency / Amount
+    const hasCurrency = /(₹|inr|\brs\.?\b|\bamount\b)/i.test(normalizedText) && /\d+/.test(normalizedText);
+
+    // Calculate confidence score
+    let score = 0;
+    if (hasOwnerMatch) score += 4;
+    if (hasStatus) score += 3;
+    if (hasUtrNumber) score += 3;
+    if (hasTxnIndicator) score += 2;
+    if (hasProvider) score += 2;
+    if (hasCurrency) score += 1;
+
+    // Check optional expected UTR if passed
+    let expectedUtrMatched = false;
     const cleanExpectedUtr = (expectedUtr || '').trim();
     if (cleanExpectedUtr.length >= 8) {
       const digitsOnlyText = normalizedText.replace(/\D/g, '');
       if (digitsOnlyText.includes(cleanExpectedUtr)) {
-        utrMatched = true;
-      } else {
-        const first8 = cleanExpectedUtr.slice(0, 8);
-        const last8 = cleanExpectedUtr.slice(-8);
-        if (digitsOnlyText.includes(first8) || digitsOnlyText.includes(last8)) {
-          utrMatched = true;
-        }
+        expectedUtrMatched = true;
+        score += 3;
       }
     }
 
-    // 2. Check for ANY 10 to 12 digit reference number (standard in Indian UPI receipts)
-    const hasAnyUtrOrTxnNumber = /\b\d{10,12}\b/.test(normalizedText) || /\d{4}\s*\d{4}\s*\d{4}/.test(normalizedText);
+    console.log('📸 [OCR Validation Score]:', score);
+    console.log('📸 [OCR Details]:', { hasOwnerMatch, hasStatus, hasUtrNumber, hasTxnIndicator, hasProvider, hasCurrency });
 
-    // 3. Count matched payment keywords
-    const matchedKeywords = PAYMENT_KEYWORDS.filter((keyword) =>
-      normalizedText.includes(keyword)
-    );
+    // Strict Decision Rule:
+    // A photo is verified as a payment receipt ONLY if:
+    // - Direct match with owner details (PhonePe/UPI/Name)
+    // - OR (Payment status is present AND a 10-12 digit UTR or Transaction indicator exists)
+    // - OR (Composite score >= 5 AND at least one payment status is present)
+    // Random photos (selfies, wallpapers, memes, chat screenshots, random objects) fail all of these!
+    const isGenuineReceipt =
+      hasOwnerMatch ||
+      expectedUtrMatched ||
+      (hasStatus && (hasUtrNumber || hasTxnIndicator)) ||
+      (score >= 5 && hasStatus);
 
-    console.log('📸 [OCR Text Sample]:', normalizedText.slice(0, 150));
-    console.log('📸 [OCR Matched Keywords]:', matchedKeywords);
-    console.log('📸 [OCR UTR Matched]:', utrMatched);
-    console.log('📸 [OCR 10-12 Digit Reference Found]:', hasAnyUtrOrTxnNumber);
-
-    // Decision rule:
-    // Any genuine payment screenshot has either:
-    // - User's UTR match
-    // - Any 10-12 digit transaction/reference number
-    // - At least 1 payment keyword ('paid', 'successful', 'phonepe', 'gpay', 'paytm', 'upi', 'fun maja', etc.)
-    // Non-payment photos (selfies, memes, products, landscapes) have NONE of these!
-    if (utrMatched || hasAnyUtrOrTxnNumber || matchedKeywords.length >= 1) {
+    if (!isGenuineReceipt) {
       return {
-        isValid: true,
-        matchedKeywords,
-        utrMatched,
+        isValid: false,
+        score,
+        message: 'Invalid payment proof: This image does not appear to be a genuine payment receipt. Please upload a clear screenshot of your successful UPI transaction.',
       };
     }
 
+    // Extract genuine 12-digit UTR if found in receipt text
+    let extractedUtr = null;
+    if (utr12Match) {
+      extractedUtr = utr12Match[0];
+    } else if (utrSpacedMatch) {
+      extractedUtr = utrSpacedMatch[0].replace(/\s/g, '');
+    }
+
     return {
-      isValid: false,
-      message: 'Invalid payment proof: No payment or transaction details detected. Please upload a clear screenshot of your payment receipt.',
+      isValid: true,
+      score,
+      extractedUtr,
+      hasOwnerMatch,
+      matchedKeywords: [
+        hasOwnerMatch ? 'owner_match' : null,
+        hasStatus ? 'status_verified' : null,
+        hasUtrNumber ? 'utr_found' : null,
+        hasProvider ? 'provider_verified' : null,
+      ].filter(Boolean),
     };
   } catch (err) {
     console.error('Error running OCR on payment proof:', err);
-    // If OCR engine encounters an internal glitch, allow through so user isn't permanently blocked by server error
     return {
-      isValid: true,
-      matchedKeywords: ['fallback_bypass'],
-      utrMatched: false,
+      isValid: false,
+      message: 'Failed to verify payment proof image. Please ensure the screenshot is clear and try again.',
     };
   }
 };
+
+/**
+ * Unified validator: Checks if an uploaded image is a valid QR Code OR a genuine UPI Payment Receipt.
+ * Rejects random photos (selfies, wallpapers, memes, blank photos, unrelated images).
+ * @param {string} base64Data
+ * @param {string} [expectedUtr]
+ * @returns {Promise<{ isValid: boolean, type?: 'qr_code' | 'receipt_ocr', message?: string, extractedUtr?: string, qrData?: string, score?: number }>}
+ */
+exports.validatePaymentOrQrProof = async (base64Data, expectedUtr = '') => {
+  try {
+    // 1. Try detecting QR code first (instant & reliable via jsQR)
+    try {
+      const qrCheck = await exports.validateRefundQrImage(base64Data);
+      if (qrCheck && qrCheck.isValid) {
+        return {
+          isValid: true,
+          type: 'qr_code',
+          qrData: qrCheck.qrData,
+          message: 'Valid payment QR code detected.',
+        };
+      }
+    } catch (qrErr) {
+      console.warn('⚠️ QR check attempt error:', qrErr.message);
+    }
+
+    // 2. Fallback to Payment Receipt OCR (checks for PhonePe/GPay/Paytm, UTR, Paid status)
+    try {
+      const ocrCheck = await exports.validatePaymentProofImage(base64Data, expectedUtr);
+      if (ocrCheck && ocrCheck.isValid) {
+        return {
+          isValid: true,
+          type: 'receipt_ocr',
+          extractedUtr: ocrCheck.extractedUtr || null,
+          score: ocrCheck.score,
+          message: 'Valid payment receipt detected.',
+        };
+      }
+    } catch (ocrErr) {
+      console.warn('⚠️ OCR check attempt error:', ocrErr.message);
+    }
+
+    // 3. Neither QR code nor payment receipt details found
+    return {
+      isValid: false,
+      message: 'Invalid image: Only valid payment QR codes or genuine payment receipts are accepted. Random photos cannot be uploaded.',
+    };
+  } catch (err) {
+    console.error('Error in validatePaymentOrQrProof:', err);
+    return {
+      isValid: false,
+      message: 'Failed to validate image. Please ensure the image is clear and try again.',
+    };
+  }
+};
+

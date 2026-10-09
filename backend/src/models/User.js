@@ -96,6 +96,15 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 1,
     },
+    userLevel: {
+      type: Number,
+      default: 1,
+    },
+    family: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Family',
+      default: null,
+    },
     // VIP Membership System
     isVip: {
       type: Boolean,

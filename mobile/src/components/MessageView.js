@@ -11,6 +11,7 @@ import {
   Modal,
   RefreshControl,
   Platform,
+  TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -201,6 +202,7 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
   const [systemNotifications, setSystemNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [unreadFollowersCount, setUnreadFollowersCount] = useState(0);
   const [lastViewedNotifTime, setLastViewedNotifTime] = useState(0);
 
   const storageKey = `@notif_last_opened_${currentUser?._id || 'guest'}`;
@@ -218,11 +220,20 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
     loadLastViewed();
   }, [storageKey]);
 
-  // Recharge Dispute Modal
+  // Recharge Query / Dispute Modal
   const [selectedDisputeNotification, setSelectedDisputeNotification] = useState(null);
   const [disputeModalVisible, setDisputeModalVisible] = useState(false);
+  const [disputeReasonInput, setDisputeReasonInput] = useState('');
+  const [disputeProofBase64, setDisputeProofBase64] = useState(null);
+  const [submittingDispute, setSubmittingDispute] = useState(false);
+  const [validatingProof, setValidatingProof] = useState(false);
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
   const [uploadingRefundQr, setUploadingRefundQr] = useState(false);
+
+  // Followers Activity / Notifications state (Matching Followers Menu Screenshot)
+  const [followerNotifs, setFollowerNotifs] = useState([]);
+  const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [refreshingFollowers, setRefreshingFollowers] = useState(false);
 
   // Format timestamp helper (e.g. 10/07 - 13:48)
   const formatTime = (dateStr) => {
@@ -265,6 +276,7 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
       }
       if (unreadRes.data?.success) {
         setUnreadNotificationsCount(unreadRes.data.unreadNotificationsCount || 0);
+        setUnreadFollowersCount(unreadRes.data.unreadFollowersCount || 0);
       }
     } catch (err) {
       console.error('Error fetching system notifications:', err);
@@ -272,6 +284,75 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
       setLoadingNotifications(false);
     }
   }, []);
+
+  // Fetch follower notifications
+  const fetchFollowerNotifications = useCallback(async () => {
+    try {
+      setLoadingFollowers(true);
+      const res = await api.get('/users/follower-notifications');
+      if (res.data?.success) {
+        setFollowerNotifs(res.data.notifications || []);
+      }
+    } catch (err) {
+      console.error('Error fetching follower notifications:', err);
+    } finally {
+      setLoadingFollowers(false);
+    }
+  }, []);
+
+  // Follow back toggle
+  const handleToggleFollowBack = async (targetUserId) => {
+    try {
+      const res = await api.post(`/users/${targetUserId}/follow`);
+      if (res.data?.success) {
+        showToast(
+          res.data.following
+            ? t('Followed back successfully!')
+            : t('Unfollowed successfully'),
+          'success'
+        );
+        fetchFollowerNotifications();
+      }
+    } catch (err) {
+      showToast(t('Action failed'), 'error');
+    }
+  };
+
+  // Follow relative time helper (matching screenshot e.g. "1 days ago")
+  const formatFollowTime = (dateStr) => {
+    if (!dateStr) return '1 days ago';
+    try {
+      const now = new Date();
+      const past = new Date(dateStr);
+      const diffMs = now.getTime() - past.getTime();
+      const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHours = Math.floor(diffMin / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMin < 60) return diffMin <= 1 ? t('Just now') : `${diffMin} ${t('minutes ago')}`;
+      if (diffHours < 24) return `${diffHours} ${t('hours ago')}`;
+      if (diffDays === 1) return t('1 days ago');
+      if (diffDays < 30) return `${diffDays} ${t('days ago')}`;
+      return past.toLocaleDateString();
+    } catch {
+      return '1 days ago';
+    }
+  };
+
+  // Handler for user clicking Followers tab
+  const handleOpenFollowersTab = async () => {
+    setUnreadFollowersCount(0);
+    setActiveView('followers');
+    fetchFollowerNotifications();
+    try {
+      await api.post('/users/mark-followers-read');
+      const res = await api.get('/notifications/unread-count');
+      if (res.data?.success && onUnreadCountChange) {
+        onUnreadCountChange(res.data.totalUnread || 0);
+      }
+    } catch (e) {}
+  };
 
   // Handler for user clicking Notification tab
   const handleOpenNotificationMenu = async () => {
@@ -300,8 +381,10 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
       const res = await api.get('/notifications/unread-count');
       if (res.data?.success) {
         const notifCount = res.data.unreadNotificationsCount || 0;
+        const followersCount = res.data.unreadFollowersCount || 0;
         const total = res.data.totalUnread || 0;
         setUnreadNotificationsCount(notifCount);
+        setUnreadFollowersCount(followersCount);
         if (onUnreadCountChange) {
           onUnreadCountChange(total);
         }
@@ -314,12 +397,15 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
   // Initial Load & Refresh
   useEffect(() => {
     setLoadingChats(true);
-    Promise.all([fetchConversations(), fetchSystemNotifications(), fetchUnreadBadge()]).finally(
-      () => setLoadingChats(false)
-    );
-  }, [fetchConversations, fetchSystemNotifications, fetchUnreadBadge]);
+    Promise.all([
+      fetchConversations(),
+      fetchSystemNotifications(),
+      fetchUnreadBadge(),
+      fetchFollowerNotifications(),
+    ]).finally(() => setLoadingChats(false));
+  }, [fetchConversations, fetchSystemNotifications, fetchUnreadBadge, fetchFollowerNotifications]);
 
-  // Real-time socket listener for incoming DMs & recharge updates
+  // Real-time socket listener for incoming DMs, recharge updates, and new followers
   useEffect(() => {
     let socket = null;
     try {
@@ -343,6 +429,14 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
         fetchSystemNotifications();
         fetchUnreadBadge();
       });
+
+      socket.on('new_follower_notification', (data) => {
+        if (!data || !data.targetUserId || data.targetUserId === currentUser?._id?.toString()) {
+          fetchFollowerNotifications();
+          fetchUnreadBadge();
+          showToast(t('New follower!'), 'info');
+        }
+      });
     } catch (err) {
       console.error('Socket setup error in MessageView:', err);
     }
@@ -350,7 +444,7 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [currentUser?._id, fetchConversations, fetchSystemNotifications, fetchUnreadBadge]);
+  }, [currentUser?._id, fetchConversations, fetchSystemNotifications, fetchUnreadBadge, fetchFollowerNotifications]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -358,6 +452,7 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
       fetchConversations(),
       fetchSystemNotifications(),
       fetchUnreadBadge(),
+      fetchFollowerNotifications(),
     ]);
     setRefreshing(false);
   };
@@ -366,6 +461,89 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
   const handleOpenChat = (partner) => {
     setChatPartner(partner);
     setChatModalVisible(true);
+  };
+
+  // Pick payment proof for user problem query
+  const handlePickDisputeProof = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showToast(t('Permission to access photos is required'), 'error');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64Data = `data:image/jpeg;base64,${asset.base64}`;
+
+        // Validate proof image with AI validator
+        setValidatingProof(true);
+        try {
+          const res = await api.post('/recharge/validate-proof', {
+            proofImage: base64Data,
+          });
+          if (!res.data?.isValid) {
+            showToast(t(res.data?.message || 'Invalid payment proof'), 'error');
+            return;
+          }
+        } catch (e) {
+          // If validator network check fails, allow attaching
+        } finally {
+          setValidatingProof(false);
+        }
+
+        setDisputeProofBase64(base64Data);
+        showToast(t('Payment proof attached successfully'), 'success');
+      }
+    } catch (err) {
+      console.error('Error selecting proof:', err);
+      showToast(t('Failed to select payment proof'), 'error');
+    }
+  };
+
+  // Submit dispute / query to owner
+  const handleSubmitDispute = async () => {
+    if (!selectedDisputeNotification) return;
+    const finalReason = disputeReasonInput.trim();
+    if (!finalReason) {
+      showToast(t('Please enter your query or reason'), 'error');
+      return;
+    }
+    if (!disputeProofBase64) {
+      showToast(t('Please upload your payment proof screenshot'), 'error');
+      return;
+    }
+
+    try {
+      setSubmittingDispute(true);
+      const res = await api.post(`/recharge/${selectedDisputeNotification.rechargeId}/submit-problem`, {
+        reason: finalReason,
+        proofImage: disputeProofBase64,
+      });
+
+      if (res.data?.success) {
+        showToast(t('Your query and payment proof have been submitted to owner for review.'), 'success');
+        setDisputeModalVisible(false);
+        setDisputeReasonInput('');
+        setDisputeProofBase64(null);
+        await fetchSystemNotifications();
+        await fetchUnreadBadge();
+      } else {
+        showToast(t(res.data?.message || 'Failed to submit query'), 'error');
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to submit query';
+      showToast(t(msg), 'error');
+    } finally {
+      setSubmittingDispute(false);
+    }
   };
 
   // Upload Payment Proof (Receipt) with AI OCR verification
@@ -468,7 +646,7 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
     } catch (e) {}
   };
 
-  // Auto-expire resolved notifications after 5 minutes of viewing
+  // Auto-expire resolved and approved notifications after 5 minutes of viewing
   useEffect(() => {
     if (activeView !== 'system_notifications') return;
     const interval = setInterval(() => {
@@ -477,6 +655,9 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
         const filtered = prev.filter((item) => {
           if (item.type === 'recharge_resolved' && item.resolvedViewedAt) {
             return Date.now() - new Date(item.resolvedViewedAt).getTime() < fiveMinutes;
+          }
+          if (item.type === 'recharge_approved' && item.approvalViewedAt) {
+            return Date.now() - new Date(item.approvalViewedAt).getTime() < fiveMinutes;
           }
           return true;
         });
@@ -532,6 +713,7 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
               const isResolved = item.type === 'recharge_resolved';
               const isProofSubmitted = item.type === 'proof_submitted';
               const isApproved = item.type === 'recharge_approved';
+              const isPending = item.type === 'recharge_pending';
 
               return (
                 <TouchableOpacity
@@ -540,12 +722,26 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
                     styles.notificationCard,
                     isRejected && styles.rejectedNotificationCard,
                     isResolved && styles.resolvedNotificationCard,
+                    isApproved && styles.approvedNotificationCard,
+                    isPending && styles.pendingNotificationCard,
                   ]}
-                  activeOpacity={isRejected ? 0.8 : 1}
+                  activeOpacity={isRejected ? 0.8 : isApproved ? 0.8 : 1}
                   onPress={() => {
                     if (isRejected) {
                       setSelectedDisputeNotification(item);
                       setDisputeModalVisible(true);
+                    } else if (isApproved) {
+                      showToast(
+                        t('Payment approved. ') +
+                          `${item.coins} ` +
+                          t('coins added to wallet.'),
+                        'success'
+                      );
+                    } else if (isPending || isProofSubmitted) {
+                      showToast(
+                        t('Your payment proof is pending owner verification.'),
+                        'info'
+                      );
                     }
                   }}
                 >
@@ -559,7 +755,7 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
                         <View style={[styles.notifBadgeCircle, { backgroundColor: '#DBEAFE' }]}>
                           <Text style={{ fontSize: 18 }}>🎉</Text>
                         </View>
-                      ) : isProofSubmitted ? (
+                      ) : (isProofSubmitted || isPending) ? (
                         <View style={[styles.notifBadgeCircle, { backgroundColor: '#FEF3C7' }]}>
                           <Text style={{ fontSize: 18 }}>⏳</Text>
                         </View>
@@ -577,13 +773,37 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
                         </Text>
                         <Text style={styles.notifTime}>{formatTime(item.createdAt)}</Text>
                       </View>
-                      <Text style={[styles.notifSubDetails, isResolved && { color: '#3B82F6' }]}>
+                      <Text style={[styles.notifSubDetails, isResolved && { color: '#3B82F6' }, isApproved && { color: '#16A34A' }]}>
                         ₹{item.amount} • {item.coins} <T>Coins</T>
                       </Text>
                     </View>
                   </View>
 
                   <Text style={styles.notifBody}>{item.body}</Text>
+
+                  {/* Approved Info Banner with Coins and Remarks (Auto-clears in 5 mins) */}
+                  {isApproved && (
+                    <View style={styles.approvedActionBanner}>
+                      <View style={styles.approvedCoinsHighlightRow}>
+                        <Text style={styles.approvedCoinsHighlightText}>
+                          💰 +{item.coins} <T>Coins added to your wallet</T>
+                        </Text>
+                      </View>
+                      {item.remarks ? (
+                        <View style={styles.approvedRemarksCard}>
+                          <Text style={styles.approvedRemarksLabel}>
+                            📝 <T>Remarks</T>:
+                          </Text>
+                          <Text style={styles.approvedRemarksText}>
+                            {item.remarks}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <Text style={styles.autoClearHintText}>
+                        ⏱️ <T>Auto-clears after 5 minutes</T>
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Resolved Info Banner (Without Got it button - Auto-clears in 5 mins) */}
                   {isResolved && (
@@ -597,27 +817,44 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
                     </View>
                   )}
 
-                  {/* Rejection Specific Action Button / Dispute Prompt */}
+                  {/* Rejection Specific Action Button / Query Prompt */}
                   {isRejected && (
                     <View style={styles.rejectedActionBanner}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.rejectedBannerPrompt}>
-                          <T>Tap to submit payment proof or refund QR</T>
-                        </Text>
                         <Text style={styles.rejectedBannerSub}>
                           <T>Rejection Reason</T>: {item.rejectionReason || t('Verification failed')}
                         </Text>
-                      </View>
-                      <View style={styles.uploadBtnPill}>
-                        <Text style={styles.uploadBtnPillText}><T>Submit</T> ➔</Text>
+                        <TouchableOpacity
+                          style={styles.queryPromptButton}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setSelectedDisputeNotification(item);
+                            setDisputeReasonInput('');
+                            setDisputeProofBase64(null);
+                            setDisputeModalVisible(true);
+                          }}
+                        >
+                          <Text style={styles.queryPromptButtonText}>
+                            ❓ <T>If you have any query, click here</T> ➔
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   )}
 
-                  {isProofSubmitted && (
+                  {/* Problem / Query Under Review Banner */}
+                  {item.type === 'recharge_problem' && (
                     <View style={styles.pendingActionBanner}>
                       <Text style={styles.pendingBannerText}>
-                        <T>Proof submitted. Awaiting owner review.</T>
+                        ⏳ <T>Query submitted. Under owner review in User Problems.</T>
+                      </Text>
+                    </View>
+                  )}
+
+                  {(isProofSubmitted || isPending) && (
+                    <View style={styles.pendingActionBanner}>
+                      <Text style={styles.pendingBannerText}>
+                        ⏳ <T>Proof submitted. Awaiting owner review.</T>
                       </Text>
                     </View>
                   )}
@@ -627,7 +864,7 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
           </ScrollView>
         )}
 
-        {/* RECHARGE DISPUTE MODAL (Upload Proof / Refund QR) */}
+        {/* RECHARGE QUERY & PROOF POPUP MODAL */}
         {selectedDisputeNotification && (
           <Modal
             visible={disputeModalVisible}
@@ -639,7 +876,9 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
               <View style={[styles.disputeModalBox, { paddingBottom: Math.max(24, insets.bottom) }]}>
                 {/* Header */}
                 <View style={styles.disputeModalHeader}>
-                  <Text style={styles.disputeModalTitle}><T>Recharge Rejection Dispute</T></Text>
+                  <Text style={styles.disputeModalTitle}>
+                    <T>Submit Your Query</T>
+                  </Text>
                   <TouchableOpacity
                     style={styles.disputeCloseBtn}
                     onPress={() => setDisputeModalVisible(false)}
@@ -659,61 +898,234 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
                   </Text>
                 </View>
 
-                {/* Dispute Actions */}
-                <Text style={styles.disputeSectionTitle}>
-                  <T>Choose a resolution option</T>:
+                {/* Query Reason Text Input */}
+                <Text style={styles.disputeInputLabel}>
+                  <T>Explain your problem or query</T>:
                 </Text>
+                <TextInput
+                  style={styles.disputeTextInput}
+                  placeholder={t('Explain why your payment was valid or details of the deduction...')}
+                  placeholderTextColor="#94A3B8"
+                  value={disputeReasonInput}
+                  onChangeText={setDisputeReasonInput}
+                  multiline={true}
+                  numberOfLines={3}
+                  maxLength={300}
+                />
 
-                {/* Option 1: Upload Payment Proof */}
-                <View style={styles.disputeOptionCard}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.disputeOptionTitle}>
-                      📄 <T>Upload Payment Proof (Receipt)</T>
-                    </Text>
-                    <Text style={styles.disputeOptionDesc}>
-                      <T>If you already paid, upload clear screenshot with UTR number for AI re-verification.</T>
-                    </Text>
+                {/* Payment Proof Upload Section */}
+                <Text style={styles.disputeInputLabel}>
+                  <T>Upload Payment Proof (Receipt / QR Screenshot)</T>:
+                </Text>
+                {disputeProofBase64 ? (
+                  <View style={styles.disputeProofPreviewRow}>
+                    <Image
+                      source={{ uri: disputeProofBase64 }}
+                      style={styles.disputeProofPreviewImg}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.disputeProofPreviewActions}>
+                      <TouchableOpacity
+                        style={styles.changeProofBtn}
+                        activeOpacity={0.8}
+                        onPress={handlePickDisputeProof}
+                        disabled={validatingProof}
+                      >
+                        <Text style={styles.changeProofBtnText}>
+                          📷 <T>Change Screenshot</T>
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeProofBtn}
+                        activeOpacity={0.8}
+                        onPress={() => setDisputeProofBase64(null)}
+                      >
+                        <Text style={styles.removeProofBtnText}>✕ <T>Remove</T></Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
+                ) : (
                   <TouchableOpacity
-                    style={styles.disputeActionBtn}
+                    style={styles.uploadProofPickBtn}
                     activeOpacity={0.8}
-                    disabled={uploadingPaymentProof}
-                    onPress={() => handlePickPaymentProof(selectedDisputeNotification.rechargeId)}
+                    onPress={handlePickDisputeProof}
+                    disabled={validatingProof}
                   >
-                    {uploadingPaymentProof ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    {validatingProof ? (
+                      <ActivityIndicator size="small" color="#6366F1" />
                     ) : (
-                      <Text style={styles.disputeActionBtnText}><T>Upload Proof</T></Text>
+                      <>
+                        <Text style={styles.uploadProofPickIcon}>📷</Text>
+                        <Text style={styles.uploadProofPickText}>
+                          <T>Choose Payment Screenshot</T>
+                        </Text>
+                      </>
                     )}
                   </TouchableOpacity>
-                </View>
+                )}
 
-                {/* Option 2: Upload Refund QR Code */}
-                <View style={styles.disputeOptionCard}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.disputeOptionTitle}>
-                      📲 <T>Upload Refund QR Code</T>
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={styles.submitDisputeBtn}
+                  activeOpacity={0.85}
+                  onPress={handleSubmitDispute}
+                  disabled={submittingDispute}
+                >
+                  {submittingDispute ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitDisputeBtnText}>
+                      ✓ <T>Submit Query</T>
                     </Text>
-                    <Text style={styles.disputeOptionDesc}>
-                      <T>Upload your PhonePe/GPay QR code to receive your refund directly to your bank.</T>
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.disputeActionBtn, { backgroundColor: '#6366F1' }]}
-                    activeOpacity={0.8}
-                    disabled={uploadingRefundQr}
-                    onPress={() => handlePickRefundQr(selectedDisputeNotification.rechargeId)}
-                  >
-                    {uploadingRefundQr ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.disputeActionBtnText}><T>Upload QR</T></Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
           </Modal>
+        )}
+      </View>
+    );
+  }
+
+  // ====================================================================
+  // SUB-VIEW 4: FOLLOWERS ACTIVITY / NOTIFICATIONS (Matching User Screenshot)
+  // ====================================================================
+  if (activeView === 'followers') {
+    return (
+      <View style={[styles.followersContainer, { paddingTop: Math.max(16, insets.top) }]}>
+        {/* Header with Back Chevron & Title "Followers" */}
+        <View style={styles.followersHeader}>
+          <TouchableOpacity
+            style={styles.followersBackBtn}
+            activeOpacity={0.75}
+            onPress={() => setActiveView('chats')}
+          >
+            <BackChevron size={24} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.followersHeaderTitle}>
+            <T>Followers</T>
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {loadingFollowers && followerNotifs.length === 0 ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#FF6D00" />
+          </View>
+        ) : followerNotifs.length === 0 ? (
+          <View style={styles.centerContainer}>
+            <Image
+              source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3602/3602145.png' }}
+              style={{ width: 68, height: 68, opacity: 0.5, marginBottom: 12 }}
+              resizeMode="contain"
+            />
+            <Text style={styles.emptyTitle}><T>No Followers Yet</T></Text>
+            <Text style={styles.emptySub}>
+              <T>When another user follows you, their activity will appear here.</T>
+            </Text>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.followersScrollList}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120 + insets.bottom }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshingFollowers}
+                onRefresh={async () => {
+                  setRefreshingFollowers(true);
+                  await fetchFollowerNotifications();
+                  setRefreshingFollowers(false);
+                }}
+                colors={['#FF6D00']}
+              />
+            }
+          >
+            {followerNotifs.map((item) => {
+              const follower = item.follower || {};
+              const shortName = follower.name || t('User');
+
+              return (
+                <View key={item._id} style={styles.followerItemBlock}>
+                  {/* Centered Timestamp (e.g. "1 days ago") */}
+                  <Text style={styles.followerTimestampText}>
+                    {formatFollowTime(item.createdAt)}
+                  </Text>
+
+                  {/* Notification Card Row (Avatar on Left, White Speech Bubble on Right) */}
+                  <View style={styles.followerCardRow}>
+                    {/* User Profile Avatar (Click to open Profile) */}
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        if (follower._id) {
+                          navigation?.navigate('UserProfile', { userId: follower._id });
+                        }
+                      }}
+                      style={styles.followerAvatarWrap}
+                    >
+                      <Image
+                        source={{
+                          uri:
+                            follower.avatar ||
+                            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+                        }}
+                        style={styles.followerAvatarImg}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+
+                    {/* White Rounded Bubble */}
+                    <View style={styles.followerBubbleCard}>
+                      <TouchableOpacity
+                        style={styles.followerBubbleTextWrap}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          if (follower._id) {
+                            handleToggleFollowBack(follower._id);
+                          }
+                        }}
+                      >
+                        <Text style={styles.followerBubbleMessage}>
+                          <Text style={styles.followerBubbleName}>{shortName} </Text>
+                          <T>followed you, click here to follow them back and become new friends! 👏</T>
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Chat Button (Click to open direct chatbox) */}
+                      <TouchableOpacity
+                        style={styles.followerChatPillBtn}
+                        activeOpacity={0.75}
+                        onPress={() => handleOpenChat(follower)}
+                      >
+                        <Text style={styles.followerChatPillText}>
+                          <T>Chat</T>
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {/* 1-ON-1 DIRECT CHAT MODAL */}
+        {chatPartner && (
+          <DirectChatModal
+            visible={chatModalVisible}
+            onClose={() => {
+              setChatModalVisible(false);
+              setChatPartner(null);
+              fetchConversations();
+              fetchUnreadBadge();
+            }}
+            partnerUser={chatPartner}
+            currentUser={currentUser}
+            onMessageSent={() => {
+              fetchConversations();
+            }}
+          />
         )}
       </View>
     );
@@ -832,22 +1244,27 @@ export default function MessageView({ currentUser, navigation, onUnreadCountChan
         <TouchableOpacity
           style={styles.topTabItem}
           activeOpacity={0.8}
-          onPress={() => {
-            if (navigation) {
-              navigation.navigate('UserRelations', { initialTab: 'followers' });
-            } else {
-              showToast(t('Followers'), 'info');
-            }
-          }}
+          onPress={handleOpenFollowersTab}
         >
-          <LinearGradient
-            colors={['#FFA500', '#FF6D00']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.topTabCircle}
-          >
-            <FollowersTabIcon size={28} />
-          </LinearGradient>
+          <View style={{ position: 'relative' }}>
+            <LinearGradient
+              colors={['#FFA500', '#FF6D00']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.topTabCircle}
+            >
+              <FollowersTabIcon size={28} />
+            </LinearGradient>
+
+            {/* Unread follower count badge */}
+            {unreadFollowersCount > 0 && (
+              <View style={styles.tabRedDot}>
+                <Text style={styles.tabRedDotText}>
+                  {unreadFollowersCount > 99 ? '99+' : unreadFollowersCount}
+                </Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.topTabLabel}><T>Followers</T></Text>
         </TouchableOpacity>
 
@@ -1283,6 +1700,58 @@ const styles = StyleSheet.create({
     borderColor: '#93C5FD',
     backgroundColor: '#F8FAFC',
   },
+  approvedNotificationCard: {
+    borderColor: '#86EFAC',
+    backgroundColor: '#F0FDF4',
+  },
+  pendingNotificationCard: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
+  approvedActionBanner: {
+    marginTop: 10,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  approvedCoinsHighlightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  approvedCoinsHighlightText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  approvedRemarksCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 4,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  approvedRemarksLabel: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#475569',
+    marginBottom: 2,
+  },
+  approvedRemarksText: {
+    fontSize: 12.5,
+    color: '#1E293B',
+    lineHeight: 16,
+  },
+  autoClearHintText: {
+    fontSize: 11,
+    color: '#16A34A',
+    fontWeight: '600',
+    marginTop: 2,
+  },
   resolvedActionBanner: {
     marginTop: 12,
     backgroundColor: '#EFF6FF',
@@ -1377,6 +1846,19 @@ const styles = StyleSheet.create({
     color: '#B91C1C',
     marginTop: 2,
   },
+  queryPromptButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  queryPromptButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   uploadBtnPill: {
     backgroundColor: '#EF4444',
     paddingVertical: 6,
@@ -1435,7 +1917,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
     borderRadius: 14,
     padding: 14,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   disputeReasonHeading: {
     fontSize: 13.5,
@@ -1454,47 +1936,193 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 6,
   },
-  disputeSectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
+  disputeInputLabel: {
+    fontSize: 12.5,
+    fontWeight: '700',
     color: '#334155',
+    marginBottom: 6,
+  },
+  disputeTextInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    fontSize: 13,
+    color: '#1E293B',
+    textAlignVertical: 'top',
+    height: 75,
     marginBottom: 12,
   },
-  disputeOptionCard: {
+  uploadProofPickBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#C7D2FE',
+    borderStyle: 'dashed',
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  uploadProofPickIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  uploadProofPickText: {
+    color: '#4F46E5',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  disputeProofPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
     backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
+    padding: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  disputeOptionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 3,
+  disputeProofPreviewImg: {
+    width: 65,
+    height: 65,
+    borderRadius: 8,
   },
-  disputeOptionDesc: {
-    fontSize: 11.5,
-    color: '#64748B',
-    lineHeight: 16,
+  disputeProofPreviewActions: {
+    marginLeft: 12,
+    flex: 1,
+    gap: 6,
   },
-  disputeActionBtn: {
+  changeProofBtn: {
+    backgroundColor: '#4F46E5',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  changeProofBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  removeProofBtn: {
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  removeProofBtnText: {
+    color: '#EF4444',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  submitDisputeBtn: {
     backgroundColor: '#10B981',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
     borderRadius: 12,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 100,
-    marginLeft: 10,
   },
-  disputeActionBtnText: {
+  submitDisputeBtnText: {
     color: '#FFFFFF',
-    fontSize: 12.5,
+    fontSize: 14,
     fontWeight: '800',
+  },
+
+  // Followers Sub-view Styles (Matching User Screenshot)
+  followersContainer: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  followersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F2F5',
+  },
+  followersBackBtn: {
+    padding: 6,
+    marginLeft: -4,
+  },
+  followersHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  followersScrollList: {
+    flex: 1,
+  },
+  followerItemBlock: {
+    marginBottom: 20,
+  },
+  followerTimestampText: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  followerCardRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  followerAvatarWrap: {
+    marginRight: 10,
+    paddingTop: 2,
+  },
+  followerAvatarImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E2E8F0',
+  },
+  followerBubbleCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#F0F2F5',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  followerBubbleTextWrap: {
+    flex: 1,
+    marginRight: 10,
+  },
+  followerBubbleMessage: {
+    fontSize: 13.5,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  followerBubbleName: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  followerChatPillBtn: {
+    borderWidth: 1.2,
+    borderColor: '#9CA3AF',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 6,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followerChatPillText: {
+    color: '#4B5563',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

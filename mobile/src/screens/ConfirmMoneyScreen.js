@@ -23,6 +23,17 @@ import { useToast } from '../components/Toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
+
+const COIN_PACKAGES = [
+  { id: 'p1', coins: 200, price: '₹22.20' },
+  { id: 'p2', coins: 1000, price: '₹111.00' },
+  { id: 'p3', coins: 5000, price: '₹571.00' },
+  { id: 'p4', coins: 14000, price: '₹1,576.00' },
+  { id: 'p5', coins: 40000, price: '₹4,559.00' },
+  { id: 'p6', coins: 160000, price: '₹18,279.00' },
+];
+
 // Back Arrow SVG
 const BackArrowIcon = ({ size = 24, color = '#FFFFFF' }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -97,6 +108,14 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
   const [enlargedProofModalVisible, setEnlargedProofModalVisible] = useState(false);
   const [enlargedProofData, setEnlargedProofData] = useState(null);
 
+  // Approve Modal State (Select Coin Card & Remarks)
+  const [approveModalVisible, setApproveModalVisible] = useState(false);
+  const [approveTargetItem, setApproveTargetItem] = useState(null);
+  const [selectedCoins, setSelectedCoins] = useState(200);
+  const [customCoinsInput, setCustomCoinsInput] = useState('');
+  const [approveRemarks, setApproveRemarks] = useState('Payment verified & coins added');
+  const [submittingApprove, setSubmittingApprove] = useState(false);
+
   // Fetch recharge requests
   const fetchRequests = useCallback(async () => {
     try {
@@ -150,16 +169,42 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
     };
   }, [fetchRequests, showToast, t]);
 
-  // Handle Approve
-  const handleApprove = async (item) => {
+  // Open Approve Modal
+  const handleOpenApproveModal = (item) => {
+    setApproveTargetItem(item);
+    const initialCoins = item.coins || 200;
+    setSelectedCoins(initialCoins);
+    setCustomCoinsInput('');
+    setApproveRemarks('Payment verified & coins credited successfully');
+    setApproveModalVisible(true);
+  };
+
+  // Submit Approval with Selected Coins & Remarks
+  const handleConfirmApprove = async () => {
+    if (!approveTargetItem) return;
+    const coinsToCredit = customCoinsInput && parseInt(customCoinsInput, 10) > 0
+      ? parseInt(customCoinsInput, 10)
+      : selectedCoins;
+
+    if (!coinsToCredit || coinsToCredit <= 0) {
+      showToast(t('Please select or enter coins to credit'), 'error');
+      return;
+    }
+
     try {
-      setProcessingId(item._id);
-      const res = await api.post(`/recharge/admin/${item._id}/approve`);
+      setSubmittingApprove(true);
+      const res = await api.post(`/recharge/admin/${approveTargetItem._id}/approve`, {
+        coins: coinsToCredit,
+        remarks: approveRemarks.trim() || 'Payment approved & coins added',
+      });
+
       if (res.data?.success) {
         showToast(
-          t('Recharge request approved successfully') + ` (₹${item.amount})`,
+          t('Recharge approved! Added') + ` ${coinsToCredit} ` + t('coins to user.'),
           'success'
         );
+        setApproveModalVisible(false);
+        setApproveTargetItem(null);
         fetchRequests();
       } else {
         showToast(t(res.data?.message || 'Approval failed'), 'error');
@@ -168,7 +213,7 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
       const msg = err?.response?.data?.message || err?.message || 'Approval failed';
       showToast(t(msg), 'error');
     } finally {
-      setProcessingId(null);
+      setSubmittingApprove(false);
     }
   };
 
@@ -542,7 +587,7 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
                             <TouchableOpacity
                               style={styles.confirmBtn}
                               activeOpacity={0.8}
-                              onPress={() => handleApprove(item)}
+                              onPress={() => handleOpenApproveModal(item)}
                             >
                               <Text style={styles.confirmBtnText}>
                                 <T>Confirm</T>
@@ -583,16 +628,6 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
                             <View style={styles.rejectedBadge}>
                               <Text style={styles.rejectedBadgeText}>✗ Rejected</Text>
                             </View>
-
-                            <TouchableOpacity
-                              style={styles.resolveActionBtn}
-                              activeOpacity={0.8}
-                              onPress={() => handleOpenResolveModal(item)}
-                            >
-                              <Text style={styles.resolveActionBtnText}>
-                                ✓ <T>Resolve</T>
-                              </Text>
-                            </TouchableOpacity>
                           </View>
 
                           {/* Rejection Reason Display */}
@@ -1020,11 +1055,11 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
               <TouchableOpacity
                 style={styles.proofApproveBtn}
                 activeOpacity={0.85}
-                onPress={async () => {
+                onPress={() => {
                   const target = enlargedProofData?.item;
                   setEnlargedProofModalVisible(false);
                   if (target) {
-                    await handleApprove(target);
+                    handleOpenApproveModal(target);
                   }
                 }}
               >
@@ -1057,6 +1092,249 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
                 <Text style={styles.proofCloseBtnText}>
                   <T>Close</T>
                 </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ══ APPROVE RECHARGE MODAL (Select Coins Card & Enter Remarks) ══ */}
+      <Modal
+        visible={approveModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setApproveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdropTouch}
+            activeOpacity={1}
+            onPress={() => setApproveModalVisible(false)}
+          />
+
+          <View style={styles.approveModalCard}>
+            {/* Modal Header */}
+            <View style={styles.approveModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 20 }}>💰</Text>
+                <Text style={styles.approveModalTitle}>
+                  <T>Approve & Credit Coins</T>
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setApproveModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.modalCloseX}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.approveModalScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 10 }}
+            >
+              {/* Target Order Summary */}
+              {approveTargetItem && (
+                <View style={styles.approveTargetCard}>
+                  <View style={styles.approveTargetUserRow}>
+                    <Image
+                      source={{
+                        uri:
+                          approveTargetItem.user?.avatar ||
+                          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+                      }}
+                      style={styles.approveTargetAvatar}
+                    />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={styles.approveTargetName} numberOfLines={1}>
+                        {approveTargetItem.user?.name || 'User'}
+                      </Text>
+                      <Text style={styles.approveTargetSub}>
+                        ID: #{approveTargetItem.user?._id?.toString().slice(-8) || ''} • {approveTargetItem.paymentMethod || 'UPI'}
+                      </Text>
+                    </View>
+                    <View style={styles.approveTargetAmountBadge}>
+                      <Text style={styles.approveTargetAmountText}>
+                        ₹{approveTargetItem.amount}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Payment Proof Mini-Preview */}
+                  {approveTargetItem.paymentProofImage ? (
+                    <TouchableOpacity
+                      style={styles.approveProofThumbnailWrap}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setEnlargedProofData({
+                          item: approveTargetItem,
+                          proofImage: approveTargetItem.paymentProofImage,
+                          userName: approveTargetItem.user?.name,
+                          userId: approveTargetItem.user?._id?.toString().slice(-8),
+                          amount: approveTargetItem.amount,
+                          coins: approveTargetItem.coins,
+                          paymentMethod: approveTargetItem.paymentMethod,
+                          utrNumber: approveTargetItem.utrNumber,
+                          status: approveTargetItem.status,
+                          rejectionReason: approveTargetItem.rejectionReason,
+                        });
+                        setEnlargedProofModalVisible(true);
+                      }}
+                    >
+                      <Image
+                        source={{ uri: approveTargetItem.paymentProofImage }}
+                        style={styles.approveProofThumbnailImg}
+                        resizeMode="cover"
+                      />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.approveProofLabel}>
+                          🧾 <T>Payment Receipt Attached</T>
+                        </Text>
+                        <Text style={styles.approveProofSub}>
+                          <T>Tap to view full receipt</T> 👁️
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+
+              {/* 1. Coin Cards Grid */}
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.coinsSectionTitle}>
+                  <T>Select Coins Package to Credit:</T>
+                </Text>
+                <Text style={styles.selectedCoinsBadgeText}>
+                  +{(customCoinsInput && parseInt(customCoinsInput, 10) > 0 ? parseInt(customCoinsInput, 10) : selectedCoins).toLocaleString()} <T>Coins</T>
+                </Text>
+              </View>
+
+              <View style={styles.coinsCardsGrid}>
+                {COIN_PACKAGES.map((pkg) => {
+                  const isSelected = selectedCoins === pkg.coins && !customCoinsInput;
+                  return (
+                    <TouchableOpacity
+                      key={pkg.id}
+                      style={[
+                        styles.coinPackageCard,
+                        isSelected && styles.coinPackageCardActive,
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setSelectedCoins(pkg.coins);
+                        setCustomCoinsInput('');
+                      }}
+                    >
+                      <Image
+                        source={GOLD_COIN_IMG}
+                        style={styles.coinCardImg}
+                        resizeMode="contain"
+                      />
+                      <Text style={[styles.coinCardAmount, isSelected && styles.coinCardAmountActive]}>
+                        {pkg.coins.toLocaleString()}
+                      </Text>
+                      <Text style={styles.coinCardPrice}>
+                        {pkg.price}
+                      </Text>
+                      {isSelected && (
+                        <View style={styles.coinSelectedCheck}>
+                          <Text style={styles.coinSelectedCheckText}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Custom Coins Input (Optional override) */}
+              <View style={styles.customCoinsWrap}>
+                <Text style={styles.customCoinsLabel}>
+                  <T>Or Custom Coins Amount:</T>
+                </Text>
+                <TextInput
+                  style={styles.customCoinsInput}
+                  placeholder={t('Enter custom coins...')}
+                  placeholderTextColor="#64748B"
+                  keyboardType="numeric"
+                  value={customCoinsInput}
+                  onChangeText={(val) => setCustomCoinsInput(val.replace(/[^0-9]/g, ''))}
+                  maxLength={7}
+                />
+              </View>
+
+              {/* 2. Remarks Section */}
+              <Text style={styles.remarksSectionTitle}>
+                <T>Remarks for User (Sent via System Notification):</T>
+              </Text>
+
+              {/* Quick Remarks Chips */}
+              <View style={styles.quickRemarksRow}>
+                {[
+                  'Payment verified & coins added',
+                  'Receipt verified successfully',
+                  'Bonus coins added',
+                  'Payment approved by owner',
+                ].map((chip) => (
+                  <TouchableOpacity
+                    key={chip}
+                    style={[
+                      styles.quickRemarkChip,
+                      approveRemarks === chip && styles.quickRemarkChipActive,
+                    ]}
+                    activeOpacity={0.75}
+                    onPress={() => setApproveRemarks(chip)}
+                  >
+                    <Text
+                      style={[
+                        styles.quickRemarkChipText,
+                        approveRemarks === chip && styles.quickRemarkChipTextActive,
+                      ]}
+                    >
+                      <T>{chip}</T>
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.approveRemarksInput}
+                placeholder={t('Enter remarks for user notification...')}
+                placeholderTextColor="#64748B"
+                value={approveRemarks}
+                onChangeText={setApproveRemarks}
+                multiline={true}
+                numberOfLines={3}
+                maxLength={200}
+              />
+            </ScrollView>
+
+            {/* Modal Actions */}
+            <View style={styles.approveModalActions}>
+              <TouchableOpacity
+                style={styles.cancelApproveBtn}
+                activeOpacity={0.8}
+                onPress={() => setApproveModalVisible(false)}
+                disabled={submittingApprove}
+              >
+                <Text style={styles.cancelApproveBtnText}>
+                  <T>Cancel</T>
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.confirmApproveBtn}
+                activeOpacity={0.85}
+                onPress={handleConfirmApprove}
+                disabled={submittingApprove}
+              >
+                {submittingApprove ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmApproveBtnText}>
+                    ✓ <T>Approve & Add Coins</T>
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1929,6 +2207,284 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmRejectBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  // Approve Recharge Modal
+  approveModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '90%',
+    backgroundColor: '#1E1E2E',
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: '#383852',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  approveModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  approveModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  approveModalScroll: {
+    maxHeight: 460,
+  },
+  approveTargetCard: {
+    backgroundColor: '#27273A',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    borderLeftWidth: 3.5,
+    borderLeftColor: '#10B981',
+  },
+  approveTargetUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  approveTargetAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#3D3D58',
+  },
+  approveTargetName: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  approveTargetSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  approveTargetAmountBadge: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  approveTargetAmountText: {
+    color: '#34D399',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  approveProofThumbnailWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1C1C2D',
+    borderRadius: 10,
+    padding: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#3D3D58',
+  },
+  approveProofThumbnailImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    backgroundColor: '#2D2D44',
+  },
+  approveProofLabel: {
+    color: '#E0E7FF',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  approveProofSub: {
+    color: '#38BDF8',
+    fontSize: 10.5,
+    marginTop: 2,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  coinsSectionTitle: {
+    color: '#CBD5E1',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  selectedCoinsBadgeText: {
+    color: '#F59E0B',
+    fontSize: 12.5,
+    fontWeight: '900',
+  },
+  coinsCardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  coinPackageCard: {
+    width: '31%',
+    backgroundColor: '#27273C',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#383852',
+    position: 'relative',
+  },
+  coinPackageCardActive: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#2E2838',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  coinCardImg: {
+    width: 24,
+    height: 24,
+    marginBottom: 4,
+  },
+  coinCardAmount: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  coinCardAmountActive: {
+    color: '#FBBF24',
+  },
+  coinCardPrice: {
+    color: '#94A3B8',
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  coinSelectedCheck: {
+    position: 'absolute',
+    top: 3,
+    right: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#F59E0B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coinSelectedCheckText: {
+    color: '#000000',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  customCoinsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#161626',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#2D2D44',
+    marginBottom: 14,
+    gap: 10,
+  },
+  customCoinsLabel: {
+    color: '#94A3B8',
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  customCoinsInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    padding: 4,
+  },
+  remarksSectionTitle: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  quickRemarksRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  quickRemarkChip: {
+    backgroundColor: '#27273C',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3D3D58',
+  },
+  quickRemarkChipActive: {
+    backgroundColor: '#064E3B',
+    borderColor: '#10B981',
+  },
+  quickRemarkChipText: {
+    color: '#94A3B8',
+    fontSize: 10.5,
+    fontWeight: '600',
+  },
+  quickRemarkChipTextActive: {
+    color: '#34D399',
+    fontWeight: '700',
+  },
+  approveRemarksInput: {
+    backgroundColor: '#141422',
+    borderRadius: 10,
+    padding: 10,
+    color: '#FFFFFF',
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: '#383852',
+    minHeight: 55,
+    textAlignVertical: 'top',
+    marginBottom: 12,
+  },
+  approveModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 4,
+  },
+  cancelApproveBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#2D2D42',
+  },
+  cancelApproveBtnText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  confirmApproveBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  confirmApproveBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '800',

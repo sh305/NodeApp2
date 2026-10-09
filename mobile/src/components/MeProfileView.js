@@ -15,7 +15,8 @@ import Svg, { Path, Circle, Rect, G, Polygon } from 'react-native-svg';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
-import api from '../api/client';
+import io from 'socket.io-client';
+import api, { BASE_URL } from '../api/client';
 
 // 1. Right Chevron Arrow
 const ChevronRight = ({ size = 18, color = '#C7C7CC' }) => (
@@ -196,6 +197,20 @@ const MenuIcon = ({ type, color = '#2C3E50', size = 22 }) => {
           <Path d="M6 12H6.01M18 12H18.01" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
         </Svg>
       );
+    case 'userProblem':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 13.8214 2.48697 15.5291 3.33782 17L2.5 21.5L7 20.6622C8.47089 21.513 10.1786 22 12 22Z"
+            stroke={color}
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path d="M12 8V12" stroke={color} strokeWidth="2" strokeLinecap="round" />
+          <Circle cx="12" cy="15.5" r="1" fill={color} />
+        </Svg>
+      );
     default:
       return null;
   }
@@ -217,6 +232,7 @@ export default function MeProfileView({
   const [isGamesExpanded, setIsGamesExpanded] = useState(true);
 
   const [profile, setProfile] = useState(myProfile || currentUser);
+  const [problemCount, setProblemCount] = useState(0);
 
   const fetchProfile = async () => {
     try {
@@ -231,8 +247,38 @@ export default function MeProfileView({
     }
   };
 
+  const fetchProblemCount = async () => {
+    try {
+      const res = await api.get('/recharge/admin/problems-count');
+      if (res.data?.success) {
+        setProblemCount(res.data.count || 0);
+      }
+    } catch (e) {
+      // quiet fallback
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
+    fetchProblemCount();
+
+    let socket = null;
+    try {
+      socket = io(BASE_URL, {
+        transports: ['websocket'],
+        reconnection: true,
+      });
+      socket.on('user_problem_submitted', () => {
+        fetchProblemCount();
+      });
+      socket.on('user_problem_resolved', () => {
+        fetchProblemCount();
+      });
+    } catch (e) {}
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
   }, [currentUser?._id, currentUser?.id]);
 
   const handleRefresh = async () => {
@@ -271,6 +317,14 @@ export default function MeProfileView({
         navigation.navigate('ConfirmMoney');
       } else {
         showToast(t('Confirm Money'), 'info');
+      }
+      return;
+    }
+    if (menuKey === 'userProblem') {
+      if (navigation?.navigate) {
+        navigation.navigate('UserProblem');
+      } else {
+        showToast(t('User Problems'), 'info');
       }
       return;
     }
@@ -544,6 +598,7 @@ export default function MeProfileView({
           { key: 'help', title: 'Help', icon: 'help' },
           { key: 'setting', title: 'Setting', icon: 'setting' },
           { key: 'confirmMoney', title: 'Confirm Money', icon: 'confirmMoney' },
+          { key: 'userProblem', title: 'User Problems', icon: 'userProblem', badge: problemCount },
         ].map((item, index, arr) => (
           <React.Fragment key={item.key}>
             <TouchableOpacity
@@ -554,6 +609,11 @@ export default function MeProfileView({
               <View style={styles.menuRowLeft}>
                 <MenuIcon type={item.icon} size={22} color="#1C1C1E" />
                 <Text style={styles.menuRowTitle}>{t(item.title)}</Text>
+                {item.badge !== undefined && item.badge > 0 ? (
+                  <View style={styles.menuRowBadge}>
+                    <Text style={styles.menuRowBadgeText}>{item.badge}</Text>
+                  </View>
+                ) : null}
               </View>
               <ChevronRight size={18} color="#C7C7CC" />
             </TouchableOpacity>
@@ -892,5 +952,17 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: '#F0F0F5',
     marginLeft: 52,
+  },
+  menuRowBadge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  menuRowBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
