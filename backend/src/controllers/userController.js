@@ -391,32 +391,39 @@ exports.getFollowingRooms = async (req, res) => {
 exports.recordRecentRoom = async (req, res) => {
   try {
     const { roomId } = req.params;
-    const currentUserId = req.user._id;
+    const currentUserId = req.user?._id || req.user?.id;
 
-    const roomExists = await Room.findById(roomId);
+    if (!roomId || !mongoose.Types.ObjectId.isValid(roomId)) {
+      return res.status(400).json({ success: false, message: 'Invalid room ID' });
+    }
+
+    const roomExists = await Room.findById(roomId).select('_id');
     if (!roomExists) {
       return res.status(404).json({ success: false, message: 'Room not found' });
     }
 
-    const user = await User.findById(currentUserId);
-    if (!user.recentRooms) user.recentRooms = [];
+    // Atomic update: removes if already present, prepends to top, limits to 25
+    // Avoids full user document re-validation, password hashing issues, and null pointer crashes
+    await User.findByIdAndUpdate(currentUserId, {
+      $pull: { recentRooms: roomId },
+    });
 
-    // Filter out if already present, then prepend to top (most recent first)
-    user.recentRooms = user.recentRooms.filter((id) => id.toString() !== roomId.toString());
-    user.recentRooms.unshift(roomId);
-
-    // Keep max 25 recent rooms
-    if (user.recentRooms.length > 25) {
-      user.recentRooms = user.recentRooms.slice(0, 25);
-    }
-
-    await user.save();
+    await User.findByIdAndUpdate(currentUserId, {
+      $push: {
+        recentRooms: {
+          $each: [roomId],
+          $position: 0,
+          $slice: 25,
+        },
+      },
+    });
 
     return res.status(200).json({
       success: true,
       message: 'Room recorded in recent history',
     });
   } catch (error) {
+    console.error('Error in recordRecentRoom:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -425,8 +432,11 @@ exports.recordRecentRoom = async (req, res) => {
 // @route   GET /api/users/recent-rooms
 exports.getRecentRooms = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    const recentRoomIds = user.recentRooms || [];
+    const currentUserId = req.user?._id || req.user?.id;
+    const user = await User.findById(currentUserId).select('recentRooms');
+    const recentRoomIds = (user?.recentRooms || []).filter(
+      (id) => id && mongoose.Types.ObjectId.isValid(id)
+    );
 
     if (recentRoomIds.length === 0) {
       return res.status(200).json({
@@ -447,6 +457,7 @@ exports.getRecentRooms = async (req, res) => {
 
     const orderedRooms = [];
     for (const rId of recentRoomIds) {
+      if (!rId) continue;
       const found = roomMap.get(rId.toString());
       if (found) {
         const rObj = found.toObject ? found.toObject() : found;
@@ -460,6 +471,7 @@ exports.getRecentRooms = async (req, res) => {
       rooms: orderedRooms,
     });
   } catch (error) {
+    console.error('Error in getRecentRooms:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -752,6 +764,56 @@ exports.exchangeGameCoins = async (req, res) => {
       exchangedGoldCoins: amount,
       receivedGameCoins: gameCoinsGained,
       message: `Successfully exchanged ${amount} gold coins for ${gameCoinsGained} game coins!`,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Purchase store item with coins or gameCoins
+// @route   POST /api/users/store/purchase
+exports.purchaseStoreItem = async (req, res) => {
+  try {
+    const { itemId, itemName, durationDays, coinsCost, currencyType = 'coins' } = req.body;
+    const cost = parseInt(coinsCost, 10);
+    if (!cost || isNaN(cost) || cost <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid coins amount' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (currencyType === 'gameCoins') {
+      if ((user.gameCoins || 0) < cost) {
+        return res.status(400).json({
+          success: false,
+          insufficient: true,
+          currencyType: 'gameCoins',
+          message: 'Insufficient game coins, please recharge first',
+        });
+      }
+      user.gameCoins = (user.gameCoins || 0) - cost;
+    } else {
+      if ((user.coins || 0) < cost) {
+        return res.status(400).json({
+          success: false,
+          insufficient: true,
+          currencyType: 'coins',
+          message: 'Insufficient coins, please recharge first',
+        });
+      }
+      user.coins = (user.coins || 0) - cost;
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Item purchased successfully!',
+      coins: user.coins,
+      gameCoins: user.gameCoins,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

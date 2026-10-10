@@ -148,13 +148,19 @@ const GAME_COIN_PRESETS = [
   { id: 'gc4', gameCoins: 100000, goldCost: 10000 },
 ];
 
-export default function WalletScreen({ navigation, currentUser }) {
+export default function WalletScreen({ navigation, route, currentUser }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { showToast } = useToast();
 
   // Active Tab: 'coins' | 'diamonds' | 'gameCoins'
-  const [activeTab, setActiveTab] = useState('coins');
+  const [activeTab, setActiveTab] = useState(route?.params?.initialTab || 'coins');
+
+  useEffect(() => {
+    if (route?.params?.initialTab) {
+      setActiveTab(route.params.initialTab);
+    }
+  }, [route?.params?.initialTab]);
 
   // Balances
   const [goldCoins, setGoldCoins] = useState(currentUser?.coins || 0);

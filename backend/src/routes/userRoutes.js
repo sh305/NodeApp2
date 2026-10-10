@@ -22,6 +22,7 @@ const {
   getUserVisitors,
   getWalletBalance,
   exchangeGameCoins,
+  purchaseStoreItem,
   getFollowerNotifications,
   markFollowersRead,
 } = require('../controllers/userController');
@@ -29,6 +30,7 @@ const { protect } = require('../middlewares/authMiddleware');
 
 router.get('/wallet/balance', protect, getWalletBalance);
 router.post('/wallet/exchange-game-coins', protect, exchangeGameCoins);
+router.post('/store/purchase', protect, purchaseStoreItem);
 router.get('/follower-notifications', protect, getFollowerNotifications);
 router.post('/mark-followers-read', protect, markFollowersRead);
 

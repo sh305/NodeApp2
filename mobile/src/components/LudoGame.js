@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
@@ -170,6 +171,24 @@ export default function LudoGame({
   const [movableTokenIds, setMovableTokenIds] = useState([]);
   const [matchOver, setMatchOver] = useState(false);
   const [eventNotice, setEventNotice] = useState('');
+  const [equippedDice, setEquippedDice] = useState(null);
+  const [equippedPiece, setEquippedPiece] = useState(null);
+
+  useEffect(() => {
+    const loadEquippedItems = async () => {
+      try {
+        const storedDice = await AsyncStorage.getItem('@equipped_dice');
+        if (storedDice) {
+          setEquippedDice(JSON.parse(storedDice));
+        }
+        const storedPiece = await AsyncStorage.getItem('@equipped_piece');
+        if (storedPiece) {
+          setEquippedPiece(JSON.parse(storedPiece));
+        }
+      } catch (_) {}
+    };
+    loadEquippedItems();
+  }, []);
 
   // AI Opponent Dice State
   const [aiDiceValue, setAiDiceValue] = useState(6);
@@ -1024,17 +1043,36 @@ export default function LudoGame({
                   },
                 ]}
               >
-                {/* 3D Center Crown/Star Ring */}
-                <View
-                  style={[
-                    styles.tokenInnerRing,
-                    { backgroundColor: tokenColor.secondary },
-                  ]}
-                >
-                  {tok.pos === 56 && (
-                    <Text style={styles.tokenPawnSymbol}>★</Text>
-                  )}
-                </View>
+                {/* 3D Center Crown/Star Ring or Equipped Piece Image */}
+                {tok.player === myColor && equippedPiece?.image ? (
+                  <View style={styles.equippedPawnWrap}>
+                    <Image
+                      source={
+                        typeof equippedPiece.image === 'string'
+                          ? { uri: equippedPiece.image }
+                          : equippedPiece.image
+                      }
+                      style={styles.equippedPawnImg}
+                      resizeMode="cover"
+                    />
+                    {tok.pos === 56 && (
+                      <View style={styles.crownOverlay}>
+                        <Text style={styles.tokenPawnSymbol}>★</Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <View
+                    style={[
+                      styles.tokenInnerRing,
+                      { backgroundColor: tokenColor.secondary },
+                    ]}
+                  >
+                    {tok.pos === 56 && (
+                      <Text style={styles.tokenPawnSymbol}>★</Text>
+                    )}
+                  </View>
+                )}
               </TouchableOpacity>
             </Animated.View>
           );
@@ -1099,13 +1137,25 @@ export default function LudoGame({
               >
                 <Animated.View style={{ transform: [{ rotate: diceSpin }] }}>
                   <View style={styles.diceFace}>
-                    <Text style={[styles.diceEmoji, { color: TOKEN_COLORS[myColor]?.primary || '#DC2626' }]}>
-                      {diceValue === 1 ? '⚀' :
-                       diceValue === 2 ? '⚁' :
-                       diceValue === 3 ? '⚂' :
-                       diceValue === 4 ? '⚃' :
-                       diceValue === 5 ? '⚄' : '⚅'}
-                    </Text>
+                    {equippedDice?.image ? (
+                      <Image
+                        source={
+                          typeof equippedDice.image === 'string'
+                            ? { uri: equippedDice.image }
+                            : equippedDice.image
+                        }
+                        style={{ width: 44, height: 44, borderRadius: 10 }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text style={[styles.diceEmoji, { color: TOKEN_COLORS[myColor]?.primary || '#DC2626' }]}>
+                        {diceValue === 1 ? '⚀' :
+                         diceValue === 2 ? '⚁' :
+                         diceValue === 3 ? '⚂' :
+                         diceValue === 4 ? '⚃' :
+                         diceValue === 5 ? '⚄' : '⚅'}
+                      </Text>
+                    )}
                   </View>
                 </Animated.View>
                 <Text style={styles.diceValueText}>{diceValue}</Text>
@@ -1306,6 +1356,26 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
+  },
+  equippedPawnWrap: {
+    width: '100%',
+    height: '100%',
+    borderRadius: TOKEN_SIZE / 2,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  equippedPawnImg: {
+    width: '100%',
+    height: '100%',
+  },
+  crownOverlay: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    width: '100%',
+    height: '100%',
   },
   noticeBanner: {
     backgroundColor: '#FEF3C7',
