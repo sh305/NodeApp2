@@ -13,6 +13,7 @@ import CpCoupleSticker from './CpCoupleSticker';
 import { getIconScoutGif } from '../constants/iconScoutEmojis';
 import { getCoupleEmojiSource } from '../constants/coupleEmojis';
 import { getSealEmojiSource } from '../constants/sealsEmojis';
+import { getEquippedDice } from '../constants/diceAssets';
 
 // Precise action mapper for every emoji
 const getEmojiAction = (emoji, id) => {
@@ -181,6 +182,13 @@ function RollingCasinoDiceVisual({ targetNumber = 6, size = 50 }) {
 
   const [currentNum, setCurrentNum] = useState(1);
   const [isRolling, setIsRolling] = useState(true);
+  const [equippedDice, setEquippedDice] = useState(null);
+
+  useEffect(() => {
+    getEquippedDice().then((d) => {
+      if (d) setEquippedDice(d);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     // 3D Tumbling & Bouncing Animation
@@ -292,7 +300,19 @@ function RollingCasinoDiceVisual({ targetNumber = 6, size = 50 }) {
           },
         ]}
       >
-        {renderDiceFace(currentNum)}
+        {equippedDice?.image ? (
+          <Image
+            source={
+              typeof equippedDice.image === 'string'
+                ? { uri: equippedDice.image }
+                : equippedDice.image
+            }
+            style={{ width: diceSize, height: diceSize }}
+            resizeMode="contain"
+          />
+        ) : (
+          renderDiceFace(currentNum)
+        )}
       </Animated.View>
 
       {/* Lucky Result Number Stamp */}

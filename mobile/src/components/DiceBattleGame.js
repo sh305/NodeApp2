@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
+import { getEquippedDice } from '../constants/diceAssets';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ARENA_WIDTH = Math.min(SCREEN_WIDTH - 24, 380);
@@ -21,8 +22,36 @@ const ARENA_WIDTH = Math.min(SCREEN_WIDTH - 24, 380);
 const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
 const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
 
-// Visual representation of dice dots (1 to 6)
-function DiceFace({ value, size = 68, isRolling = false, theme = 'white' }) {
+// Visual representation of dice dots (1 to 6) or custom equipped dice image
+function DiceFace({ value, size = 68, isRolling = false, theme = 'white', customDiceImage = null }) {
+  if (customDiceImage) {
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          diceStyles.customDiceWrap,
+          {
+            width: size,
+            height: size,
+          },
+        ]}
+      >
+        <Image
+          source={
+            typeof customDiceImage === 'string'
+              ? { uri: customDiceImage }
+              : customDiceImage
+          }
+          style={{ width: size, height: size }}
+          resizeMode="contain"
+        />
+        <View style={diceStyles.customDiceValueBadge}>
+          <Text style={diceStyles.customDiceValueText}>{value}</Text>
+        </View>
+      </View>
+    );
+  }
+
   const isGold = theme === 'gold';
   const bgColor = isGold ? ['#FDE68A', '#F59E0B', '#B45309'] : ['#FFFFFF', '#F1F5F9', '#CBD5E1'];
   const borderColor = isGold ? '#D97706' : '#94A3B8';
@@ -205,6 +234,35 @@ const diceStyles = StyleSheet.create({
       },
     }),
   },
+  customDiceWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  customDiceValueBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#0F172A',
+    borderColor: '#F59E0B',
+    borderWidth: 1.5,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  customDiceValueText: {
+    color: '#FDE68A',
+    fontSize: 11,
+    fontWeight: '900',
+  },
 });
 
 export default function DiceBattleGame({
@@ -294,6 +352,19 @@ export default function DiceBattleGame({
   const [roundWinnerSlot, setRoundWinnerSlot] = useState(null);
   const [matchOver, setMatchOver] = useState(false);
   const [matchWinnerSlot, setMatchWinnerSlot] = useState(null);
+  const [equippedDice, setEquippedDice] = useState(null);
+
+  useEffect(() => {
+    const loadEquippedDice = async () => {
+      try {
+        const stored = await getEquippedDice();
+        if (stored) {
+          setEquippedDice(stored);
+        }
+      } catch (_) {}
+    };
+    loadEquippedDice();
+  }, []);
 
   // Synchronized refs to prevent any closure staleness or race conditions
   const isRollingRef = useRef(false);
@@ -865,12 +936,14 @@ export default function DiceBattleGame({
               value={playerDice[0]}
               size={76}
               theme="gold"
+              customDiceImage={equippedDice?.image}
             />
             <View style={{ width: 16 }} />
             <DiceFace
               value={playerDice[1]}
               size={76}
               theme="gold"
+              customDiceImage={equippedDice?.image}
             />
           </Animated.View>
 

@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
+import { getEquippedDice, getDiceSkin } from '../constants/diceAssets';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOARD_SIZE = Math.min(SCREEN_WIDTH - 24, 380);
@@ -177,9 +178,9 @@ export default function LudoGame({
   useEffect(() => {
     const loadEquippedItems = async () => {
       try {
-        const storedDice = await AsyncStorage.getItem('@equipped_dice');
+        const storedDice = await getEquippedDice();
         if (storedDice) {
-          setEquippedDice(JSON.parse(storedDice));
+          setEquippedDice(storedDice);
         }
         const storedPiece = await AsyncStorage.getItem('@equipped_piece');
         if (storedPiece) {
@@ -1145,7 +1146,7 @@ export default function LudoGame({
                             : equippedDice.image
                         }
                         style={{ width: 44, height: 44, borderRadius: 10 }}
-                        resizeMode="cover"
+                        resizeMode="contain"
                       />
                     ) : (
                       <Text style={[styles.diceEmoji, { color: TOKEN_COLORS[myColor]?.primary || '#DC2626' }]}>

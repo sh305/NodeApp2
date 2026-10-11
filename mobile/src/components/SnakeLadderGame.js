@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
+import { getEquippedDice } from '../constants/diceAssets';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOARD_SIZE = Math.min(SCREEN_WIDTH - 20, 380);
@@ -139,6 +140,19 @@ export default function SnakeLadderGame({
   const [diceRolling, setDiceRolling] = useState(false);
   const [matchOver, setMatchOver] = useState(false);
   const [eventNotice, setEventNotice] = useState('');
+  const [equippedDice, setEquippedDice] = useState(null);
+
+  useEffect(() => {
+    const loadEquippedDice = async () => {
+      try {
+        const stored = await getEquippedDice();
+        if (stored) {
+          setEquippedDice(stored);
+        }
+      } catch (_) {}
+    };
+    loadEquippedDice();
+  }, []);
 
   // AI Opponent Dice State
   const [aiDiceValue, setAiDiceValue] = useState(6);
@@ -850,13 +864,25 @@ export default function SnakeLadderGame({
               >
                 <Animated.View style={{ transform: [{ rotate: diceSpin }] }}>
                   <View style={styles.diceFace}>
-                    <Text style={[styles.diceEmoji, { color: TOKEN_COLORS[myColor]?.primary || '#DC2626' }]}>
-                      {diceValue === 1 ? '⚀' :
-                       diceValue === 2 ? '⚁' :
-                       diceValue === 3 ? '⚂' :
-                       diceValue === 4 ? '⚃' :
-                       diceValue === 5 ? '⚄' : '⚅'}
-                    </Text>
+                    {equippedDice?.image ? (
+                      <Image
+                        source={
+                          typeof equippedDice.image === 'string'
+                            ? { uri: equippedDice.image }
+                            : equippedDice.image
+                        }
+                        style={{ width: 44, height: 44, borderRadius: 10 }}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={[styles.diceEmoji, { color: TOKEN_COLORS[myColor]?.primary || '#DC2626' }]}>
+                        {diceValue === 1 ? '⚀' :
+                         diceValue === 2 ? '⚁' :
+                         diceValue === 3 ? '⚂' :
+                         diceValue === 4 ? '⚃' :
+                         diceValue === 5 ? '⚄' : '⚅'}
+                      </Text>
+                    )}
                   </View>
                 </Animated.View>
                 <Text style={styles.diceValueText}>{diceValue}</Text>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Platform,
   ScrollView,
   Modal,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +21,7 @@ import api from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
+import { DICE_ITEMS_LIST, getEquippedDice, saveEquippedDice } from '../constants/diceAssets';
 
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40) / 2;
@@ -486,64 +489,7 @@ const STORE_DATA = {
 
 // 3. GAME COINS STORE DATA MATCHING USER'S SCREENSHOTS
 const GAME_COINS_STORE_DATA = {
-  Dice: [
-    {
-      id: 'gc_dice_ruby',
-      name: 'Classic Ruby Dice',
-      price: '2800',
-      isNew: true,
-      image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300',
-    },
-    {
-      id: 'gc_dice_gold',
-      name: 'Golden King Dice',
-      price: '5600',
-      isNew: true,
-      image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300',
-    },
-    {
-      id: 'gc_dice_frost',
-      name: 'Frost Crystal Dice',
-      price: '8400',
-      isNew: false,
-      image: 'https://images.unsplash.com/photo-1516339901601-2e1b62dc0c45?w=300',
-    },
-    {
-      id: 'gc_dice_emerald',
-      name: 'Emerald Dragon Dice',
-      price: '11200',
-      isNew: false,
-      image: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300',
-    },
-    {
-      id: 'gc_dice_cyber',
-      name: 'Neon Cyber Dice',
-      price: '16800',
-      isNew: true,
-      image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=300',
-    },
-    {
-      id: 'gc_dice_cosmic',
-      name: 'Cosmic Starry Dice',
-      price: '24000',
-      isNew: false,
-      image: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=300',
-    },
-    {
-      id: 'gc_dice_obsidian',
-      name: 'Shadow Obsidian Dice',
-      price: '32000',
-      isNew: false,
-      image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=300',
-    },
-    {
-      id: 'gc_dice_phoenix',
-      name: 'Fire Phoenix Dice',
-      price: '45000',
-      isNew: true,
-      image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=300',
-    },
-  ],
+  Dice: DICE_ITEMS_LIST,
 
   Pieces: [
     {
@@ -726,10 +672,9 @@ export default function StoreScreen({ navigation, currentUser }) {
       if (storedOwned) {
         setOwnedItemIds(JSON.parse(storedOwned));
       }
-      const storedDice = await AsyncStorage.getItem('@equipped_dice');
-      if (storedDice) {
-        const parsed = JSON.parse(storedDice);
-        if (parsed?.id) setEquippedDiceId(parsed.id);
+      const storedDice = await getEquippedDice();
+      if (storedDice?.id) {
+        setEquippedDiceId(storedDice.id);
       }
       const storedPiece = await AsyncStorage.getItem('@equipped_piece');
       if (storedPiece) {
@@ -819,16 +764,7 @@ export default function StoreScreen({ navigation, currentUser }) {
       showToast(t('Piece equipped successfully!'), 'success');
     } else {
       setEquippedDiceId(targetItem.id);
-      try {
-        await AsyncStorage.setItem(
-          '@equipped_dice',
-          JSON.stringify({
-            id: targetItem.id,
-            name: targetItem.name,
-            image: targetItem.image,
-          })
-        );
-      } catch (_) {}
+      await saveEquippedDice(targetItem);
       showToast(t('Dice equipped successfully!'), 'success');
     }
   };
@@ -875,16 +811,7 @@ export default function StoreScreen({ navigation, currentUser }) {
       showToast(t('Piece equipped successfully!'), 'success');
     } else {
       setEquippedDiceId(pendingApplyItem.id);
-      try {
-        await AsyncStorage.setItem(
-          '@equipped_dice',
-          JSON.stringify({
-            id: pendingApplyItem.id,
-            name: pendingApplyItem.name,
-            image: pendingApplyItem.image,
-          })
-        );
-      } catch (_) {}
+      await saveEquippedDice(pendingApplyItem);
       setApplyModalVisible(false);
       setPendingApplyItem(null);
       showToast(t('Dice equipped successfully!'), 'success');
@@ -1005,12 +932,13 @@ export default function StoreScreen({ navigation, currentUser }) {
     const imageSource =
       typeof item.image === 'string' ? { uri: item.image } : item.image;
     const isGameCoins = activeCurrencyTab === 'Game Coins';
+    const isDice = item?.id?.startsWith('gc_dice_') || (isGameCoins && activeSubTab === 'Dice');
 
     return (
       <View style={styles.card}>
         {/* Top Badges Row */}
         <View style={styles.cardHeaderRow}>
-          {item.isNew ? (
+          {item.isNew && !isDice ? (
             <LinearGradient
               colors={['#FFA000', '#FF6F00']}
               start={{ x: 0, y: 0 }}
@@ -1020,10 +948,10 @@ export default function StoreScreen({ navigation, currentUser }) {
               <Text style={styles.newBadgeText}>NEW</Text>
             </LinearGradient>
           ) : (
-            <View style={{ width: 44 }} />
+            <View style={{ width: 1 }} />
           )}
 
-          {/* Circular Play Button */}
+          {/* Circular Play Button matching screenshot */}
           <TouchableOpacity
             style={styles.playBtn}
             activeOpacity={0.75}
@@ -1036,14 +964,14 @@ export default function StoreScreen({ navigation, currentUser }) {
 
         {/* Center Preview Image */}
         <TouchableOpacity
-          style={styles.imageWrap}
+          style={[styles.imageWrap, isDice && styles.diceImageWrap]}
           activeOpacity={0.85}
           onPress={() => handlePlayPress(item)}
         >
           <Image
             source={imageSource}
-            style={styles.itemImage}
-            resizeMode="cover"
+            style={[styles.itemImage, isDice && styles.diceItemImage]}
+            resizeMode="contain"
           />
         </TouchableOpacity>
 
@@ -1051,6 +979,8 @@ export default function StoreScreen({ navigation, currentUser }) {
         <Text style={styles.itemName} numberOfLines={1}>
           <T>{item.name}</T>
         </Text>
+
+
 
         {/* Button Pill: "In Use" | "Use it" | Price Pill */}
         {isGameCoins && (equippedDiceId === item.id || equippedPieceId === item.id || item.status === 'in_use') ? (
@@ -1197,23 +1127,40 @@ export default function StoreScreen({ navigation, currentUser }) {
               <CloseIcon size={18} color="#FFFFFF" />
             </TouchableOpacity>
 
-            <View style={styles.previewImageContainer}>
-              {previewItem && (
+            {previewItem?.id?.startsWith('gc_dice_') || (activeCurrencyTab === 'Game Coins' && activeSubTab === 'Dice') ? (
+              <View style={styles.previewDiceContainer}>
                 <Image
                   source={
                     typeof previewItem.image === 'string'
                       ? { uri: previewItem.image }
                       : previewItem.image
                   }
-                  style={styles.previewLargeImage}
-                  resizeMode={activeSubTab === 'Background' ? 'cover' : 'contain'}
+                  style={styles.previewDiceLargeImage}
+                  resizeMode="contain"
                 />
-              )}
-            </View>
+              </View>
+            ) : (
+              // Standard preview for backgrounds / frames / etc.
+              <View style={styles.previewImageContainer}>
+                {previewItem && (
+                  <Image
+                    source={
+                      typeof previewItem.image === 'string'
+                        ? { uri: previewItem.image }
+                        : previewItem.image
+                    }
+                    style={styles.previewLargeImage}
+                    resizeMode={activeSubTab === 'Background' ? 'cover' : 'contain'}
+                  />
+                )}
+              </View>
+            )}
 
             <Text style={styles.previewTitle} numberOfLines={1}>
               <T>{previewItem?.name || ''}</T>
             </Text>
+
+
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -1529,6 +1476,19 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+  dice3dTag: {
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.4)',
+  },
+  dice3dTagText: {
+    color: '#6366F1',
+    fontSize: 9.5,
+    fontWeight: '900',
+  },
   playBtn: {
     width: 24,
     height: 24,
@@ -1536,6 +1496,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#8E8E93',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  playBtnDice: {
+    backgroundColor: '#6366F1',
   },
   imageWrap: {
     width: 108,
@@ -1547,16 +1510,26 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     backgroundColor: '#F8FAFC',
   },
+  diceImageWrap: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    width: 110,
+    height: 110,
+  },
   itemImage: {
     width: '100%',
     height: '100%',
     borderRadius: 16,
   },
+  diceItemImage: {
+    width: '100%',
+    height: '100%',
+  },
   itemName: {
     fontSize: 13.5,
     fontWeight: '700',
     color: '#1E293B',
-    marginTop: 8,
+    marginTop: 6,
     marginBottom: 10,
     textAlign: 'center',
   },
@@ -1634,6 +1607,20 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     textAlign: 'center',
   },
+  previewDiceContainer: {
+    width: '100%',
+    height: 220,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  previewDiceLargeImage: {
+    width: 170,
+    height: 170,
+  },
+
 
   // 4. Coins Purchase Bottom Sheet Modal Styles (Matching Screenshot)
   buyModalBackdrop: {
