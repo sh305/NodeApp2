@@ -345,14 +345,6 @@ export default function MeProfileView({
   };
 
   const handleMenuClick = (menuKey, menuTitle) => {
-    if (menuKey === 'setting') {
-      if (onLogout) {
-        onLogout();
-      } else {
-        showToast(t('Settings opened'), 'info');
-      }
-      return;
-    }
     if (menuKey === 'task') {
       if (onOpenTasks) onOpenTasks();
       return;
@@ -378,6 +370,30 @@ export default function MeProfileView({
         navigation.navigate('Store');
       } else {
         showToast(t('Store'), 'info');
+      }
+      return;
+    }
+    if (menuKey === 'level') {
+      if (navigation?.navigate) {
+        navigation.navigate('Level', { user: profile });
+      } else {
+        showToast(t('Level'), 'info');
+      }
+      return;
+    }
+    if (menuKey === 'tools') {
+      if (navigation?.navigate) {
+        navigation.navigate('Store', { initialCurrencyTab: 'Tools' });
+      } else {
+        showToast(t('Tools'), 'info');
+      }
+      return;
+    }
+    if (menuKey === 'setting') {
+      if (navigation?.navigate) {
+        navigation.navigate('Setting');
+      } else {
+        showToast(t('Setting'), 'info');
       }
       return;
     }

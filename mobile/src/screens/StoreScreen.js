@@ -26,6 +26,7 @@ import { LUDO_BOARD_ITEMS_LIST, getEquippedLudoBoard, saveEquippedLudoBoard } fr
 import { LUDO_PIECE_ITEMS_LIST, getEquippedLudoPiece, saveEquippedLudoPiece } from '../constants/ludoPieceAssets';
 import { LUDO_FRAME_ITEMS_LIST, getEquippedLudoFrame, saveEquippedLudoFrame } from '../constants/ludoFrameAssets';
 import AnimatedLudoFrame from '../components/AnimatedLudoFrame';
+import AnimatedDicePreview from '../components/AnimatedDicePreview';
 
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40) / 2;
@@ -104,6 +105,51 @@ const GamepadWatermark = ({ size = 135 }) => (
     <Path
       d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
       fill="rgba(255, 255, 255, 0.14)"
+    />
+  </Svg>
+);
+
+// History Clock Icon matching Tools screenshot
+const HistoryClockIcon = ({ size = 22, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M12 7V12L15 15"
+      stroke={color}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M21 12A9 9 0 1 1 12 3C14.7 3 17.1 4.2 18.7 6.1L21 8.5"
+      stroke={color}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M21 3.5V8.5H16"
+      stroke={color}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+// Concentric ripple empty state illustration matching user's screenshot
+const EmptyToolsIllustration = ({ size = 160 }) => (
+  <Svg width={size} height={size} viewBox="0 0 160 160" fill="none">
+    <Circle cx="80" cy="80" r="72" stroke="#E2E8F0" strokeWidth="2" strokeDasharray="6 8" />
+    <Circle cx="80" cy="80" r="54" stroke="#CBD5E1" strokeWidth="2" strokeDasharray="5 7" />
+    <Circle cx="80" cy="80" r="36" stroke="#94A3B8" strokeWidth="2" strokeDasharray="4 6" />
+    <Circle cx="80" cy="80" r="22" fill="#DCFCE7" />
+    <Circle cx="80" cy="80" r="16" fill="#86EFAC" opacity={0.6} />
+    <Path
+      d="M72 88L86 74M84 72L88 76M70 90C68.9 91.1 67.1 91.1 66 90C64.9 88.9 64.9 87.1 66 86L68 84"
+      stroke="#16A34A"
+      strokeWidth="3.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     />
   </Svg>
 );
@@ -564,13 +610,26 @@ const SUB_TABS_GAME_COINS = [
 
 const CURRENCY_TABS = ['Coins', 'Point', 'Game Coins', 'Tools'];
 
-export default function StoreScreen({ navigation, currentUser }) {
+export default function StoreScreen({ navigation, route, currentUser }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { showToast } = useToast();
 
-  const [activeCurrencyTab, setActiveCurrencyTab] = useState('Coins');
-  const [activeSubTab, setActiveSubTab] = useState('Frame');
+  const initialCurrency =
+    route?.params?.initialCurrencyTab || route?.params?.initialTab || 'Coins';
+  const initialToolsSec = route?.params?.initialToolsSection || 'Room';
+
+  const [activeCurrencyTab, setActiveCurrencyTab] = useState(initialCurrency);
+  const [toolsSection, setToolsSection] = useState(initialToolsSec);
+  const [activeSubTab, setActiveSubTab] = useState(
+    initialCurrency === 'Tools'
+      ? initialToolsSec === 'Game'
+        ? 'All'
+        : 'Frame'
+      : initialCurrency === 'Game Coins'
+      ? 'All'
+      : 'Frame'
+  );
   const [previewItem, setPreviewItem] = useState(null);
 
   // Live User Coins & Game Coins Balance
@@ -589,6 +648,10 @@ export default function StoreScreen({ navigation, currentUser }) {
   const [equippedPieceId, setEquippedPieceId] = useState(null);
   const [equippedBgId, setEquippedBgId] = useState(null);
   const [equippedFrameId, setEquippedFrameId] = useState(null);
+  const [equippedRoomItemId, setEquippedRoomItemId] = useState(null);
+
+  // Sub-tabs ScrollView ref for resetting horizontal scroll position
+  const subTabsScrollRef = useRef(null);
 
   // Apply / Equip Confirmation Modal State
   const [applyModalVisible, setApplyModalVisible] = useState(false);
@@ -621,6 +684,10 @@ export default function StoreScreen({ navigation, currentUser }) {
       if (storedFrame?.id) {
         setEquippedFrameId(storedFrame.id);
       }
+      const storedRoom = await AsyncStorage.getItem('@equipped_room_item');
+      if (storedRoom) {
+        setEquippedRoomItemId(storedRoom);
+      }
     } catch (_) {}
   };
 
@@ -637,15 +704,44 @@ export default function StoreScreen({ navigation, currentUser }) {
     }
   };
 
-  // Switch between currency tabs (Coins vs Game Coins)
+  // Switch between currency tabs (Coins vs Game Coins vs Tools)
   const handleSelectCurrencyTab = (tab) => {
     setActiveCurrencyTab(tab);
     if (tab === 'Game Coins') {
       setActiveSubTab('All');
     } else if (tab === 'Coins') {
       setActiveSubTab('Frame');
+    } else if (tab === 'Tools') {
+      setToolsSection('Room');
+      setActiveSubTab('Frame');
     }
+    setTimeout(() => {
+      subTabsScrollRef.current?.scrollTo({ x: 0, animated: false });
+    }, 10);
   };
+
+  // Switch between Tools sections (Room vs Game)
+  const handleSelectToolsSection = (section) => {
+    setToolsSection(section);
+    if (section === 'Room') {
+      setActiveSubTab('Frame');
+    } else {
+      setActiveSubTab('All');
+    }
+    setTimeout(() => {
+      subTabsScrollRef.current?.scrollTo({ x: 0, animated: false });
+    }, 10);
+  };
+
+  useEffect(() => {
+    const targetTab = route?.params?.initialCurrencyTab || route?.params?.initialTab;
+    if (targetTab) {
+      handleSelectCurrencyTab(targetTab);
+      if (route?.params?.initialToolsSection) {
+        handleSelectToolsSection(route.params.initialToolsSection);
+      }
+    }
+  }, [route?.params?.initialCurrencyTab, route?.params?.initialTab, route?.params?.initialToolsSection]);
 
   // Helper to extract numeric base price from string (e.g. '1799/1Days' -> 1799)
   const parseBasePrice = (priceStr) => {
@@ -690,7 +786,8 @@ export default function StoreScreen({ navigation, currentUser }) {
   const handleEquipItem = async (targetItem) => {
     const isPiece = activeSubTab === 'Pieces' || targetItem.id.startsWith('gc_piece_');
     const isBg = activeSubTab === 'Background' || targetItem.id.startsWith('gc_bg_');
-    const isFrame = activeSubTab === 'Frame' || targetItem.id.startsWith('gc_frame_');
+    const isFrame = activeSubTab === 'Frame' || targetItem.id.startsWith('gc_frame_') || targetItem.id.startsWith('frame_');
+    const isDice = activeSubTab === 'Dice' || targetItem.id.startsWith('gc_dice_');
 
     if (isPiece) {
       setEquippedPieceId(targetItem.id);
@@ -704,10 +801,16 @@ export default function StoreScreen({ navigation, currentUser }) {
       setEquippedFrameId(targetItem.id);
       await saveEquippedLudoFrame(targetItem);
       showToast(t('Frame equipped successfully!'), 'success');
-    } else {
+    } else if (isDice) {
       setEquippedDiceId(targetItem.id);
       await saveEquippedDice(targetItem);
       showToast(t('Dice equipped successfully!'), 'success');
+    } else {
+      setEquippedRoomItemId(targetItem.id);
+      try {
+        await AsyncStorage.setItem('@equipped_room_item', targetItem.id);
+      } catch (_) {}
+      showToast(t('Item equipped successfully!'), 'success');
     }
   };
 
@@ -883,30 +986,78 @@ export default function StoreScreen({ navigation, currentUser }) {
     }
   };
 
-  const currentSubTabs =
-    activeCurrencyTab === 'Game Coins' ? SUB_TABS_GAME_COINS : SUB_TABS_COINS;
+  const isTools = activeCurrencyTab === 'Tools';
 
-  const currentItems =
-    activeCurrencyTab === 'Game Coins'
-      ? GAME_COINS_STORE_DATA[activeSubTab] || []
-      : STORE_DATA[activeSubTab] || [];
+  const currentSubTabs = isTools
+    ? toolsSection === 'Room'
+      ? SUB_TABS_COINS
+      : SUB_TABS_GAME_COINS
+    : activeCurrencyTab === 'Game Coins'
+    ? SUB_TABS_GAME_COINS
+    : SUB_TABS_COINS;
+
+  let currentItems = [];
+  if (isTools) {
+    if (toolsSection === 'Room') {
+      const pool = STORE_DATA[activeSubTab] || [];
+      currentItems = pool.filter(
+        (item) =>
+          ownedItemIds.includes(item.id) ||
+          item.status === 'owned' ||
+          equippedRoomItemId === item.id ||
+          equippedFrameId === item.id
+      );
+    } else {
+      // Game Section
+      const pool =
+        activeSubTab === 'All'
+          ? GAME_COINS_STORE_DATA.All || []
+          : GAME_COINS_STORE_DATA[activeSubTab] || [];
+      currentItems = pool.filter(
+        (item) =>
+          ownedItemIds.includes(item.id) ||
+          item.status === 'owned' ||
+          equippedDiceId === item.id ||
+          equippedPieceId === item.id ||
+          equippedBgId === item.id ||
+          equippedFrameId === item.id
+      );
+    }
+  } else if (activeCurrencyTab === 'Game Coins') {
+    currentItems = GAME_COINS_STORE_DATA[activeSubTab] || [];
+  } else {
+    currentItems = STORE_DATA[activeSubTab] || [];
+  }
 
   const renderStoreItem = ({ item }) => {
     const imageSource =
       typeof item.image === 'string' ? { uri: item.image } : item.image;
-    const isGameCoins = activeCurrencyTab === 'Game Coins';
-    const isDice = item?.id?.startsWith('gc_dice_') || (isGameCoins && activeSubTab === 'Dice');
-    const isBg = item?.id?.startsWith('gc_bg_') || (isGameCoins && activeSubTab === 'Background');
-    const isPiece = item?.id?.startsWith('gc_piece_') || (isGameCoins && activeSubTab === 'Pieces');
-    const isFrame = item?.id?.startsWith('gc_frame_') || (isGameCoins && activeSubTab === 'Frame');
+    const isGameCoins =
+      activeCurrencyTab === 'Game Coins' || (isTools && toolsSection === 'Game');
+    const isDice =
+      item?.id?.startsWith('gc_dice_') || (isGameCoins && activeSubTab === 'Dice');
+    const isBg =
+      item?.id?.startsWith('gc_bg_') || (isGameCoins && activeSubTab === 'Background');
+    const isPiece =
+      item?.id?.startsWith('gc_piece_') || (isGameCoins && activeSubTab === 'Pieces');
+    const isFrame =
+      item?.id?.startsWith('gc_frame_') ||
+      item?.id?.startsWith('frame_') ||
+      activeSubTab === 'Frame';
 
     const isEquipped =
-      isGameCoins &&
-      (equippedDiceId === item.id ||
-        equippedPieceId === item.id ||
-        equippedBgId === item.id ||
-        equippedFrameId === item.id ||
-        item.status === 'in_use');
+      equippedDiceId === item.id ||
+      equippedPieceId === item.id ||
+      equippedBgId === item.id ||
+      equippedFrameId === item.id ||
+      equippedRoomItemId === item.id ||
+      item.status === 'in_use';
+
+    const isOwned =
+      isTools ||
+      ownedItemIds.includes(item.id) ||
+      item.status === 'owned' ||
+      isEquipped;
 
     return (
       <View style={styles.card}>
@@ -927,7 +1078,7 @@ export default function StoreScreen({ navigation, currentUser }) {
 
           {/* Circular Play Button matching screenshot */}
           <TouchableOpacity
-            style={styles.playBtn}
+            style={[styles.playBtn, isDice && styles.playBtnDice]}
             activeOpacity={0.75}
             onPress={() => handlePlayPress(item)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -984,6 +1135,11 @@ export default function StoreScreen({ navigation, currentUser }) {
               <Text style={styles.pieceFourDotText}>🔴🟢🟡🔵</Text>
             </View>
           )}
+          {isDice && (
+            <View style={styles.diceRollHintTag}>
+              <Text style={styles.diceRollHintText}>🎲 <T>Roll</T></Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* Item Title */}
@@ -998,7 +1154,7 @@ export default function StoreScreen({ navigation, currentUser }) {
               <T>In Use</T>
             </Text>
           </View>
-        ) : isGameCoins && (ownedItemIds.includes(item.id) || item.status === 'owned') ? (
+        ) : isOwned ? (
           <TouchableOpacity
             style={styles.useItPill}
             activeOpacity={0.8}
@@ -1030,49 +1186,104 @@ export default function StoreScreen({ navigation, currentUser }) {
     <View style={styles.container}>
       {/* 1. TOP HEADER IN VIBRANT EMERALD GREEN */}
       <View style={[styles.headerContainer, { paddingTop: Math.max(12, insets.top) }]}>
-        {activeCurrencyTab === 'Game Coins' ? (
+        {activeCurrencyTab === 'Game Coins' || (isTools && toolsSection === 'Game') ? (
           <GamepadWatermark size={135} />
         ) : (
           <GiftWatermark size={130} />
         )}
 
-        {/* Currency Tabs Row */}
-        <View style={styles.topRow}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            activeOpacity={0.75}
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <BackArrowIcon size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+        {/* Currency Tabs Row / Tools Room-Game Row */}
+        {isTools ? (
+          <View style={styles.topRow}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              activeOpacity={0.75}
+              onPress={() => navigation.goBack()}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <BackArrowIcon size={24} color="#FFFFFF" />
+            </TouchableOpacity>
 
-          <View style={styles.currencyTabsWrap}>
-            {CURRENCY_TABS.map((tab) => {
-              const isActive = activeCurrencyTab === tab;
-              return (
-                <TouchableOpacity
-                  key={tab}
-                  style={styles.currencyTabItem}
-                  activeOpacity={0.8}
-                  onPress={() => handleSelectCurrencyTab(tab)}
+            <View style={styles.toolsTabsWrap}>
+              <TouchableOpacity
+                style={styles.toolsTabBtn}
+                activeOpacity={0.8}
+                onPress={() => handleSelectToolsSection('Room')}
+              >
+                <Text
+                  style={[
+                    styles.toolsTabText,
+                    toolsSection === 'Room' && styles.toolsTabTextActive,
+                  ]}
                 >
-                  <Text
-                    style={[
-                      styles.currencyTabText,
-                      isActive && styles.currencyTabTextActive,
-                    ]}
-                  >
-                    <T>{tab}</T>
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                  <T>Room</T>
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.toolsTabBtn}
+                activeOpacity={0.8}
+                onPress={() => handleSelectToolsSection('Game')}
+              >
+                <Text
+                  style={[
+                    styles.toolsTabText,
+                    toolsSection === 'Game' && styles.toolsTabTextActive,
+                  ]}
+                >
+                  <T>Game</T>
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.historyBtn}
+              activeOpacity={0.75}
+              onPress={() => showToast(t('No purchase history yet'), 'info')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <HistoryClockIcon size={22} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
-        </View>
+        ) : (
+          <View style={styles.topRow}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              activeOpacity={0.75}
+              onPress={() => navigation.goBack()}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <BackArrowIcon size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={styles.currencyTabsWrap}>
+              {CURRENCY_TABS.map((tab) => {
+                const isActive = activeCurrencyTab === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    style={styles.currencyTabItem}
+                    activeOpacity={0.8}
+                    onPress={() => handleSelectCurrencyTab(tab)}
+                  >
+                    <Text
+                      style={[
+                        styles.currencyTabText,
+                        isActive && styles.currencyTabTextActive,
+                      ]}
+                    >
+                      <T>{tab}</T>
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Sub-Category Tabs */}
         <ScrollView
+          ref={subTabsScrollRef}
+          key={`subtabs_${activeCurrencyTab}_${toolsSection}`}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.subTabsScroll}
@@ -1102,11 +1313,39 @@ export default function StoreScreen({ navigation, currentUser }) {
         keyExtractor={(item) => item.id}
         renderItem={renderStoreItem}
         numColumns={2}
-        columnWrapperStyle={styles.gridRow}
+        columnWrapperStyle={currentItems.length > 0 ? styles.gridRow : undefined}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: Math.max(24, insets.bottom + 16) },
+          currentItems.length === 0 && styles.listContentEmpty,
+          { paddingBottom: Math.max(30, insets.bottom + 20) },
         ]}
+        ListEmptyComponent={
+          isTools ? (
+            <View style={styles.emptyToolsContainer}>
+              <EmptyToolsIllustration size={160} />
+              <Text style={styles.emptyToolsText}>
+                <T>
+                  No tools are available now. Please go to the store to buy one, and they will make you and your room more attractive.
+                </T>
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyToolsGoBtn}
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (toolsSection === 'Room') {
+                    setActiveCurrencyTab('Coins');
+                  } else {
+                    setActiveCurrencyTab('Game Coins');
+                  }
+                }}
+              >
+                <Text style={styles.emptyToolsGoBtnText}>
+                  <T>Go to Store</T>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
         showsVerticalScrollIndicator={false}
       />
 
@@ -1139,14 +1378,10 @@ export default function StoreScreen({ navigation, currentUser }) {
 
               {previewItem.id?.startsWith('gc_dice_') || (activeCurrencyTab === 'Game Coins' && activeSubTab === 'Dice') ? (
                 <View style={styles.previewDiceContainer}>
-                  <Image
-                    source={
-                      typeof previewItem.image === 'string'
-                        ? { uri: previewItem.image }
-                        : previewItem.image
-                    }
-                    style={styles.previewDiceLargeImage}
-                    resizeMode="contain"
+                  <AnimatedDicePreview
+                    dice={previewItem}
+                    size={135}
+                    autoRoll={true}
                   />
                 </View>
               ) : previewItem.id?.startsWith('gc_piece_') || (activeCurrencyTab === 'Game Coins' && activeSubTab === 'Pieces') ? (
@@ -1510,6 +1745,68 @@ const styles = StyleSheet.create({
     fontSize: 17.5,
     fontWeight: '900',
   },
+  toolsTabsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 32,
+    flex: 1,
+  },
+  toolsTabBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  toolsTabText: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 16.5,
+    fontWeight: '600',
+  },
+  toolsTabTextActive: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  historyBtn: {
+    padding: 6,
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyToolsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+    width: '100%',
+  },
+  emptyToolsText: {
+    color: '#64748B',
+    fontSize: 14.5,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginTop: 22,
+    fontWeight: '500',
+    maxWidth: 320,
+  },
+  emptyToolsGoBtn: {
+    marginTop: 24,
+    backgroundColor: '#00C853',
+    paddingHorizontal: 26,
+    paddingVertical: 10,
+    borderRadius: 22,
+    shadowColor: '#00C853',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  emptyToolsGoBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '800',
+  },
 
   // Sub-Category Tabs Row
   subTabsScroll: {
@@ -1716,16 +2013,29 @@ const styles = StyleSheet.create({
   },
   previewDiceContainer: {
     width: '100%',
-    height: 220,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: 4,
+    marginBottom: 4,
   },
   previewDiceLargeImage: {
     width: 170,
     height: 170,
+  },
+  diceRollHintTag: {
+    marginTop: 3,
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 230, 118, 0.35)',
+  },
+  diceRollHintText: {
+    color: '#00E676',
+    fontSize: 10,
+    fontWeight: '800',
   },
   previewBoardContainer: {
     width: Math.min(width - 80, 270),

@@ -979,18 +979,26 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               )}
 
               {/* Wealth Level */}
-              <View style={styles.wealthBadge}>
+              <TouchableOpacity
+                style={styles.wealthBadge}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('Level', { initialTab: 'fortune', user: profile })}
+              >
                 <Text style={styles.wealthBadgeText}>
                   💰 Lv.{profile.wealthLevel || 1}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
-              {/* Charm Level */}
-              <View style={styles.charmBadge}>
+              {/* Charm Level / User Level */}
+              <TouchableOpacity
+                style={styles.charmBadge}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('Level', { initialTab: 'user', user: profile })}
+              >
                 <Text style={styles.charmBadgeText}>
-                  💖 Lv.{profile.charmLevel || 1}
+                  💖 Lv.{profile.charmLevel || profile.userLevel || 1}
                 </Text>
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* Golden Laurel Medal */}

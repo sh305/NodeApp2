@@ -59,6 +59,47 @@ const PhoneHandsetIcon = ({ size = 22, color = '#0284C7' }) => (
   </Svg>
 );
 
+const SocialFacebookIcon = ({ size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#1877F2" />
+    <Path
+      d="M20.2 14.5h-1.8c-.8 0-1.1.4-1.1 1.2v1.6h2.8l-.4 2.8h-2.4v7.4h-3v-7.4h-2.4v-2.8h2.4v-2c0-2.4 1.4-3.8 3.7-3.8 1.1 0 2.1.1 2.4.1v2.9z"
+      fill="#FFFFFF"
+    />
+  </Svg>
+);
+
+const SocialTwitterIcon = ({ size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#1DA1F2" />
+    <Path
+      d="M25 12.8a6.2 6.2 0 01-1.8.5 3.1 3.1 0 001.4-1.7 6.2 6.2 0 01-2 .8 3.1 3.1 0 00-5.4 2.8 8.9 8.9 0 01-6.5-3.3 3.1 3.1 0 001 4.2 3.1 3.1 0 01-1.4-.4v.1a3.1 3.1 0 002.5 3.1 3.2 3.2 0 01-1.4.1 3.1 3.1 0 002.9 2.2 6.3 6.3 0 01-3.9 1.3H10a8.8 8.8 0 004.8 1.4c5.7 0 8.9-4.7 8.9-8.9v-.4a6.3 6.3 0 001.3-1.5z"
+      fill="#FFFFFF"
+    />
+  </Svg>
+);
+
+const SocialGoogleIcon = ({ size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 48 48">
+    <Path
+      fill="#EA4335"
+      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+    />
+    <Path
+      fill="#4285F4"
+      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+    />
+    <Path
+      fill="#FBBC05"
+      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+    />
+    <Path
+      fill="#34A853"
+      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+    />
+  </Svg>
+);
+
 // Interactive Animated Pill Button with Rich Hover (Web) & Press (Phone) Spring Physics
 const InteractivePillButton = ({ onPress, variant = 'google', icon, title }) => {
   const isGoogle = variant === 'google';
@@ -594,6 +635,79 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
+  // Direct Social Logins (Google, Facebook, Twitter) - Bound Account Direct 1-Tap Login
+  const handleDirectGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      const stored = await AsyncStorage.getItem('@user_info');
+      const parsed = stored ? JSON.parse(stored) : null;
+      const googleId = parsed?.googleId || parsed?.boundAccounts?.google?.id || '108336193049371194923';
+      const email = parsed?.email || parsed?.boundAccounts?.google?.email || 'user@gmail.com';
+      const res = await api.post('/auth/google-login', {
+        googleId,
+        email,
+        name: parsed?.name || 'Google User',
+      });
+      if (res.data?.success) {
+        showToast(t('Logged in with Google successfully! 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', res.data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        if (onLoginSuccess) onLoginSuccess(res.data.user);
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Google login failed'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDirectFacebookLogin = async () => {
+    setLoading(true);
+    try {
+      const stored = await AsyncStorage.getItem('@user_info');
+      const parsed = stored ? JSON.parse(stored) : null;
+      const facebookId = parsed?.facebookId || parsed?.boundAccounts?.facebook?.id || 'fb_user_892341908234';
+      const res = await api.post('/auth/facebook-login', {
+        facebookId,
+        name: parsed?.name || 'Facebook User',
+      });
+      if (res.data?.success) {
+        showToast(t('Logged in with Facebook successfully! 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', res.data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        if (onLoginSuccess) onLoginSuccess(res.data.user);
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Facebook login failed'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDirectTwitterLogin = async () => {
+    setLoading(true);
+    try {
+      const stored = await AsyncStorage.getItem('@user_info');
+      const parsed = stored ? JSON.parse(stored) : null;
+      const twitterId = parsed?.twitterId || parsed?.boundAccounts?.twitter?.id || 'tw_892341908234';
+      const res = await api.post('/auth/twitter-login', {
+        twitterId,
+        username: parsed?.boundAccounts?.twitter?.username || 'user_yo',
+        name: parsed?.name || 'Twitter User',
+      });
+      if (res.data?.success) {
+        showToast(t('Logged in with Twitter successfully! 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', res.data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        if (onLoginSuccess) onLoginSuccess(res.data.user);
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Twitter login failed'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ---------------- GMAIL / EMAIL AUTH HANDLERS ----------------
 
   // 1. Send OTP to Gmail
@@ -802,6 +916,46 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               icon={<PhoneHandsetIcon size={28} color="#0284C7" />}
               title={t('Sign in with Phone Number')}
             />
+
+            {/* 3. Direct Social 1-Tap Login (Facebook, Google, Twitter) */}
+            <View style={styles.socialDirectWrap}>
+              <View style={styles.socialDividerRow}>
+                <View style={styles.socialDividerLine} />
+                <Text style={styles.socialDividerText}>
+                  <T>Or direct login with bound account</T>
+                </Text>
+                <View style={styles.socialDividerLine} />
+              </View>
+
+              <View style={styles.socialIconsRow}>
+                {/* Facebook Direct Login */}
+                <TouchableOpacity
+                  style={styles.socialCircleBtn}
+                  activeOpacity={0.8}
+                  onPress={handleDirectFacebookLogin}
+                >
+                  <SocialFacebookIcon size={36} />
+                </TouchableOpacity>
+
+                {/* Google Direct Login */}
+                <TouchableOpacity
+                  style={styles.socialCircleBtn}
+                  activeOpacity={0.8}
+                  onPress={handleDirectGoogleLogin}
+                >
+                  <SocialGoogleIcon size={34} />
+                </TouchableOpacity>
+
+                {/* Twitter Direct Login */}
+                <TouchableOpacity
+                  style={styles.socialCircleBtn}
+                  activeOpacity={0.8}
+                  onPress={handleDirectTwitterLogin}
+                >
+                  <SocialTwitterIcon size={36} />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         ) : activeModal === 'phone' ? (
           /* Mobile Phone Tabbed Modal Card (Login User vs Register User) */
@@ -1767,6 +1921,51 @@ const styles = StyleSheet.create({
     maxWidth: 390,
     gap: 16,
     marginVertical: 18,
+  },
+  socialDirectWrap: {
+    marginTop: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  socialDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginVertical: 8,
+  },
+  socialDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  socialDividerText: {
+    marginHorizontal: 12,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  socialIconsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 22,
+    marginTop: 4,
+  },
+  socialCircleBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4,
   },
   animatedPillOuter: {
     width: '100%',

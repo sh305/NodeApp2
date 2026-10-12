@@ -26,7 +26,10 @@ const {
   getFollowerNotifications,
   markFollowersRead,
 } = require('../controllers/userController');
+const { getMe } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
+
+router.get('/me', protect, getMe);
 
 router.get('/wallet/balance', protect, getWalletBalance);
 router.post('/wallet/exchange-game-coins', protect, exchangeGameCoins);

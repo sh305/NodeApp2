@@ -27,14 +27,37 @@ class SmsOtpService {
    * Send 6-Digit Real SMS OTP to Mobile Number
    * @param {string} rawPhoneNumber - 10 digit Indian number (e.g. 7982720270)
    */
-  static async sendOtp(rawPhoneNumber) {
+  static async sendOtp(rawPhoneNumber, preferredChannel = 'any') {
     const cleanDigits = (rawPhoneNumber || '').replace(/\D/g, '').slice(-10);
     if (!cleanDigits || cleanDigits.length !== 10) {
       return { success: false, message: 'Please enter a valid 10-digit Indian mobile number' };
     }
     const formattedPhone = `+91${cleanDigits}`;
 
-    // 1. Primary: 2Factor.in Real Indian SMS Delivery (Instant & Free 200 SMS)
+    // 1. If WhatsApp requested (or Twilio configured), try Twilio WhatsApp first
+    if (twilioClient && verifyServiceSid) {
+      try {
+        console.log(`📡 [Twilio] Attempting WhatsApp OTP to ${formattedPhone}...`);
+        const verification = await twilioClient.verify.v2
+          .services(verifyServiceSid)
+          .verifications.create({
+            to: formattedPhone,
+            channel: 'whatsapp',
+          });
+
+        console.log('✅ Twilio WhatsApp Dispatched successfully! Status:', verification.status);
+
+        return {
+          success: true,
+          channel: 'whatsapp',
+          message: `OTP code sent to your WhatsApp (+91 ${cleanDigits})!`,
+        };
+      } catch (twilioWhatsAppErr) {
+        console.warn('⚠️ Twilio WhatsApp not available, falling back to SMS:', twilioWhatsAppErr.message);
+      }
+    }
+
+    // 2. Primary SMS: 2Factor.in Real Indian SMS Delivery (Instant & Free 200 SMS)
     if (twoFactorApiKey) {
       try {
         console.log(`📡 [2Factor.in] Sending Real SMS OTP to ${cleanDigits}...`);
@@ -49,6 +72,7 @@ class SmsOtpService {
 
           return {
             success: true,
+            channel: 'sms',
             message: `SMS OTP code sent to +91 ${cleanDigits}!`,
           };
         } else {
@@ -59,7 +83,7 @@ class SmsOtpService {
       }
     }
 
-    // 2. Secondary: Twilio Verify fallback
+    // 3. Fallback SMS: Twilio SMS fallback
     if (twilioClient && verifyServiceSid) {
       try {
         console.log(`📡 [Twilio] Sending SMS OTP to ${formattedPhone}...`);
@@ -74,6 +98,7 @@ class SmsOtpService {
 
         return {
           success: true,
+          channel: 'sms',
           message: `SMS OTP code sent to +91 ${cleanDigits}!`,
         };
       } catch (twilioErr) {
@@ -83,7 +108,7 @@ class SmsOtpService {
 
     return {
       success: false,
-      message: 'Failed to deliver SMS OTP. Please try again or sign in with Gmail.',
+      message: 'Failed to deliver OTP. Please try again or sign in with Gmail.',
     };
   }
 

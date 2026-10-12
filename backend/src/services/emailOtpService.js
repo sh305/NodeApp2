@@ -40,15 +40,15 @@ class EmailOtpService {
       const mailer = getTransporter();
       if (mailer) {
         const mailOptions = {
-          from: `"YoYo Live Voice" <${process.env.EMAIL_USER}>`,
+          from: `"FunMaza" <${process.env.EMAIL_USER}>`,
           to: cleanEmail,
           replyTo: process.env.EMAIL_USER,
-          subject: `${otp} is your YoYo Live verification code`,
-          text: `Your YoYo Live verification code is: ${otp}\n\nThis code is valid for 5 minutes. Please do not share it with anyone.`,
+          subject: `${otp} is your FunMaza verification code`,
+          text: `Your FunMaza verification code is: ${otp}\n\nThis code is valid for 5 minutes. Please do not share it with anyone.`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #ffffff; color: #1f2937; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb;">
               <div style="text-align: center; margin-bottom: 20px;">
-                <h2 style="color: #10b981; margin: 0; font-size: 24px;">🎙️ YoYo Live Voice</h2>
+                <h2 style="color: #6366f1; margin: 0; font-size: 24px;">🎉 FunMaza</h2>
                 <p style="color: #6b7280; font-size: 13px; margin-top: 4px;">Voice Chat Rooms & Community</p>
               </div>
               <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;">

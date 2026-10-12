@@ -16,6 +16,9 @@ import WalletScreen from './src/screens/WalletScreen';
 import ConfirmMoneyScreen from './src/screens/ConfirmMoneyScreen';
 import UserProblemScreen from './src/screens/UserProblemScreen';
 import StoreScreen from './src/screens/StoreScreen';
+import LevelScreen from './src/screens/LevelScreen';
+import SettingScreen from './src/screens/SettingScreen';
+import AccountBindingScreen from './src/screens/AccountBindingScreen';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { ToastProvider } from './src/context/ToastContext';
 
@@ -147,6 +150,31 @@ export default function App() {
                   <Stack.Screen name="Store">
                     {(props) => (
                       <StoreScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Level">
+                    {(props) => (
+                      <LevelScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Setting">
+                    {(props) => (
+                      <SettingScreen
+                        {...props}
+                        currentUser={currentUser}
+                        onLogout={handleLogout}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="AccountBinding">
+                    {(props) => (
+                      <AccountBindingScreen
                         {...props}
                         currentUser={currentUser}
                       />

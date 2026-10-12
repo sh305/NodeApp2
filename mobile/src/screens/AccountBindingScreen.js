@@ -1,0 +1,2152 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Modal,
+  Image,
+  TextInput,
+  ActivityIndicator,
+  Platform,
+  Linking,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../api/client';
+import { useLanguage } from '../context/LanguageContext';
+import { T } from '../components/TranslatedText';
+import { useToast } from '../components/Toast';
+
+// ══ SVG ICONS MATCHING SCREENSHOT ══
+const BackArrowIcon = ({ size = 24, color = '#2C2C2E' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M15 19l-7-7 7-7"
+      stroke={color}
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const ChevronRightIcon = ({ size = 18, color = '#C7C7CC' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M9 5l7 7-7 7"
+      stroke={color}
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+// 1. Phone Handset / Smartphone Circle Icon (Matching screenshot)
+const PhoneCircleIcon = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#B0B5BA" />
+    <Rect
+      x="12"
+      y="8.5"
+      width="12"
+      height="19"
+      rx="2.5"
+      stroke="#FFFFFF"
+      strokeWidth="1.8"
+    />
+    <Circle cx="18" cy="24" r="1.2" fill="#FFFFFF" />
+    <Path d="M15.5 11.5h5" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+  </Svg>
+);
+
+// 2. Facebook Circle Icon (Matching screenshot)
+const FacebookCircleIcon = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#B0B5BA" />
+    <Path
+      d="M20.2 14.5h-1.8c-.8 0-1.1.4-1.1 1.2v1.6h2.8l-.4 2.8h-2.4v7.4h-3v-7.4h-2.4v-2.8h2.4v-2c0-2.4 1.4-3.8 3.7-3.8 1.1 0 2.1.1 2.4.1v2.9z"
+      fill="#FFFFFF"
+    />
+  </Svg>
+);
+
+const FacebookBrandIcon = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+  </Svg>
+);
+
+const MessengerIcon = ({ size = 22, color = '#0084FF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Path d="M12 2C6.477 2 2 6.145 2 11.258c0 2.91 1.455 5.513 3.735 7.185V22l3.418-1.875c.91.252 1.87.39 2.847.39 5.523 0 10-4.145 10-9.257C22 6.145 17.523 2 12 2zm1.002 12.443l-2.556-2.727-4.992 2.727 5.49-5.83 2.616 2.727 4.932-2.727-5.49 5.83z" />
+  </Svg>
+);
+
+const WhatsAppIcon = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2zm5.82 14.15c-.24.68-1.2 1.25-1.66 1.29-.44.04-1 .06-3.23-.84-2.22-.9-3.66-3.13-3.77-3.28-.11-.15-.9-1.2-1-2.28-.1-1.08.52-1.61.73-1.84.21-.23.46-.29.62-.29.15 0 .31 0 .44.01.14.01.33-.05.51.39.2.49.68 1.67.74 1.79.06.12.1.27.02.43-.08.16-.12.26-.24.4-.12.14-.25.31-.36.42-.12.12-.25.25-.11.49.14.24.63 1.04 1.35 1.68.93.83 1.71 1.09 1.95 1.21.24.12.38.1.52-.06.14-.16.6-.7.76-.94.16-.24.32-.2.54-.12.22.08 1.4.66 1.64.78.24.12.4.18.46.28.06.1.06.59-.18 1.27z" />
+  </Svg>
+);
+
+// 3. Official Google Multicolor G Icon (Matching screenshot)
+const GoogleCircleIcon = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 48 48">
+    <Path
+      fill="#EA4335"
+      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+    />
+    <Path
+      fill="#4285F4"
+      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+    />
+    <Path
+      fill="#FBBC05"
+      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+    />
+    <Path
+      fill="#34A853"
+      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+    />
+  </Svg>
+);
+
+// 4. Twitter Circle Icon (Matching screenshot)
+const TwitterCircleIcon = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#B0B5BA" />
+    <Path
+      d="M25 12.8a6.2 6.2 0 01-1.8.5 3.1 3.1 0 001.4-1.7 6.2 6.2 0 01-2 .8 3.1 3.1 0 00-5.4 2.8 8.9 8.9 0 01-6.5-3.3 3.1 3.1 0 001 4.2 3.1 3.1 0 01-1.4-.4v.1a3.1 3.1 0 002.5 3.1 3.2 3.2 0 01-1.4.1 3.1 3.1 0 002.9 2.2 6.3 6.3 0 01-3.9 1.3H10a8.8 8.8 0 004.8 1.4c5.7 0 8.9-4.7 8.9-8.9v-.4a6.3 6.3 0 001.3-1.5z"
+      fill="#FFFFFF"
+    />
+  </Svg>
+);
+
+// 5. VK Circle Icon (Matching screenshot)
+const VkCircleIcon = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#B0B5BA" />
+    <Path
+      d="M26 13h-2.2c-.8 0-1.1.4-1.5 1.3-1.6 3-3.1 5.3-4.2 5.3-.2 0-.4-.2-.4-.8V14c0-.7-.2-1-1-1h-2.4c-.4 0-.7.2-.7.5 0 .6.9.7 1 2.4v3.3c0 .7-.1.9-.4.9-.7 0-2.3-2.5-3.5-5.3-.2-.5-.6-.8-1.4-.8H8c-.8 0-1 .4-1 .8 0 .8 1.1 4.4 5.1 9.8C14.7 27 18 27 18.7 27h1.4c.5 0 .8-.3.8-1v-2c.7.2 1.6 1.1 2.2 2 .5.7 1 .9 1.8.9h2.2c.8 0 1.2-.4 1-1.2-.4-1.3-2.2-3.2-3.1-4.2-.4-.4-.5-.7 0-1.3 1.2-1.6 2.8-4.2 3-6.2.1-.5-.2-1-1-1z"
+      fill="#FFFFFF"
+    />
+  </Svg>
+);
+
+export default function AccountBindingScreen({ navigation, currentUser }) {
+  const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
+  const { showToast } = useToast();
+
+  const [profile, setProfile] = useState(currentUser || null);
+  const [loading, setLoading] = useState(false);
+
+  // ── 0. Phone Number Binding State (FunMaza WhatsApp Direct Verification) ──
+  const [phoneModalVisible, setPhoneModalVisible] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneStep, setPhoneStep] = useState('input'); // 'input' | 'waiting'
+  const [waCode, setWaCode] = useState('');
+  const [phoneSending, setPhoneSending] = useState(false);
+  const [phoneVerifying, setPhoneVerifying] = useState(false);
+
+  // ── 1. Google / Gmail Binding State with OTP ──
+  const [googleChooserVisible, setGoogleChooserVisible] = useState(false);
+  const [customGmailInput, setCustomGmailInput] = useState('');
+  const [googleOtpStep, setGoogleOtpStep] = useState('input'); // 'input' | 'otp'
+  const [googleOtp, setGoogleOtp] = useState('');
+  const [googleCountdown, setGoogleCountdown] = useState(0);
+  const [googleSending, setGoogleSending] = useState(false);
+  const [googleVerifying, setGoogleVerifying] = useState(false);
+
+  // ── 2. Facebook Binding State with Security OTP Verification ──
+  const [fbChooserVisible, setFbChooserVisible] = useState(false);
+  const [fbAccountInput, setFbAccountInput] = useState('');
+  const [fbOtpStep, setFbOtpStep] = useState('input'); // 'input' | 'otp'
+  const [fbOtp, setFbOtp] = useState('');
+  const [fbCountdown, setFbCountdown] = useState(0);
+  const [fbSending, setFbSending] = useState(false);
+  const [fbVerifying, setFbVerifying] = useState(false);
+
+  // ── 3. Twitter Binding State ──
+  const [twChooserVisible, setTwChooserVisible] = useState(false);
+  const [customTwInput, setCustomTwInput] = useState('');
+
+  // ── 4. Final Confirmation Prompt Modal ──
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [pendingBind, setPendingBind] = useState(null); // { provider, accountId, name, email, avatar, username }
+
+  // ── 5. Unbind / Remove Account Binding State ──
+  const [unbindModalVisible, setUnbindModalVisible] = useState(false);
+  const [pendingUnbind, setPendingUnbind] = useState(null); // { provider, label, value }
+
+  // Countdown timer refs
+  const googleTimerRef = useRef(null);
+  const fbTimerRef = useRef(null);
+
+  useEffect(() => {
+    fetchLatestProfile();
+    return () => {
+      if (googleTimerRef.current) clearInterval(googleTimerRef.current);
+      if (fbTimerRef.current) clearInterval(fbTimerRef.current);
+    };
+  }, []);
+
+  const fetchLatestProfile = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('@user_info');
+      if (stored) {
+        setProfile(JSON.parse(stored));
+      }
+      const res = await api.get('/auth/me');
+      if (res.data?.success && res.data.user) {
+        setProfile(res.data.user);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+      }
+    } catch (_) {}
+  };
+
+  // Determine current bound status text for each item
+  const googleBoundValue =
+    profile?.googleId ||
+    profile?.boundAccounts?.google?.id ||
+    profile?.boundAccounts?.google?.email;
+
+  const facebookBoundValue =
+    profile?.facebookId ||
+    profile?.boundAccounts?.facebook?.name;
+
+  const twitterBoundValue =
+    profile?.twitterId ||
+    profile?.boundAccounts?.twitter?.username;
+
+  const phoneBoundValue =
+    profile?.phone ||
+    profile?.phoneNumber ||
+    profile?.boundAccounts?.phone?.number;
+
+  // ══════════════════════════════════════════════════
+  // 1. PHONE HANDLER (FUNMAZA WHATSAPP DIRECT DEEP-LINK)
+  // ══════════════════════════════════════════════════
+  const handlePhoneClick = () => {
+    if (phoneBoundValue) {
+      setPendingUnbind({
+        provider: 'phone',
+        label: t('Phone Number'),
+        value: phoneBoundValue,
+      });
+      setUnbindModalVisible(true);
+      return;
+    }
+    setPhoneInput(profile?.phone || profile?.phoneNumber || '');
+    setPhoneStep('input');
+    setWaCode('');
+    setPhoneModalVisible(true);
+  };
+
+  const handleStartWhatsAppVerify = async () => {
+    const raw = phoneInput.trim().replace(/\D/g, '').slice(-10);
+    if (!raw || raw.length !== 10) {
+      showToast(t('Please enter a valid 10-digit mobile number'), 'error');
+      return;
+    }
+
+    setPhoneSending(true);
+    try {
+      const res = await api.post('/auth/generate-whatsapp-code', { phoneNumber: raw });
+      if (res.data?.success && res.data.code) {
+        setWaCode(res.data.code);
+        setPhoneStep('waiting');
+        showToast(t('Opening WhatsApp... Please tap send!'), 'info');
+        if (res.data.deepLinkUrl) {
+          Linking.openURL(res.data.deepLinkUrl).catch(() => {
+            showToast(t('Could not launch WhatsApp. Please check if WhatsApp is installed.'), 'error');
+          });
+        }
+      } else {
+        showToast(t(res.data?.message || 'Failed to generate code'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Failed to connect to verification service'), 'error');
+    } finally {
+      setPhoneSending(false);
+    }
+  };
+
+  const handleReopenWhatsApp = () => {
+    if (!waCode) return;
+    const targetNumber = '917982720270';
+    const messageText = `Verify FunMaza Code: #${waCode}`;
+    const url = `https://wa.me/${targetNumber}?text=${encodeURIComponent(messageText)}`;
+    Linking.openURL(url).catch(() => {
+      showToast(t('Could not launch WhatsApp'), 'error');
+    });
+  };
+
+  const handleConfirmPhoneVerify = async () => {
+    const raw = phoneInput.trim().replace(/\D/g, '').slice(-10);
+    if (!raw || !waCode) {
+      showToast(t('Verification code missing'), 'error');
+      return;
+    }
+
+    setPhoneVerifying(true);
+    try {
+      const res = await api.post('/auth/confirm-whatsapp-verify', {
+        phoneNumber: raw,
+        code: waCode,
+      });
+
+      if (res.data?.success) {
+        showToast(t('WhatsApp Verified Successfully! ✅'), 'success');
+        setPhoneModalVisible(false);
+        setPhoneStep('input');
+
+        // Open "Are you sure..." confirmation prompt
+        setPendingBind({
+          provider: 'phone',
+          accountId: raw,
+          name: profile?.name || `User ${raw.slice(-4)}`,
+          phoneNumber: raw,
+          promptText: t('Are you sure do you want to bind your account to this phone number?'),
+        });
+        setConfirmModalVisible(true);
+      } else {
+        showToast(t(res.data?.message || 'Verification not completed yet. Please send message in WhatsApp.'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Verification code expired or invalid'), 'error');
+    } finally {
+      setPhoneVerifying(false);
+    }
+  };
+
+  // ══════════════════════════════════════════════════
+  // 2. GOOGLE / GMAIL BINDING WITH REAL OTP FLOW
+  // ══════════════════════════════════════════════════
+  const handleGoogleClick = () => {
+    if (googleBoundValue) {
+      setPendingUnbind({
+        provider: 'google',
+        label: t('Google (Gmail)'),
+        value: googleBoundValue,
+      });
+      setUnbindModalVisible(true);
+      return;
+    }
+    setCustomGmailInput(profile?.email || '');
+    setGoogleOtp('');
+    setGoogleOtpStep('input');
+    setGoogleChooserVisible(true);
+  };
+
+  const startGoogleCountdown = () => {
+    setGoogleCountdown(60);
+    if (googleTimerRef.current) clearInterval(googleTimerRef.current);
+    googleTimerRef.current = setInterval(() => {
+      setGoogleCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(googleTimerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Step 1: Send OTP to user's Gmail
+  const handleSendGoogleOtp = async (targetEmail) => {
+    const raw = typeof targetEmail === 'string' ? targetEmail : customGmailInput;
+    let clean = raw.trim().toLowerCase();
+    if (!clean.includes('@') && clean.length > 0) {
+      clean = `${clean}@gmail.com`;
+    }
+    if (!clean || !clean.includes('@') || !clean.includes('.') || clean.length < 6) {
+      showToast(t('Please enter a valid Gmail address'), 'error');
+      return;
+    }
+    setCustomGmailInput(clean);
+
+    setGoogleSending(true);
+    try {
+      const res = await api.post('/auth/send-email-otp', { email: clean });
+      if (res.data?.success) {
+        showToast(t('OTP Sent to your Gmail! 📨'), 'success');
+        setGoogleOtpStep('otp');
+        startGoogleCountdown();
+      } else {
+        showToast(t(res.data?.message || 'Failed to send OTP'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Failed to send OTP to Gmail'), 'error');
+    } finally {
+      setGoogleSending(false);
+    }
+  };
+
+  // Step 2: Verify Gmail OTP -> Then open "Are you sure..." prompt
+  const handleVerifyGoogleOtp = async () => {
+    const cleanOtp = googleOtp.trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      showToast(t('Please enter the 6-digit OTP code'), 'error');
+      return;
+    }
+
+    setGoogleVerifying(true);
+    try {
+      const res = await api.post('/auth/verify-email-otp', {
+        email: customGmailInput.trim().toLowerCase(),
+        otp: cleanOtp,
+      });
+
+      if (res.data?.success) {
+        showToast(t('OTP Verified Successfully! ✅'), 'success');
+        setGoogleChooserVisible(false);
+        setGoogleOtpStep('input');
+
+        // Open "Are you sure..." confirmation prompt requested by user
+        setPendingBind({
+          provider: 'google',
+          accountId: `108${Math.floor(10000000000000000 + Math.random() * 90000000000000000)}`,
+          email: customGmailInput.trim().toLowerCase(),
+          name: profile?.name || customGmailInput.split('@')[0],
+          avatar: profile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120',
+          promptText: t('Are you sure do you want to bind your account to this gmail account?'),
+        });
+        setConfirmModalVisible(true);
+      } else {
+        showToast(t(res.data?.message || 'Invalid OTP code'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Wrong OTP code'), 'error');
+    } finally {
+      setGoogleVerifying(false);
+    }
+  };
+
+  // ══════════════════════════════════════════════════
+  // 3. FACEBOOK BINDING (MESSENGER OTP VERIFICATION)
+  // ══════════════════════════════════════════════════
+  const handleFacebookClick = () => {
+    if (facebookBoundValue) {
+      setPendingUnbind({
+        provider: 'facebook',
+        label: t('Facebook'),
+        value: facebookBoundValue,
+      });
+      setUnbindModalVisible(true);
+      return;
+    }
+    setFbAccountInput(profile?.name ? profile.name.toLowerCase().replace(/\s+/g, '') : '');
+    setFbOtp('');
+    setFbOtpStep('input');
+    setFbChooserVisible(true);
+  };
+
+  const startFbCountdown = () => {
+    setFbCountdown(60);
+    if (fbTimerRef.current) clearInterval(fbTimerRef.current);
+    fbTimerRef.current = setInterval(() => {
+      setFbCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(fbTimerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Step 1: Send OTP to Facebook Messenger
+  const handleSendFbOtp = async () => {
+    const raw = fbAccountInput.trim().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?facebook\.com\//, '');
+    if (!raw || raw.length < 3) {
+      showToast(t('Please enter your Facebook ID or Username'), 'error');
+      return;
+    }
+
+    setFbSending(true);
+    try {
+      const res = await api.post('/auth/generate-facebook-otp', { facebookId: raw });
+      if (res.data?.success) {
+        showToast(t('Opening Messenger to deliver OTP... 📨'), 'info');
+        setFbOtpStep('otp');
+        startFbCountdown();
+
+        // Launch Facebook Messenger app
+        if (res.data.messengerUrl) {
+          Linking.openURL(res.data.messengerUrl).catch(() => {
+            showToast(t('Could not open Messenger app. Please check your Messenger inbox.'), 'info');
+          });
+        }
+      } else {
+        showToast(t(res.data?.message || 'Failed to send Messenger OTP'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Failed to dispatch Messenger OTP'), 'error');
+    } finally {
+      setFbSending(false);
+    }
+  };
+
+  const handleReopenMessenger = () => {
+    const messengerUrl = 'https://m.me/FunMazaLive';
+    Linking.openURL(messengerUrl).catch(() => {
+      showToast(t('Could not open Messenger app'), 'error');
+    });
+  };
+
+  // Step 2: Verify Facebook Messenger OTP -> Then open "Are you sure..." prompt
+  const handleVerifyFbOtp = async () => {
+    const cleanOtp = fbOtp.trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      showToast(t('Please enter the 6-digit OTP code'), 'error');
+      return;
+    }
+
+    const cleanFbId = fbAccountInput.trim().toLowerCase().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?facebook\.com\//, '');
+    setFbVerifying(true);
+    try {
+      const res = await api.post('/auth/verify-facebook-otp', {
+        facebookId: cleanFbId,
+        otp: cleanOtp,
+      });
+
+      if (res.data?.success) {
+        showToast(t('Messenger OTP Verified Successfully! ✅'), 'success');
+        setFbChooserVisible(false);
+        setFbOtpStep('input');
+
+        // Open "Are you sure..." confirmation prompt requested by user
+        setPendingBind({
+          provider: 'facebook',
+          accountId: cleanFbId,
+          name: profile?.name || cleanFbId,
+          avatar: profile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120',
+          promptText: t('Are you sure do you want to bind your account to this facebook account?'),
+        });
+        setConfirmModalVisible(true);
+      } else {
+        showToast(t(res.data?.message || 'Wrong OTP code!'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Wrong OTP code! Please check your Facebook Messenger.'), 'error');
+    } finally {
+      setFbVerifying(false);
+    }
+  };
+
+  // ══════════════════════════════════════════════════
+  // 4. TWITTER BINDING FLOW
+  // ══════════════════════════════════════════════════
+  const handleTwitterClick = () => {
+    if (twitterBoundValue) {
+      setPendingUnbind({
+        provider: 'twitter',
+        label: t('Twitter'),
+        value: twitterBoundValue,
+      });
+      setUnbindModalVisible(true);
+      return;
+    }
+    const defaultTw = profile?.name ? `@${profile.name.toLowerCase().replace(/\s+/g, '')}` : '@twitter_user';
+    setCustomTwInput(defaultTw);
+    setTwChooserVisible(true);
+  };
+
+  const handleTwSubmit = () => {
+    let clean = customTwInput.trim();
+    if (!clean.startsWith('@')) clean = `@${clean}`;
+    setTwChooserVisible(false);
+    setPendingBind({
+      provider: 'twitter',
+      accountId: `tw_${Date.now()}`,
+      username: clean,
+      name: profile?.name || clean.replace('@', ''),
+      avatar: profile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120',
+      promptText: t('Are you sure do you want to bind your account to this Twitter account?'),
+    });
+    setConfirmModalVisible(true);
+  };
+
+  // 5. VK Click
+  const handleVkClick = () => {
+    showToast(t('VK account binding coming soon'), 'info');
+  };
+
+  // ══════════════════════════════════════════════════
+  // 5. FINAL BINDING CONFIRMATION ("Yes, Bind")
+  // ══════════════════════════════════════════════════
+  const handleConfirmBinding = async () => {
+    if (!pendingBind) return;
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/bind-account', {
+        provider: pendingBind.provider,
+        accountId: pendingBind.accountId,
+        email: pendingBind.email,
+        name: pendingBind.name,
+        username: pendingBind.username,
+        avatar: pendingBind.avatar,
+      });
+
+      if (res.data?.success && res.data.user) {
+        setProfile(res.data.user);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        setConfirmModalVisible(false);
+        setPendingBind(null);
+        showToast(
+          t(
+            pendingBind.provider === 'google'
+              ? 'Gmail account bound successfully!'
+              : pendingBind.provider === 'facebook'
+              ? 'Facebook account bound successfully!'
+              : pendingBind.provider === 'phone'
+              ? 'Phone number bound successfully!'
+              : 'Twitter account bound successfully!'
+          ),
+          'success'
+        );
+      } else {
+        showToast(t(res.data?.message || 'Failed to bind account'), 'error');
+      }
+    } catch (err) {
+      const errMsg =
+        err.response?.data?.message || t('Failed to bind account. Try again.');
+      showToast(t(errMsg), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ══════════════════════════════════════════════════
+  // 6. FINAL UNBIND CONFIRMATION ("Yes, Remove")
+  // ══════════════════════════════════════════════════
+  const handleConfirmUnbind = async () => {
+    if (!pendingUnbind) return;
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/unbind-account', {
+        provider: pendingUnbind.provider,
+      });
+
+      if (res.data?.success && res.data.user) {
+        setProfile(res.data.user);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        setUnbindModalVisible(false);
+        setPendingUnbind(null);
+        showToast(t('Account binding removed successfully!'), 'success');
+      } else {
+        showToast(t(res.data?.message || 'Failed to remove account binding'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'Failed to remove account binding'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* ══ TOP HEADER ══ */}
+      <View style={[styles.header, { paddingTop: Math.max(12, insets.top) }]}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          activeOpacity={0.75}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+        >
+          <BackArrowIcon size={24} color="#2C2C2E" />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>
+          <T>Account Binding</T>
+        </Text>
+
+        <View style={{ width: 36 }} />
+      </View>
+
+      {/* ══ BINDING ITEMS LIST (MATCHING SCREENSHOT) ══ */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(30, insets.bottom + 20) },
+        ]}
+      >
+        <View style={styles.listContainer}>
+          {/* 1. Phone Number */}
+          <TouchableOpacity
+            style={styles.rowItem}
+            activeOpacity={0.75}
+            onPress={handlePhoneClick}
+          >
+            <View style={styles.rowLeft}>
+              <PhoneCircleIcon size={36} />
+              <Text style={styles.rowLabelText}>
+                <T>Phone Number</T>
+              </Text>
+            </View>
+
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.statusText,
+                  phoneBoundValue && styles.statusTextBound,
+                ]}
+              >
+                {phoneBoundValue || <T>Bind on Account</T>}
+              </Text>
+              <ChevronRightIcon size={18} color="#C7C7CC" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.rowDivider} />
+
+          {/* 2. Facebook */}
+          <TouchableOpacity
+            style={styles.rowItem}
+            activeOpacity={0.75}
+            onPress={handleFacebookClick}
+          >
+            <View style={styles.rowLeft}>
+              <FacebookCircleIcon size={36} />
+              <Text style={styles.rowLabelText}>
+                <T>Facebook</T>
+              </Text>
+            </View>
+
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.statusText,
+                  facebookBoundValue && styles.statusTextBound,
+                ]}
+              >
+                {facebookBoundValue || <T>Bind on Account</T>}
+              </Text>
+              <ChevronRightIcon size={18} color="#C7C7CC" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.rowDivider} />
+
+          {/* 3. Google (Gmail) */}
+          <TouchableOpacity
+            style={styles.rowItem}
+            activeOpacity={0.75}
+            onPress={handleGoogleClick}
+          >
+            <View style={styles.rowLeft}>
+              <GoogleCircleIcon size={36} />
+              <Text style={styles.rowLabelText}>
+                <T>Google</T>
+              </Text>
+            </View>
+
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.statusText,
+                  googleBoundValue && styles.statusTextBound,
+                ]}
+                numberOfLines={1}
+              >
+                {googleBoundValue || <T>Bind on Account</T>}
+              </Text>
+              <ChevronRightIcon size={18} color="#C7C7CC" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.rowDivider} />
+
+          {/* 4. Twitter */}
+          <TouchableOpacity
+            style={styles.rowItem}
+            activeOpacity={0.75}
+            onPress={handleTwitterClick}
+          >
+            <View style={styles.rowLeft}>
+              <TwitterCircleIcon size={36} />
+              <Text style={styles.rowLabelText}>
+                <T>Twitter</T>
+              </Text>
+            </View>
+
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.statusText,
+                  twitterBoundValue && styles.statusTextBound,
+                ]}
+              >
+                {twitterBoundValue || <T>Bind on Account</T>}
+              </Text>
+              <ChevronRightIcon size={18} color="#C7C7CC" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.rowDivider} />
+
+          {/* 5. VK */}
+          <TouchableOpacity
+            style={styles.rowItem}
+            activeOpacity={0.75}
+            onPress={handleVkClick}
+          >
+            <View style={styles.rowLeft}>
+              <VkCircleIcon size={36} />
+              <Text style={styles.rowLabelText}>
+                <T>VK</T>
+              </Text>
+            </View>
+
+            <View style={styles.rowRight}>
+              <Text style={styles.statusText}>
+                <T>Bind on Account</T>
+              </Text>
+              <ChevronRightIcon size={18} color="#C7C7CC" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* ══ 0. PHONE NUMBER BINDING VIA WHATSAPP DEEP-LINK MODAL ══ */}
+      <Modal
+        visible={phoneModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPhoneModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.chooserOverlay}
+          activeOpacity={1}
+          onPress={() => setPhoneModalVisible(false)}
+        >
+          <View
+            style={styles.chooserSheet}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.fbHeaderRow}>
+              <View style={styles.fbHeaderLeft}>
+                <View style={[styles.fbLogoCircle, { backgroundColor: '#25D366' }]}>
+                  <WhatsAppIcon size={22} color="#FFFFFF" />
+                </View>
+                <View>
+                  <Text style={[styles.fbHeaderTitle, { color: '#128C7E' }]}>
+                    <T>Bind Phone Number</T>
+                  </Text>
+                  <Text style={styles.fbHeaderSub}>
+                    <T>Direct WhatsApp Verification (FunMaza)</T>
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setPhoneModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.chooserCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {phoneStep === 'input' ? (
+              /* STEP 1: Enter 10-digit mobile number */
+              <>
+                <Text style={styles.fbIntroText}>
+                  <T>Verify your mobile number for FunMaza directly via WhatsApp.</T>
+                </Text>
+
+                <View style={styles.inputSectionCard}>
+                  <Text style={styles.inputSectionLabel}>
+                    <T>Your 10-Digit Mobile Number</T>
+                  </Text>
+                  <View style={styles.phoneInputRow}>
+                    <View style={styles.countryCodeBadge}>
+                      <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
+                    </View>
+                    <TextInput
+                      style={[styles.gmailTextInput, { flex: 1, height: 46 }]}
+                      placeholder="10-digit number"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      value={phoneInput}
+                      onChangeText={setPhoneInput}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.waVerifyBtn,
+                      (!phoneInput.trim() || phoneSending) && styles.submitGmailBtnDisabled,
+                    ]}
+                    disabled={!phoneInput.trim() || phoneSending}
+                    activeOpacity={0.85}
+                    onPress={handleStartWhatsAppVerify}
+                  >
+                    {phoneSending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <WhatsAppIcon size={20} color="#FFFFFF" />
+                        <Text style={styles.waVerifyBtnText}>
+                          <T>Verify via WhatsApp</T>
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              /* STEP 2: Waiting for user to send code on WhatsApp */
+              <View style={styles.inputSectionCard}>
+                <View style={styles.waSuccessCard}>
+                  <View style={styles.waSuccessHeader}>
+                    <WhatsAppIcon size={24} color="#128C7E" />
+                    <Text style={styles.waSuccessTitle}>
+                      <T>WhatsApp Chat Opened!</T>
+                    </Text>
+                  </View>
+                  <Text style={styles.waSuccessDesc}>
+                    <T>Please send the pre-filled verification message in WhatsApp:</T>
+                  </Text>
+                  <View style={styles.waCodeBox}>
+                    <Text style={styles.waCodeBoxText}>
+                      Verify FunMaza Code: #{waCode}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Re-open WhatsApp button */}
+                <TouchableOpacity
+                  style={styles.reopenWaBtn}
+                  activeOpacity={0.8}
+                  onPress={handleReopenWhatsApp}
+                >
+                  <WhatsAppIcon size={18} color="#128C7E" />
+                  <Text style={styles.reopenWaBtnText}>
+                    <T>Re-open WhatsApp Chat</T>
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Confirm Sent button */}
+                <TouchableOpacity
+                  style={styles.waConfirmBtn}
+                  activeOpacity={0.85}
+                  disabled={phoneVerifying}
+                  onPress={handleConfirmPhoneVerify}
+                >
+                  {phoneVerifying ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.waConfirmBtnText}>
+                      ✅ <T>Confirm Sent & Bind Number</T>
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ alignSelf: 'center', marginTop: 12 }}
+                  onPress={() => setPhoneStep('input')}
+                >
+                  <Text style={styles.changeEmailText}>
+                    <T>Change Mobile Number</T>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ══ 1. GOOGLE / GMAIL BINDING WITH REAL OTP MODAL ══ */}
+      <Modal
+        visible={googleChooserVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setGoogleChooserVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.chooserOverlay}
+          activeOpacity={1}
+          onPress={() => setGoogleChooserVisible(false)}
+        >
+          <View
+            style={styles.chooserSheet}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.chooserHeaderRow}>
+              <View style={styles.chooserHeaderLeft}>
+                <GoogleCircleIcon size={28} />
+                <Text style={styles.chooserTitle}>
+                  <T>Bind Google Account</T>
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setGoogleChooserVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.chooserCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {googleOtpStep === 'input' ? (
+              /* STEP 1: Enter Gmail Address & Send OTP */
+              <>
+                <Text style={styles.chooserSubtitle}>
+                  <T>Enter your Gmail address to receive 6-digit OTP</T>
+                </Text>
+
+                {/* Quick device email badge */}
+                {profile?.email ? (
+                  <TouchableOpacity
+                    style={styles.accountOptionCard}
+                    activeOpacity={0.75}
+                    onPress={() => handleSendGoogleOtp(profile.email)}
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          profile?.avatar ||
+                          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120',
+                      }}
+                      style={styles.accountAvatar}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.accountNameText}>
+                        {profile?.name || 'My Google Account'}
+                      </Text>
+                      <Text style={styles.accountEmailText}>{profile.email}</Text>
+                    </View>
+                    <View style={styles.deviceBadge}>
+                      <Text style={styles.deviceBadgeText}>
+                        <T>Quick Send</T>
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
+
+                <View style={styles.inputSectionCard}>
+                  <Text style={styles.inputSectionLabel}>
+                    <T>Your Mobile Gmail Address</T>
+                  </Text>
+                  <View style={styles.gmailInputRow}>
+                    <TextInput
+                      style={styles.gmailTextInput}
+                      placeholder="yourname@gmail.com"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      value={customGmailInput}
+                      onChangeText={setCustomGmailInput}
+                    />
+                    {customGmailInput.length > 0 && !customGmailInput.includes('@') && (
+                      <TouchableOpacity
+                        style={styles.quickAtPill}
+                        onPress={() =>
+                          setCustomGmailInput((prev) => `${prev.trim()}@gmail.com`)
+                        }
+                      >
+                        <Text style={styles.quickAtPillText}>+ @gmail.com</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.submitGmailBtn,
+                      (!customGmailInput.trim() || googleSending) &&
+                        styles.submitGmailBtnDisabled,
+                    ]}
+                    disabled={!customGmailInput.trim() || googleSending}
+                    activeOpacity={0.8}
+                    onPress={() => handleSendGoogleOtp()}
+                  >
+                    {googleSending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.submitGmailBtnText}>
+                        📨 <T>Send OTP & Continue</T>
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              /* STEP 2: Enter 6-digit OTP */
+              <View style={styles.inputSectionCard}>
+                <View style={styles.otpHeaderRow}>
+                  <Text style={styles.inputSectionLabel}>
+                    <T>Enter 6-digit OTP sent to:</T>
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setGoogleOtpStep('input')}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Text style={styles.changeEmailText}>
+                      <T>Change</T>
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.targetAccountHighlight}>
+                  {customGmailInput}
+                </Text>
+
+                <TextInput
+                  style={[styles.gmailTextInput, styles.otpTextInput]}
+                  placeholder="• • • • • •"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={googleOtp}
+                  onChangeText={setGoogleOtp}
+                  autoFocus
+                />
+
+                <View style={styles.resendRow}>
+                  {googleCountdown > 0 ? (
+                    <Text style={styles.resendTimerText}>
+                      <T>Resend OTP in</T> {googleCountdown}s
+                    </Text>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => handleSendGoogleOtp()}
+                      disabled={googleSending}
+                    >
+                      <Text style={styles.resendActionText}>
+                        <T>Resend OTP</T>
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.submitGmailBtn,
+                    (googleOtp.length !== 6 || googleVerifying) &&
+                      styles.submitGmailBtnDisabled,
+                  ]}
+                  disabled={googleOtp.length !== 6 || googleVerifying}
+                  activeOpacity={0.8}
+                  onPress={handleVerifyGoogleOtp}
+                >
+                  {googleVerifying ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitGmailBtnText}>
+                      ✅ <T>Verify OTP</T>
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ══ 2. FACEBOOK BINDING MODAL WITH MESSENGER OTP VERIFICATION ══ */}
+      <Modal
+        visible={fbChooserVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFbChooserVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.chooserOverlay}
+          activeOpacity={1}
+          onPress={() => setFbChooserVisible(false)}
+        >
+          <View
+            style={styles.chooserSheet}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.fbHeaderRow}>
+              <View style={styles.fbHeaderLeft}>
+                <View style={[styles.fbLogoCircle, { backgroundColor: '#0084FF' }]}>
+                  <MessengerIcon size={22} color="#FFFFFF" />
+                </View>
+                <View>
+                  <Text style={[styles.fbHeaderTitle, { color: '#0084FF' }]}>
+                    <T>Bind Facebook Account</T>
+                  </Text>
+                  <Text style={styles.fbHeaderSub}>
+                    <T>Facebook Messenger OTP Verification</T>
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setFbChooserVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.chooserCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {fbOtpStep === 'input' ? (
+              /* STEP 1: Enter Facebook ID or Username */
+              <>
+                <Text style={styles.fbIntroText}>
+                  <T>Enter your Facebook profile ID or username. We will deliver a 6-digit OTP directly to your Facebook Messenger.</T>
+                </Text>
+
+                <View style={styles.inputSectionCard}>
+                  <Text style={styles.inputSectionLabel}>
+                    <T>Facebook ID or Username</T>
+                  </Text>
+                  <TextInput
+                    style={styles.gmailTextInput}
+                    placeholder="e.g. rahul.sharma or fb-username"
+                    placeholderTextColor="#9CA3AF"
+                    autoCapitalize="none"
+                    value={fbAccountInput}
+                    onChangeText={setFbAccountInput}
+                  />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.messengerBtn,
+                      (!fbAccountInput.trim() || fbSending) && styles.submitGmailBtnDisabled,
+                    ]}
+                    disabled={!fbAccountInput.trim() || fbSending}
+                    activeOpacity={0.85}
+                    onPress={handleSendFbOtp}
+                  >
+                    {fbSending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <MessengerIcon size={20} color="#FFFFFF" />
+                        <Text style={styles.messengerBtnText}>
+                          <T>Get OTP on Messenger</T>
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              /* STEP 2: Enter 6-digit OTP from Messenger */
+              <View style={styles.inputSectionCard}>
+                <View style={styles.otpHeaderRow}>
+                  <Text style={styles.inputSectionLabel}>
+                    <T>Enter 6-digit OTP sent to your Messenger:</T>
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setFbOtpStep('input')}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Text style={styles.changeEmailText}>
+                      <T>Change</T>
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.targetAccountHighlight}>
+                  @{fbAccountInput}
+                </Text>
+
+                <TextInput
+                  style={[styles.gmailTextInput, styles.otpTextInput]}
+                  placeholder="• • • • • •"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={fbOtp}
+                  onChangeText={setFbOtp}
+                  autoFocus
+                />
+
+                {/* Check Messenger Re-open button */}
+                <TouchableOpacity
+                  style={styles.reopenMessengerBtn}
+                  activeOpacity={0.8}
+                  onPress={handleReopenMessenger}
+                >
+                  <MessengerIcon size={18} color="#0084FF" />
+                  <Text style={styles.reopenMessengerBtnText}>
+                    <T>Check Facebook Messenger</T>
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.resendRow}>
+                  {fbCountdown > 0 ? (
+                    <Text style={styles.resendTimerText}>
+                      <T>Resend OTP in</T> {fbCountdown}s
+                    </Text>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={handleSendFbOtp}
+                      disabled={fbSending}
+                    >
+                      <Text style={styles.resendActionText}>
+                        <T>Resend OTP</T>
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.submitGmailBtn,
+                    (fbOtp.length !== 6 || fbVerifying) && styles.submitGmailBtnDisabled,
+                  ]}
+                  disabled={fbOtp.length !== 6 || fbVerifying}
+                  activeOpacity={0.8}
+                  onPress={handleVerifyFbOtp}
+                >
+                  {fbVerifying ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitGmailBtnText}>
+                      ✅ <T>Verify OTP & Continue</T>
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ══ 3. TWITTER BINDING MODAL ══ */}
+      <Modal
+        visible={twChooserVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTwChooserVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.chooserOverlay}
+          activeOpacity={1}
+          onPress={() => setTwChooserVisible(false)}
+        >
+          <View
+            style={styles.chooserSheet}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.chooserHeaderRow}>
+              <View style={styles.chooserHeaderLeft}>
+                <TwitterCircleIcon size={28} />
+                <Text style={styles.chooserTitle}>
+                  <T>Bind Twitter Account</T>
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setTwChooserVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.chooserCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.chooserSubtitle}>
+              <T>Enter your Twitter @handle</T>
+            </Text>
+
+            <View style={styles.inputSectionCard}>
+              <Text style={styles.inputSectionLabel}>
+                <T>Twitter @handle</T>
+              </Text>
+              <TextInput
+                style={styles.gmailTextInput}
+                placeholder="@username"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                value={customTwInput}
+                onChangeText={setCustomTwInput}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.submitGmailBtn,
+                  !customTwInput.trim() && styles.submitGmailBtnDisabled,
+                ]}
+                disabled={!customTwInput.trim()}
+                activeOpacity={0.8}
+                onPress={handleTwSubmit}
+              >
+                <Text style={styles.submitGmailBtnText}>
+                  <T>Continue to Bind</T>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ══ 4. CONFIRMATION MODAL ("Are you sure do you want to bind...") ══ */}
+      <Modal
+        visible={confirmModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !loading && setConfirmModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.confirmOverlay}
+          activeOpacity={1}
+          onPress={() => !loading && setConfirmModalVisible(false)}
+        >
+          <View
+            style={styles.confirmCard}
+            onStartShouldSetResponder={() => true}
+          >
+            {/* Header Icon */}
+            <View style={styles.confirmIconWrap}>
+              {pendingBind?.provider === 'google' ? (
+                <GoogleCircleIcon size={46} />
+              ) : pendingBind?.provider === 'facebook' ? (
+                <FacebookCircleIcon size={46} />
+              ) : (
+                <TwitterCircleIcon size={46} />
+              )}
+            </View>
+
+            {/* Prompt Text requested by user */}
+            <Text style={styles.confirmPromptTitle}>
+              {pendingBind?.promptText}
+            </Text>
+
+            {/* Account Details Card */}
+            <View style={styles.accountPreviewCard}>
+              {pendingBind?.avatar ? (
+                <Image
+                  source={{ uri: pendingBind.avatar }}
+                  style={styles.previewAvatar}
+                />
+              ) : null}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.previewName}>{pendingBind?.name}</Text>
+                {pendingBind?.email ? (
+                  <Text style={styles.previewSub}>{pendingBind.email}</Text>
+                ) : pendingBind?.username ? (
+                  <Text style={styles.previewSub}>{pendingBind.username}</Text>
+                ) : null}
+              </View>
+            </View>
+
+            <Text style={styles.confirmHintText}>
+              <T>Once bound, you can log in directly without entering a password.</T>
+            </Text>
+
+            {/* Buttons Row */}
+            <View style={styles.confirmBtnRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                activeOpacity={0.8}
+                disabled={loading}
+                onPress={() => setConfirmModalVisible(false)}
+              >
+                <Text style={styles.cancelBtnText}>
+                  <T>Cancel</T>
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.yesBindBtn}
+                activeOpacity={0.8}
+                disabled={loading}
+                onPress={handleConfirmBinding}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.yesBindBtnText}>
+                    <T>Yes, Bind</T>
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      {/* ══ 5. UNBIND / REMOVE ACCOUNT BINDING CONFIRMATION MODAL ══ */}
+      <Modal
+        visible={unbindModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !loading && setUnbindModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.confirmOverlay}
+          activeOpacity={1}
+          onPress={() => !loading && setUnbindModalVisible(false)}
+        >
+          <View
+            style={styles.confirmCard}
+            onStartShouldSetResponder={() => true}
+          >
+            {/* Header Icon */}
+            <View style={styles.confirmIconWrap}>
+              {pendingUnbind?.provider === 'google' ? (
+                <GoogleCircleIcon size={46} />
+              ) : pendingUnbind?.provider === 'facebook' ? (
+                <FacebookCircleIcon size={46} />
+              ) : pendingUnbind?.provider === 'twitter' ? (
+                <TwitterCircleIcon size={46} />
+              ) : (
+                <PhoneCircleIcon size={46} />
+              )}
+            </View>
+
+            {/* Prompt requested by user */}
+            <Text style={styles.confirmPromptTitle}>
+              <T>Are you sure do you want to remove this account binding?</T>
+            </Text>
+
+            {/* Account Details Card */}
+            <View style={styles.accountPreviewCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.previewName}>{pendingUnbind?.label}</Text>
+                <Text style={styles.previewSub}>{pendingUnbind?.value}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.confirmHintText}>
+              <T>Removing this binding will disconnect this login method from your account.</T>
+            </Text>
+
+            {/* Buttons Row */}
+            <View style={styles.confirmBtnRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                activeOpacity={0.8}
+                disabled={loading}
+                onPress={() => setUnbindModalVisible(false)}
+              >
+                <Text style={styles.cancelBtnText}>
+                  <T>Cancel</T>
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.removeBindBtn}
+                activeOpacity={0.8}
+                disabled={loading}
+                onPress={handleConfirmUnbind}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.removeBindBtnText}>
+                    <T>Yes, Remove</T>
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F0F0F2',
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    textAlign: 'center',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 6,
+  },
+  listContainer: {
+    backgroundColor: '#FFFFFF',
+  },
+  rowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 62,
+  },
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  rowLabelText: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#1C1C1E',
+    marginLeft: 14,
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '48%',
+  },
+  statusText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginRight: 8,
+  },
+  statusTextBound: {
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  rowDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#F0F0F2',
+    marginLeft: 66,
+  },
+
+  // Chooser Bottom Sheet
+  chooserOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  chooserSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+  },
+  chooserHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  chooserHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  chooserTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  chooserCloseBtn: {
+    fontSize: 18,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  chooserSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 16,
+    marginLeft: 38,
+  },
+  accountOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#F9FAFB',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  accountAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  accountNameText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  accountEmailText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  deviceBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#EEF2FF',
+  },
+  deviceBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
+
+  // Direct Input Section Card
+  inputSectionCard: {
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 4,
+  },
+  inputSectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  gmailInputRow: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  gmailTextInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 15,
+    color: '#111827',
+  },
+  otpTextInput: {
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 8,
+    marginTop: 6,
+  },
+  quickAtPill: {
+    position: 'absolute',
+    right: 8,
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  quickAtPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4338CA',
+  },
+  submitGmailBtn: {
+    marginTop: 14,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitGmailBtnDisabled: {
+    backgroundColor: '#93C5FD',
+  },
+  submitGmailBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // OTP Verification view styles
+  otpHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  changeEmailText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
+  targetAccountHighlight: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 10,
+  },
+  resendRow: {
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  resendTimerText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  resendActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+
+  // Confirm Modal
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmCard: {
+    width: '90%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 24,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  confirmIconWrap: {
+    marginBottom: 14,
+  },
+  confirmPromptTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 24,
+  },
+  accountPreviewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 12,
+  },
+  previewAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+  },
+  previewName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  previewSub: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  confirmHintText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  confirmBtnRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  yesBindBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  yesBindBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  removeBindBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeBindBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // Facebook 1-Tap Styles
+  fbHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  fbHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  fbLogoCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#1877F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fbHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1877F2',
+  },
+  fbHeaderSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 1,
+  },
+  fbIntroText: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  fbProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#F0F2F5',
+    borderWidth: 1,
+    borderColor: '#E4E6EB',
+    marginBottom: 16,
+  },
+  fbProfileAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
+  },
+  fbProfileName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#050505',
+  },
+  fbProfileStatus: {
+    fontSize: 12,
+    color: '#1877F2',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  switchAccountInputWrap: {
+    marginBottom: 16,
+  },
+  fbContinueBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#1877F2',
+    paddingVertical: 14,
+    borderRadius: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#1877F2',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  fbContinueBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  fbSecondaryLink: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  fbSecondaryLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1877F2',
+  },
+  fbDisclaimerText: {
+    fontSize: 11,
+    color: '#8A8D91',
+    textAlign: 'center',
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  messengerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0084FF',
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  messengerBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  reopenMessengerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#E7F3FF',
+    marginBottom: 12,
+  },
+  reopenMessengerBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0084FF',
+  },
+
+  // Phone WhatsApp Direct Verification Styles
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  countryCodeBadge: {
+    paddingHorizontal: 12,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countryCodeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  waVerifyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#25D366',
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  waVerifyBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  waSuccessCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
+  },
+  waSuccessHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  waSuccessTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  waSuccessDesc: {
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  waCodeBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#22C55E',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  waCodeBoxText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#15803D',
+    letterSpacing: 0.5,
+  },
+  reopenWaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#DCFCE7',
+    marginBottom: 12,
+  },
+  reopenWaBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  waConfirmBtn: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waConfirmBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+});

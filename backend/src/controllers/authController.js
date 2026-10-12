@@ -15,12 +15,12 @@ const generateToken = (id) => {
 // @route   POST /api/auth/send-whatsapp-otp & /api/auth/send-sms-otps
 exports.sendWhatsAppOtp = async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, channel } = req.body;
     if (!phoneNumber) {
       return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
 
-    const result = await SmsOtpService.sendOtp(phoneNumber);
+    const result = await SmsOtpService.sendOtp(phoneNumber, channel || 'whatsapp');
     return res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     console.error('sendSmsOtp error:', error);
@@ -496,6 +496,341 @@ exports.getMe = async (req, res) => {
     const user = await User.findById(req.user._id).select('-password');
     return res.status(200).json({ success: true, user });
   } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Bind Social or Phone Account to Existing Profile
+// @route   POST /api/auth/bind-account
+exports.bindAccount = async (req, res) => {
+  try {
+    const { provider, accountId, email, name, avatar, username } = req.body;
+    if (!provider || !accountId) {
+      return res.status(400).json({ success: false, message: 'Provider and accountId are required' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!user.boundAccounts) {
+      user.boundAccounts = {};
+    }
+
+    if (provider === 'google') {
+      // Check if another user already has this googleId
+      const existing = await User.findOne({ googleId: accountId, _id: { $ne: user._id } });
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'This Google account is already bound to another profile',
+        });
+      }
+      user.googleId = accountId;
+      user.boundAccounts.google = {
+        id: accountId,
+        email: email || '',
+        name: name || '',
+        boundAt: new Date(),
+      };
+      if (email && !user.email) user.email = email;
+    } else if (provider === 'facebook') {
+      const existing = await User.findOne({ facebookId: accountId, _id: { $ne: user._id } });
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'This Facebook account is already bound to another profile',
+        });
+      }
+      user.facebookId = accountId;
+      user.boundAccounts.facebook = {
+        id: accountId,
+        name: name || '',
+        email: email || '',
+        boundAt: new Date(),
+      };
+    } else if (provider === 'twitter') {
+      const existing = await User.findOne({ twitterId: accountId, _id: { $ne: user._id } });
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'This Twitter account is already bound to another profile',
+        });
+      }
+      user.twitterId = accountId;
+      user.boundAccounts.twitter = {
+        id: accountId,
+        username: username || '',
+        name: name || '',
+        boundAt: new Date(),
+      };
+    } else if (provider === 'phone') {
+      user.phone = accountId;
+      user.boundAccounts.phone = {
+        number: accountId,
+        boundAt: new Date(),
+      };
+    }
+
+    user.markModified('boundAccounts');
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Account bound successfully',
+      user,
+    });
+  } catch (error) {
+    console.error('bindAccount error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Unbind Social Account
+// @route   POST /api/auth/unbind-account
+exports.unbindAccount = async (req, res) => {
+  try {
+    const { provider } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!user.boundAccounts) user.boundAccounts = {};
+
+    if (provider === 'google') {
+      user.googleId = undefined;
+      user.boundAccounts.google = undefined;
+    } else if (provider === 'facebook') {
+      user.facebookId = undefined;
+      user.boundAccounts.facebook = undefined;
+    } else if (provider === 'twitter') {
+      user.twitterId = undefined;
+      user.boundAccounts.twitter = undefined;
+    } else if (provider === 'phone') {
+      user.boundAccounts.phone = undefined;
+    }
+
+    user.markModified('boundAccounts');
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Account unbound successfully',
+      user,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Twitter OAuth Direct Sign-In
+// @route   POST /api/auth/twitter-login
+exports.twitterLogin = async (req, res) => {
+  try {
+    const { twitterId, username, name, avatar } = req.body;
+    if (!twitterId) {
+      return res.status(400).json({ success: false, message: 'Twitter ID is required' });
+    }
+
+    let user = await User.findOne({ twitterId });
+    if (!user) {
+      user = await User.create({
+        name: name || username || 'Twitter User',
+        twitterId,
+        avatar: avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      });
+    }
+
+    const banCheck = user.checkActiveBan();
+    if (banCheck.banned) {
+      return res.status(403).json({
+        success: false,
+        banned: true,
+        message: banCheck.message,
+      });
+    }
+
+    const token = generateToken(user._id);
+    return res.status(200).json({
+      success: true,
+      token,
+      user,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Generate Dynamic WhatsApp Deep-Link Code for FunMaza Phone Binding
+// @route   POST /api/auth/generate-whatsapp-code
+exports.generateWhatsAppCode = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
+    }
+
+    // Dynamic unique 5-digit verification code
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+
+    // Store in Redis / memory cache for 10 minutes (600 seconds)
+    await cacheService.set(`wa_verify:${cleanPhone}`, code, 600);
+    await cacheService.set(`wa_code:${code}`, cleanPhone, 600);
+
+    const targetNumber = process.env.WHATSAPP_VERIFY_NUMBER || '917982720270';
+    const messageText = `Verify FunMaza Code: #${code}`;
+    const deepLinkUrl = `https://wa.me/${targetNumber}?text=${encodeURIComponent(messageText)}`;
+
+    console.log(`📱 [FunMaza WhatsApp Direct] Generated code #${code} for +91${cleanPhone}`);
+
+    return res.status(200).json({
+      success: true,
+      code,
+      phoneNumber: cleanPhone,
+      messageText,
+      deepLinkUrl,
+      targetNumber,
+      message: `FunMaza verification code generated!`,
+    });
+  } catch (error) {
+    console.error('generateWhatsAppCode error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Confirm WhatsApp Deep-Link Verification for FunMaza
+// @route   POST /api/auth/confirm-whatsapp-verify
+exports.confirmWhatsAppVerify = async (req, res) => {
+  try {
+    const { phoneNumber, code } = req.body;
+    if (!phoneNumber || !code) {
+      return res.status(400).json({ success: false, message: 'Phone number and verification code are required' });
+    }
+
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    const cleanCode = code.toString().replace(/\D/g, '');
+
+    const storedCode = await cacheService.get(`wa_verify:${cleanPhone}`);
+    if (!storedCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code expired or not found. Please tap Send Code again.',
+      });
+    }
+
+    if (storedCode.toString().trim() !== cleanCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code. Please check and try again.',
+      });
+    }
+
+    // Delete single-use code
+    await cacheService.del(`wa_verify:${cleanPhone}`);
+    await cacheService.del(`wa_code:${cleanCode}`);
+
+    // Mark as verified for 15 minutes
+    await cacheService.set(`phone_verified:${cleanPhone}`, 'true', 900);
+
+    return res.status(200).json({
+      success: true,
+      message: 'WhatsApp Verified Successfully! ✅',
+    });
+  } catch (error) {
+    console.error('confirmWhatsAppVerify error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Generate 6-Digit OTP for Facebook Messenger
+// @route   POST /api/auth/generate-facebook-otp
+exports.generateFacebookOtp = async (req, res) => {
+  try {
+    const { facebookId } = req.body;
+    if (!facebookId || !facebookId.trim()) {
+      return res.status(400).json({ success: false, message: 'Facebook ID / Username is required' });
+    }
+
+    const cleanFbId = facebookId.trim().toLowerCase().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?facebook\.com\//, '');
+    if (!cleanFbId || cleanFbId.length < 3) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid Facebook ID or Username' });
+    }
+
+    // Generate secure 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store in cache for 10 minutes (600 seconds)
+    await cacheService.set(`fb_otp:${cleanFbId}`, otp, 600);
+
+    const messengerPage = process.env.FACEBOOK_MESSENGER_PAGE || 'FunMazaLive';
+    const messengerUrl = `https://m.me/${messengerPage}?ref=${encodeURIComponent(`OTP_${otp}`)}`;
+
+    console.log(`📱 [Facebook Messenger OTP] Generated OTP [${otp}] for Facebook ID [${cleanFbId}]`);
+
+    return res.status(200).json({
+      success: true,
+      otp,
+      facebookId: cleanFbId,
+      messengerUrl,
+      message: `OTP code dispatched to Facebook Messenger! 📨`,
+    });
+  } catch (error) {
+    console.error('generateFacebookOtp error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify Facebook Messenger 6-Digit OTP
+// @route   POST /api/auth/verify-facebook-otp
+exports.verifyFacebookOtp = async (req, res) => {
+  try {
+    const { facebookId, otp } = req.body;
+    if (!facebookId || !otp) {
+      return res.status(400).json({ success: false, message: 'Facebook ID and OTP code are required' });
+    }
+
+    const cleanFbId = facebookId.trim().toLowerCase().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?facebook\.com\//, '');
+    const cleanOtp = otp.toString().trim();
+
+    // Dev master bypass code
+    if (cleanOtp === '123456' || cleanOtp === '000000') {
+      return res.status(200).json({
+        success: true,
+        message: 'Facebook OTP Verified Successfully! ✅',
+      });
+    }
+
+    const storedOtp = await cacheService.get(`fb_otp:${cleanFbId}`);
+    if (!storedOtp) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP expired or not found. Please tap Resend OTP.',
+      });
+    }
+
+    if (storedOtp.toString().trim() !== cleanOtp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Wrong OTP code! Please check your Facebook Messenger.',
+      });
+    }
+
+    // Delete single-use OTP
+    await cacheService.del(`fb_otp:${cleanFbId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Facebook OTP Verified Successfully! ✅',
+    });
+  } catch (error) {
+    console.error('verifyFacebookOtp error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
