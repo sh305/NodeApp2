@@ -4,16 +4,19 @@ import { WebView } from 'react-native-webview';
 import AnimatedSeatEmoji from './AnimatedSeatEmoji';
 import { getUserLevelSvg } from '../constants/userLevelSvgFrames';
 import { getLevelTierInfo } from '../constants/userLevelSystem';
+import { getLudoFrameSkin } from '../constants/ludoFrameAssets';
 
 export default function AvatarWithFrame({
   avatarUri,
   level = 1,
   size = 54,
+  frame = null,
   frameName = '',
   showLevelBadge = false,
   activeEmoji = null,
   onEmojiComplete = null,
   style,
+  avatarStyle,
   disableSvgFrame = false,
 }) {
   const safeLevel = Math.max(1, Math.min(100, Math.floor(Number(level) || 1)));
@@ -33,6 +36,24 @@ export default function AvatarWithFrame({
   // Avatar top-left position
   const avatarLeft = Math.round(avatarCenterX - size / 2);
   const avatarTop = Math.round(avatarCenterY - size / 2);
+
+  // Check if a custom store frame (e.g. Ludo frame) is equipped
+  const customFrameSkin = useMemo(() => {
+    if (!frame) return null;
+    const frameId = typeof frame === 'string' ? frame : frame?.id;
+    // Default level frame strings are not custom store frames
+    if (frameId && (frameId.startsWith('level_') || frameId === 'level_01')) {
+      return null;
+    }
+    const skin = getLudoFrameSkin(frame);
+    if (skin?.image) return skin;
+    if (frame?.image) return frame;
+    return null;
+  }, [frame]);
+
+  const customFrameSize = Math.round(size * 1.55);
+  const customFrameLeft = Math.round(avatarCenterX - customFrameSize / 2);
+  const customFrameTop = Math.round(avatarCenterY - customFrameSize / 2);
 
   // Load raw SVG XML for the user's current level (1 to 100)
   const rawSvgXml = useMemo(() => {
@@ -125,8 +146,29 @@ export default function AvatarWithFrame({
         )}
       </View>
 
-      {/* 2. Vector Animated Level Frame (100% Exact SVG Animations on Android, iOS & Web) */}
-      {!disableSvgFrame && rawSvgXml && (
+      {/* 2. Custom Store Frame (e.g. 3D Ludo Frame) sitting right on the avatar border */}
+      {customFrameSkin && (
+        <Image
+          source={
+            typeof customFrameSkin.image === 'string'
+              ? { uri: customFrameSkin.image }
+              : customFrameSkin.image
+          }
+          style={{
+            position: 'absolute',
+            width: customFrameSize,
+            height: customFrameSize,
+            left: customFrameLeft,
+            top: customFrameTop,
+            zIndex: 10,
+          }}
+          resizeMode="contain"
+          pointerEvents="none"
+        />
+      )}
+
+      {/* 3. By-Default Vector Animated Level Frame (when no custom store frame is equipped) */}
+      {!customFrameSkin && !disableSvgFrame && rawSvgXml && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
           {Platform.OS === 'web' ? (
             /* Direct DOM HTML injection for Web: executes native browser SMIL animations */
@@ -210,6 +252,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#1E1E2E',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,

@@ -422,7 +422,7 @@ export default function MeProfileView({
           }
         }}
       >
-        {/* User Avatar with Equipped Frame */}
+        {/* User Avatar with Equipped Frame or Default Level Frame */}
         <UserAvatarWithFrame
           avatarUri={
             profile?.avatar ||
@@ -430,7 +430,16 @@ export default function MeProfileView({
             'https://api.dicebear.com/7.x/bottts/png?seed=' +
               encodeURIComponent(profile?.name || currentUser?.name || 'User')
           }
-          frame={equippedFrame || profile?.activeFrame || currentUser?.activeFrame}
+          frame={
+            equippedFrame && equippedFrame.id && !equippedFrame.id.startsWith('level_')
+              ? equippedFrame
+              : profile?.activeFrame && !profile.activeFrame.id?.startsWith('level_')
+              ? profile.activeFrame
+              : currentUser?.activeFrame && !currentUser.activeFrame.id?.startsWith('level_')
+              ? currentUser.activeFrame
+              : null
+          }
+          level={profile?.wealthLevel || profile?.level || currentUser?.wealthLevel || 1}
           size={66}
         />
 

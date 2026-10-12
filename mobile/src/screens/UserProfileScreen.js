@@ -868,14 +868,25 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
 
           {/* Hero Avatar & CP Area */}
           <View style={styles.heroAvatarArea}>
-            {/* User Avatar Circle with Equipped Frame */}
+            {/* User Avatar Circle with Equipped Frame or Default Level Frame */}
             <UserAvatarWithFrame
               avatarUri={
                 profile.avatar ||
                 'https://api.dicebear.com/7.x/bottts/png?seed=' +
                   encodeURIComponent(profile.name || 'User')
               }
-              frame={isSelf ? (equippedFrame || profile.activeFrame) : profile.activeFrame}
+              frame={
+                isSelf
+                  ? (equippedFrame && equippedFrame.id && !equippedFrame.id.startsWith('level_')
+                      ? equippedFrame
+                      : (profile?.activeFrame && !profile.activeFrame.id?.startsWith('level_')
+                          ? profile.activeFrame
+                          : null))
+                  : (profile?.activeFrame && !profile.activeFrame.id?.startsWith('level_')
+                      ? profile.activeFrame
+                      : null)
+              }
+              level={profile.wealthLevel || profile.level || 1}
               size={76}
             />
 
@@ -1380,7 +1391,18 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
                     'https://api.dicebear.com/7.x/bottts/png?seed=' +
                       encodeURIComponent(editName || 'User')
                   }
-                  frame={isSelf ? (equippedFrame || profile.activeFrame) : profile.activeFrame}
+                  frame={
+                    isSelf
+                      ? (equippedFrame && equippedFrame.id && !equippedFrame.id.startsWith('level_')
+                          ? equippedFrame
+                          : (profile?.activeFrame && !profile.activeFrame.id?.startsWith('level_')
+                              ? profile.activeFrame
+                              : null))
+                      : (profile?.activeFrame && !profile.activeFrame.id?.startsWith('level_')
+                          ? profile.activeFrame
+                          : null)
+                  }
+                  level={profile.wealthLevel || profile.level || 1}
                   size={86}
                 />
               </TouchableOpacity>
