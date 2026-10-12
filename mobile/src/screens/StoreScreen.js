@@ -22,6 +22,9 @@ import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
 import { DICE_ITEMS_LIST, getEquippedDice, saveEquippedDice } from '../constants/diceAssets';
+import { LUDO_BOARD_ITEMS_LIST, getEquippedLudoBoard, saveEquippedLudoBoard } from '../constants/ludoBoardAssets';
+import { LUDO_PIECE_ITEMS_LIST, getEquippedLudoPiece, saveEquippedLudoPiece } from '../constants/ludoPieceAssets';
+import { LUDO_FRAME_ITEMS_LIST, getEquippedLudoFrame, saveEquippedLudoFrame } from '../constants/ludoFrameAssets';
 
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40) / 2;
@@ -491,88 +494,11 @@ const STORE_DATA = {
 const GAME_COINS_STORE_DATA = {
   Dice: DICE_ITEMS_LIST,
 
-  Pieces: [
-    {
-      id: 'gc_piece_gold_king',
-      name: 'Royal Gold King',
-      price: '2800',
-      isNew: true,
-      image: 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=300',
-    },
-    {
-      id: 'gc_piece_ruby_crown',
-      name: 'Ruby Crown Token',
-      price: '5600',
-      isNew: true,
-      image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300',
-    },
-    {
-      id: 'gc_piece_emerald_jade',
-      name: 'Emerald Jade Pawn',
-      price: '8800',
-      isNew: false,
-      image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300',
-    },
-    {
-      id: 'gc_piece_frost_crystal',
-      name: 'Frost Crystal Token',
-      price: '11600',
-      isNew: false,
-      image: 'https://images.unsplash.com/photo-1516339901601-2e1b62dc0c45?w=300',
-    },
-    {
-      id: 'gc_piece_cyber_neon',
-      name: 'Cyber Neon Piece',
-      price: '17400',
-      isNew: true,
-      image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=300',
-    },
-    {
-      id: 'gc_piece_cosmic_galaxy',
-      name: 'Cosmic Galaxy Pawn',
-      price: '24800',
-      isNew: false,
-      image: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=300',
-    },
-    {
-      id: 'gc_piece_shadow_obsidian',
-      name: 'Shadow Obsidian Pawn',
-      price: '34000',
-      isNew: false,
-      image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=300',
-    },
-    {
-      id: 'gc_piece_fire_dragon',
-      name: 'Fire Dragon Token',
-      price: '48000',
-      isNew: true,
-      image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=300',
-    },
-  ],
+  Pieces: LUDO_PIECE_ITEMS_LIST,
 
-  Background: [
-    {
-      id: 'gc_bg_island',
-      name: 'Island',
-      price: '5820',
-      image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300',
-    },
-    {
-      id: 'gc_bg_castle',
-      name: 'Castle',
-      price: '29280',
-      image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=300',
-    },
-  ],
+  Background: LUDO_BOARD_ITEMS_LIST,
 
-  Frame: [
-    {
-      id: 'gc_frame_ludo',
-      name: 'Ludo Frame',
-      price: '3500',
-      image: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=300',
-    },
-  ],
+  Frame: LUDO_FRAME_ITEMS_LIST,
 
   'Text Bubble': [
     {
@@ -592,21 +518,25 @@ const GAME_COINS_STORE_DATA = {
 
 // "All" sub-tab combines items matching Screenshot 1
 GAME_COINS_STORE_DATA.All = [
-  GAME_COINS_STORE_DATA.Pieces[0], // Royal Gold King
-  GAME_COINS_STORE_DATA.Frame[0], // Ludo Frame
-  GAME_COINS_STORE_DATA.Dice[0], // Classic Ruby Dice
-  GAME_COINS_STORE_DATA.Background[0], // Island
-  GAME_COINS_STORE_DATA.Dice[1], // Golden King Dice
-  GAME_COINS_STORE_DATA.Pieces[1], // Ruby Crown Token
-  GAME_COINS_STORE_DATA.Dice[2], // Frost Crystal Dice
-  GAME_COINS_STORE_DATA.Dice[3], // Emerald Dragon Dice
-  GAME_COINS_STORE_DATA.Pieces[2], // Emerald Jade Pawn
-  GAME_COINS_STORE_DATA.Pieces[3], // Frost Crystal Token
-  GAME_COINS_STORE_DATA.Background[1], // Castle
-  GAME_COINS_STORE_DATA.Dice[4], // Neon Cyber Dice
-  GAME_COINS_STORE_DATA.Dice[5], // Cosmic Starry Dice
-  GAME_COINS_STORE_DATA.Pieces[4], // Cyber Neon Piece
-  GAME_COINS_STORE_DATA.Pieces[5], // Cosmic Galaxy Pawn
+  GAME_COINS_STORE_DATA.Pieces[0], // Royal King
+  GAME_COINS_STORE_DATA.Frame[0], // Ludo Champion Frame
+  GAME_COINS_STORE_DATA.Dice[0], // Ice Dice
+  GAME_COINS_STORE_DATA.Background[1], // Royal Palace Board
+  GAME_COINS_STORE_DATA.Dice[1], // Faith Dice
+  GAME_COINS_STORE_DATA.Pieces[1], // Majestic Lion
+  GAME_COINS_STORE_DATA.Frame[1], // Cyber Neon Frame
+  GAME_COINS_STORE_DATA.Dice[2], // Starry Sky Dice
+  GAME_COINS_STORE_DATA.Dice[3], // Warrior Dice
+  GAME_COINS_STORE_DATA.Pieces[2], // Royal Elephant
+  GAME_COINS_STORE_DATA.Pieces[3], // Royal Peacock
+  GAME_COINS_STORE_DATA.Background[4], // Cyber Neon Board
+  GAME_COINS_STORE_DATA.Frame[2], // Royal Emperor Frame
+  GAME_COINS_STORE_DATA.Dice[4], // Electronic Dice
+  GAME_COINS_STORE_DATA.Dice[5], // Dragon Ball Dice
+  GAME_COINS_STORE_DATA.Frame[3], // Victory Star Frame
+  GAME_COINS_STORE_DATA.Pieces[4], // Princess Doll
+  GAME_COINS_STORE_DATA.Pieces[5], // Chintoo Bird
+  GAME_COINS_STORE_DATA.Frame[4], // Fantasy Rainbow Frame
 ];
 
 // Sub-categories list for Coins
@@ -652,10 +582,12 @@ export default function StoreScreen({ navigation, currentUser }) {
   const [selectedTierIndex, setSelectedTierIndex] = useState(0);
   const [buyCurrency, setBuyCurrency] = useState('coins'); // 'coins' | 'gameCoins'
 
-  // Owned Items, Equipped Dice & Equipped Piece Persistence State
+  // Owned Items, Equipped Dice, Equipped Piece, Background & Frame State
   const [ownedItemIds, setOwnedItemIds] = useState([]);
   const [equippedDiceId, setEquippedDiceId] = useState(null);
   const [equippedPieceId, setEquippedPieceId] = useState(null);
+  const [equippedBgId, setEquippedBgId] = useState(null);
+  const [equippedFrameId, setEquippedFrameId] = useState(null);
 
   // Apply / Equip Confirmation Modal State
   const [applyModalVisible, setApplyModalVisible] = useState(false);
@@ -676,10 +608,17 @@ export default function StoreScreen({ navigation, currentUser }) {
       if (storedDice?.id) {
         setEquippedDiceId(storedDice.id);
       }
-      const storedPiece = await AsyncStorage.getItem('@equipped_piece');
-      if (storedPiece) {
-        const parsed = JSON.parse(storedPiece);
-        if (parsed?.id) setEquippedPieceId(parsed.id);
+      const storedPiece = await getEquippedLudoPiece();
+      if (storedPiece?.id) {
+        setEquippedPieceId(storedPiece.id);
+      }
+      const storedBg = await getEquippedLudoBoard();
+      if (storedBg?.id) {
+        setEquippedBgId(storedBg.id);
+      }
+      const storedFrame = await getEquippedLudoFrame();
+      if (storedFrame?.id) {
+        setEquippedFrameId(storedFrame.id);
       }
     } catch (_) {}
   };
@@ -749,19 +688,21 @@ export default function StoreScreen({ navigation, currentUser }) {
   // Equip item directly (from "Use it" button)
   const handleEquipItem = async (targetItem) => {
     const isPiece = activeSubTab === 'Pieces' || targetItem.id.startsWith('gc_piece_');
+    const isBg = activeSubTab === 'Background' || targetItem.id.startsWith('gc_bg_');
+    const isFrame = activeSubTab === 'Frame' || targetItem.id.startsWith('gc_frame_');
+
     if (isPiece) {
       setEquippedPieceId(targetItem.id);
-      try {
-        await AsyncStorage.setItem(
-          '@equipped_piece',
-          JSON.stringify({
-            id: targetItem.id,
-            name: targetItem.name,
-            image: targetItem.image,
-          })
-        );
-      } catch (_) {}
+      await saveEquippedLudoPiece(targetItem);
       showToast(t('Piece equipped successfully!'), 'success');
+    } else if (isBg) {
+      setEquippedBgId(targetItem.id);
+      await saveEquippedLudoBoard(targetItem);
+      showToast(t('Background equipped successfully!'), 'success');
+    } else if (isFrame) {
+      setEquippedFrameId(targetItem.id);
+      await saveEquippedLudoFrame(targetItem);
+      showToast(t('Frame equipped successfully!'), 'success');
     } else {
       setEquippedDiceId(targetItem.id);
       await saveEquippedDice(targetItem);
@@ -769,7 +710,7 @@ export default function StoreScreen({ navigation, currentUser }) {
     }
   };
 
-  // Helper to handle post-purchase state & show Apply prompt if it's a dice or piece
+  // Helper to handle post-purchase state & show Apply prompt if it's a dice, piece, background or frame
   const onPurchaseSuccess = async (purchasedItem) => {
     setBuyModalVisible(false);
     const newOwned = Array.from(new Set([...ownedItemIds, purchasedItem.id]));
@@ -780,8 +721,10 @@ export default function StoreScreen({ navigation, currentUser }) {
 
     const isDice = activeSubTab === 'Dice' || purchasedItem.id.startsWith('gc_dice_');
     const isPiece = activeSubTab === 'Pieces' || purchasedItem.id.startsWith('gc_piece_');
+    const isBg = activeSubTab === 'Background' || purchasedItem.id.startsWith('gc_bg_');
+    const isFrame = activeSubTab === 'Frame' || purchasedItem.id.startsWith('gc_frame_');
 
-    if (isDice || isPiece) {
+    if (isDice || isPiece || isBg || isFrame) {
       setPendingApplyItem(purchasedItem);
       setApplyModalVisible(true);
     } else {
@@ -793,22 +736,27 @@ export default function StoreScreen({ navigation, currentUser }) {
   const handleApplyYes = async () => {
     if (!pendingApplyItem) return;
     const isPiece = activeSubTab === 'Pieces' || pendingApplyItem.id.startsWith('gc_piece_');
+    const isBg = activeSubTab === 'Background' || pendingApplyItem.id.startsWith('gc_bg_');
+    const isFrame = activeSubTab === 'Frame' || pendingApplyItem.id.startsWith('gc_frame_');
 
     if (isPiece) {
       setEquippedPieceId(pendingApplyItem.id);
-      try {
-        await AsyncStorage.setItem(
-          '@equipped_piece',
-          JSON.stringify({
-            id: pendingApplyItem.id,
-            name: pendingApplyItem.name,
-            image: pendingApplyItem.image,
-          })
-        );
-      } catch (_) {}
+      await saveEquippedLudoPiece(pendingApplyItem);
       setApplyModalVisible(false);
       setPendingApplyItem(null);
       showToast(t('Piece equipped successfully!'), 'success');
+    } else if (isBg) {
+      setEquippedBgId(pendingApplyItem.id);
+      await saveEquippedLudoBoard(pendingApplyItem);
+      setApplyModalVisible(false);
+      setPendingApplyItem(null);
+      showToast(t('Background equipped successfully!'), 'success');
+    } else if (isFrame) {
+      setEquippedFrameId(pendingApplyItem.id);
+      await saveEquippedLudoFrame(pendingApplyItem);
+      setApplyModalVisible(false);
+      setPendingApplyItem(null);
+      showToast(t('Frame equipped successfully!'), 'success');
     } else {
       setEquippedDiceId(pendingApplyItem.id);
       await saveEquippedDice(pendingApplyItem);
@@ -823,10 +771,24 @@ export default function StoreScreen({ navigation, currentUser }) {
     const isPiece =
       pendingApplyItem &&
       (activeSubTab === 'Pieces' || pendingApplyItem.id.startsWith('gc_piece_'));
+    const isBg =
+      pendingApplyItem &&
+      (activeSubTab === 'Background' || pendingApplyItem.id.startsWith('gc_bg_'));
+    const isFrame =
+      pendingApplyItem &&
+      (activeSubTab === 'Frame' || pendingApplyItem.id.startsWith('gc_frame_'));
     setApplyModalVisible(false);
     setPendingApplyItem(null);
     showToast(
-      t(isPiece ? 'Piece added to your collection!' : 'Dice added to your collection!'),
+      t(
+        isPiece
+          ? 'Piece added to your collection!'
+          : isBg
+          ? 'Background added to your collection!'
+          : isFrame
+          ? 'Frame added to your collection!'
+          : 'Dice added to your collection!'
+      ),
       'info'
     );
   };
@@ -933,6 +895,17 @@ export default function StoreScreen({ navigation, currentUser }) {
       typeof item.image === 'string' ? { uri: item.image } : item.image;
     const isGameCoins = activeCurrencyTab === 'Game Coins';
     const isDice = item?.id?.startsWith('gc_dice_') || (isGameCoins && activeSubTab === 'Dice');
+    const isBg = item?.id?.startsWith('gc_bg_') || (isGameCoins && activeSubTab === 'Background');
+    const isPiece = item?.id?.startsWith('gc_piece_') || (isGameCoins && activeSubTab === 'Pieces');
+    const isFrame = item?.id?.startsWith('gc_frame_') || (isGameCoins && activeSubTab === 'Frame');
+
+    const isEquipped =
+      isGameCoins &&
+      (equippedDiceId === item.id ||
+        equippedPieceId === item.id ||
+        equippedBgId === item.id ||
+        equippedFrameId === item.id ||
+        item.status === 'in_use');
 
     return (
       <View style={styles.card}>
@@ -964,15 +937,53 @@ export default function StoreScreen({ navigation, currentUser }) {
 
         {/* Center Preview Image */}
         <TouchableOpacity
-          style={[styles.imageWrap, isDice && styles.diceImageWrap]}
+          style={[
+            styles.imageWrap,
+            isDice && styles.diceImageWrap,
+            isBg && styles.bgImageWrap,
+            isPiece && styles.pieceImageWrap,
+            isFrame && styles.frameImageWrap,
+          ]}
           activeOpacity={0.85}
           onPress={() => handlePlayPress(item)}
         >
-          <Image
-            source={imageSource}
-            style={[styles.itemImage, isDice && styles.diceItemImage]}
-            resizeMode="contain"
-          />
+          {isFrame ? (
+            <View style={styles.frameCardInnerWrap}>
+              {/* Sample avatar circle underneath */}
+              <View style={styles.frameCardAvatarCircle}>
+                <Image
+                  source={{
+                    uri:
+                      currentUser?.avatar ||
+                      'https://api.dicebear.com/7.x/bottts/png?seed=User',
+                  }}
+                  style={styles.frameCardAvatarImg}
+                />
+              </View>
+              {/* 3D Ludo Frame on top */}
+              <Image
+                source={imageSource}
+                style={styles.frameCardOverlayImg}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Image
+              source={imageSource}
+              style={[
+                styles.itemImage,
+                isDice && styles.diceItemImage,
+                isBg && styles.bgItemImage,
+                isPiece && styles.pieceItemImage,
+              ]}
+              resizeMode={isPiece ? 'contain' : isBg ? 'cover' : 'contain'}
+            />
+          )}
+          {isPiece && (
+            <View style={styles.pieceFourDotTag}>
+              <Text style={styles.pieceFourDotText}>🔴🟢🟡🔵</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* Item Title */}
@@ -980,10 +991,8 @@ export default function StoreScreen({ navigation, currentUser }) {
           <T>{item.name}</T>
         </Text>
 
-
-
         {/* Button Pill: "In Use" | "Use it" | Price Pill */}
-        {isGameCoins && (equippedDiceId === item.id || equippedPieceId === item.id || item.status === 'in_use') ? (
+        {isEquipped ? (
           <View style={styles.inUsePill}>
             <Text style={styles.inUseText}>
               <T>In Use</T>
@@ -1113,36 +1122,114 @@ export default function StoreScreen({ navigation, currentUser }) {
           activeOpacity={1}
           onPress={() => setPreviewItem(null)}
         >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => {}}
-            style={styles.previewCard}
-          >
+          {previewItem && (
             <TouchableOpacity
-              style={styles.closeBtn}
-              activeOpacity={0.75}
-              onPress={() => setPreviewItem(null)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={1}
+              onPress={() => {}}
+              style={styles.previewCard}
             >
-              <CloseIcon size={18} color="#FFFFFF" />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.closeBtn}
+                activeOpacity={0.75}
+                onPress={() => setPreviewItem(null)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <CloseIcon size={18} color="#FFFFFF" />
+              </TouchableOpacity>
 
-            {previewItem?.id?.startsWith('gc_dice_') || (activeCurrencyTab === 'Game Coins' && activeSubTab === 'Dice') ? (
-              <View style={styles.previewDiceContainer}>
-                <Image
-                  source={
-                    typeof previewItem.image === 'string'
-                      ? { uri: previewItem.image }
-                      : previewItem.image
-                  }
-                  style={styles.previewDiceLargeImage}
-                  resizeMode="contain"
-                />
-              </View>
-            ) : (
-              // Standard preview for backgrounds / frames / etc.
-              <View style={styles.previewImageContainer}>
-                {previewItem && (
+              {previewItem.id?.startsWith('gc_dice_') || (activeCurrencyTab === 'Game Coins' && activeSubTab === 'Dice') ? (
+                <View style={styles.previewDiceContainer}>
+                  <Image
+                    source={
+                      typeof previewItem.image === 'string'
+                        ? { uri: previewItem.image }
+                        : previewItem.image
+                    }
+                    style={styles.previewDiceLargeImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              ) : previewItem.id?.startsWith('gc_piece_') || (activeCurrencyTab === 'Game Coins' && activeSubTab === 'Pieces') ? (
+                <View style={styles.previewPieceContainer}>
+                  {/* Full Strip Showcase */}
+                  <View style={styles.previewPieceStripWrap}>
+                    <Image
+                      source={
+                        typeof previewItem.image === 'string'
+                          ? { uri: previewItem.image }
+                          : previewItem.image
+                      }
+                      style={styles.previewPieceStripImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+
+                  {/* 4 Colored Tokens Row */}
+                  {previewItem.tokens && (
+                    <View style={styles.previewTokensRow}>
+                      <View style={styles.previewTokenBadge}>
+                        <Image source={previewItem.tokens.red} style={styles.previewTokenMiniImg} resizeMode="contain" />
+                        <Text style={[styles.previewTokenLabel, { color: '#EF4444' }]}><T>Red</T></Text>
+                      </View>
+                      <View style={styles.previewTokenBadge}>
+                        <Image source={previewItem.tokens.green} style={styles.previewTokenMiniImg} resizeMode="contain" />
+                        <Text style={[styles.previewTokenLabel, { color: '#10B981' }]}><T>Green</T></Text>
+                      </View>
+                      <View style={styles.previewTokenBadge}>
+                        <Image source={previewItem.tokens.yellow} style={styles.previewTokenMiniImg} resizeMode="contain" />
+                        <Text style={[styles.previewTokenLabel, { color: '#F59E0B' }]}><T>Yellow</T></Text>
+                      </View>
+                      <View style={styles.previewTokenBadge}>
+                        <Image source={previewItem.tokens.blue} style={styles.previewTokenMiniImg} resizeMode="contain" />
+                        <Text style={[styles.previewTokenLabel, { color: '#3B82F6' }]}><T>Blue</T></Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Tag: 4 Tokens (All Colors) */}
+                  <View style={styles.previewPieceTag}>
+                    <Text style={styles.previewPieceTagText}>
+                      ✨ <T>Complete 4-Color Token Set</T>
+                    </Text>
+                  </View>
+                </View>
+              ) : previewItem.id?.startsWith('gc_bg_') || (activeCurrencyTab === 'Game Coins' && activeSubTab === 'Background') ? (
+                <View style={styles.previewBoardContainer}>
+                  <Image
+                    source={
+                      typeof previewItem.image === 'string'
+                        ? { uri: previewItem.image }
+                        : previewItem.image
+                    }
+                    style={styles.previewBoardLargeImage}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : previewItem.id?.startsWith('gc_frame_') || (activeCurrencyTab === 'Game Coins' && activeSubTab === 'Frame') ? (
+                <View style={styles.previewFrameContainer}>
+                  <View style={styles.previewFrameAvatarCircle}>
+                    <Image
+                      source={{
+                        uri:
+                          currentUser?.avatar ||
+                          'https://api.dicebear.com/7.x/bottts/png?seed=User',
+                      }}
+                      style={styles.previewFrameAvatarImg}
+                    />
+                  </View>
+                  <Image
+                    source={
+                      typeof previewItem.image === 'string'
+                        ? { uri: previewItem.image }
+                        : previewItem.image
+                    }
+                    style={styles.previewFrameOverlayImg}
+                    resizeMode="contain"
+                  />
+                </View>
+              ) : (
+                // Standard preview for backgrounds / frames / etc.
+                <View style={styles.previewImageContainer}>
                   <Image
                     source={
                       typeof previewItem.image === 'string'
@@ -1150,18 +1237,16 @@ export default function StoreScreen({ navigation, currentUser }) {
                         : previewItem.image
                     }
                     style={styles.previewLargeImage}
-                    resizeMode={activeSubTab === 'Background' ? 'cover' : 'contain'}
+                    resizeMode="cover"
                   />
-                )}
-              </View>
-            )}
+                </View>
+              )}
 
-            <Text style={styles.previewTitle} numberOfLines={1}>
-              <T>{previewItem?.name || ''}</T>
-            </Text>
-
-
-          </TouchableOpacity>
+              <Text style={styles.previewTitle} numberOfLines={1}>
+                <T>{previewItem.name || ''}</T>
+              </Text>
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
       </Modal>
 
@@ -1290,23 +1375,51 @@ export default function StoreScreen({ navigation, currentUser }) {
                 <T>
                   {pendingApplyItem?.id?.startsWith('gc_piece_') || activeSubTab === 'Pieces'
                     ? 'Apply Piece?'
+                    : pendingApplyItem?.id?.startsWith('gc_bg_') || activeSubTab === 'Background'
+                    ? 'Apply Background?'
+                    : pendingApplyItem?.id?.startsWith('gc_frame_') || activeSubTab === 'Frame'
+                    ? 'Apply Frame?'
                     : 'Apply Dice?'}
                 </T>
               </Text>
             </View>
 
             {pendingApplyItem && (
-              <View style={styles.applyImageContainer}>
-                <Image
-                  source={
-                    typeof pendingApplyItem.image === 'string'
-                      ? { uri: pendingApplyItem.image }
-                      : pendingApplyItem.image
-                  }
-                  style={styles.applyDiceImage}
-                  resizeMode="cover"
-                />
-              </View>
+              pendingApplyItem?.id?.startsWith('gc_frame_') || activeSubTab === 'Frame' ? (
+                <View style={styles.applyFrameContainer}>
+                  <View style={styles.applyFrameAvatarCircle}>
+                    <Image
+                      source={{
+                        uri:
+                          currentUser?.avatar ||
+                          'https://api.dicebear.com/7.x/bottts/png?seed=User',
+                      }}
+                      style={styles.applyFrameAvatarImg}
+                    />
+                  </View>
+                  <Image
+                    source={
+                      typeof pendingApplyItem.image === 'string'
+                        ? { uri: pendingApplyItem.image }
+                        : pendingApplyItem.image
+                    }
+                    style={styles.applyFrameOverlayImg}
+                    resizeMode="contain"
+                  />
+                </View>
+              ) : (
+                <View style={styles.applyImageContainer}>
+                  <Image
+                    source={
+                      typeof pendingApplyItem.image === 'string'
+                        ? { uri: pendingApplyItem.image }
+                        : pendingApplyItem.image
+                    }
+                    style={styles.applyDiceImage}
+                    resizeMode="cover"
+                  />
+                </View>
+              )
             )}
 
             <Text style={styles.applyItemTitle} numberOfLines={1}>
@@ -1317,6 +1430,10 @@ export default function StoreScreen({ navigation, currentUser }) {
               <T>
                 {pendingApplyItem?.id?.startsWith('gc_piece_') || activeSubTab === 'Pieces'
                   ? 'Do you want to use this piece now?'
+                  : pendingApplyItem?.id?.startsWith('gc_bg_') || activeSubTab === 'Background'
+                  ? 'Do you want to use this background now?'
+                  : pendingApplyItem?.id?.startsWith('gc_frame_') || activeSubTab === 'Frame'
+                  ? 'Do you want to use this frame now?'
                   : 'Do you want to use this dice now?'}
               </T>
             </Text>
@@ -1620,6 +1737,142 @@ const styles = StyleSheet.create({
     width: 170,
     height: 170,
   },
+  previewBoardContainer: {
+    width: Math.min(width - 80, 270),
+    height: Math.min(width - 80, 270),
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 2.5,
+    borderColor: '#00E676',
+    backgroundColor: '#0F172A',
+    shadowColor: '#00E676',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+    marginTop: 10,
+    marginBottom: 10,
+    alignSelf: 'center',
+  },
+  previewBoardLargeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bgImageWrap: {
+    backgroundColor: '#0F172A',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    width: 108,
+    height: 108,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  bgItemImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  pieceImageWrap: {
+    backgroundColor: '#0F172A',
+    borderWidth: 1.5,
+    borderColor: 'rgba(99, 102, 241, 0.3)',
+    width: 108,
+    height: 108,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 6,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  pieceItemImage: {
+    width: '100%',
+    height: 56,
+  },
+  pieceFourDotTag: {
+    marginTop: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  pieceFourDotText: {
+    fontSize: 9,
+    letterSpacing: 2,
+  },
+  previewPieceContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  previewPieceStripWrap: {
+    width: Math.min(width - 70, 280),
+    height: 84,
+    borderRadius: 16,
+    backgroundColor: '#0F172A',
+    borderWidth: 2,
+    borderColor: 'rgba(99, 102, 241, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    marginBottom: 10,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  previewPieceStripImage: {
+    width: '100%',
+    height: '100%',
+  },
+  previewTokensRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: Math.min(width - 70, 280),
+    marginVertical: 6,
+    gap: 6,
+  },
+  previewTokenBadge: {
+    alignItems: 'center',
+    backgroundColor: '#1E1E2D',
+    borderRadius: 12,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    flex: 1,
+  },
+  previewTokenMiniImg: {
+    width: 42,
+    height: 42,
+    marginBottom: 4,
+  },
+  previewTokenLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  previewPieceTag: {
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.35)',
+    marginTop: 6,
+  },
+  previewPieceTagText: {
+    color: '#818CF8',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
 
 
   // 4. Coins Purchase Bottom Sheet Modal Styles (Matching Screenshot)
@@ -1859,5 +2112,76 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '900',
+  },
+  frameImageWrap: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    overflow: 'visible',
+  },
+  frameCardInnerWrap: {
+    width: 104,
+    height: 104,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  frameCardAvatarCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    backgroundColor: '#1E1E2D',
+  },
+  frameCardAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  frameCardOverlayImg: {
+    position: 'absolute',
+    width: 104,
+    height: 104,
+  },
+  previewFrameContainer: {
+    width: 170,
+    height: 170,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewFrameAvatarCircle: {
+    width: 98,
+    height: 98,
+    borderRadius: 49,
+    overflow: 'hidden',
+    backgroundColor: '#1E1E2D',
+  },
+  previewFrameAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  previewFrameOverlayImg: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
+  },
+  applyFrameContainer: {
+    width: 140,
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+  },
+  applyFrameAvatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    overflow: 'hidden',
+    backgroundColor: '#1E1E2D',
+  },
+  applyFrameAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  applyFrameOverlayImg: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
   },
 });

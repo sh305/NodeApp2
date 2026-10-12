@@ -15,6 +15,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
 import { getEquippedDice, getDiceSkin } from '../constants/diceAssets';
+import { getEquippedLudoBoard } from '../constants/ludoBoardAssets';
+import { getEquippedLudoPiece } from '../constants/ludoPieceAssets';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOARD_SIZE = Math.min(SCREEN_WIDTH - 24, 380);
@@ -174,6 +176,7 @@ export default function LudoGame({
   const [eventNotice, setEventNotice] = useState('');
   const [equippedDice, setEquippedDice] = useState(null);
   const [equippedPiece, setEquippedPiece] = useState(null);
+  const [equippedBoard, setEquippedBoard] = useState(null);
 
   useEffect(() => {
     const loadEquippedItems = async () => {
@@ -182,9 +185,13 @@ export default function LudoGame({
         if (storedDice) {
           setEquippedDice(storedDice);
         }
-        const storedPiece = await AsyncStorage.getItem('@equipped_piece');
+        const storedPiece = await getEquippedLudoPiece();
         if (storedPiece) {
-          setEquippedPiece(JSON.parse(storedPiece));
+          setEquippedPiece(storedPiece);
+        }
+        const storedBoard = await getEquippedLudoBoard();
+        if (storedBoard) {
+          setEquippedBoard(storedBoard);
         }
       } catch (_) {}
     };
@@ -956,9 +963,15 @@ export default function LudoGame({
       {/* 2. THE AUTHENTIC 15x15 LUDO BOARD */}
       <View style={[styles.boardWrapper, { width: BOARD_SIZE, height: BOARD_SIZE }]}>
         <Image
-          source={LUDO_BOARD_IMG}
+          source={
+            equippedBoard?.image
+              ? typeof equippedBoard.image === 'string'
+                ? { uri: equippedBoard.image }
+                : equippedBoard.image
+              : LUDO_BOARD_IMG
+          }
           style={styles.boardImage}
-          resizeMode="contain"
+          resizeMode="cover"
         />
 
         {/* 🌟 LUXURY 3D CENTER MEDALLION: BETS & POT (Shows once at start, then auto-hides) 🌟 */}
@@ -1044,36 +1057,46 @@ export default function LudoGame({
                   },
                 ]}
               >
-                {/* 3D Center Crown/Star Ring or Equipped Piece Image */}
-                {tok.player === myColor && equippedPiece?.image ? (
-                  <View style={styles.equippedPawnWrap}>
-                    <Image
-                      source={
-                        typeof equippedPiece.image === 'string'
-                          ? { uri: equippedPiece.image }
-                          : equippedPiece.image
-                      }
-                      style={styles.equippedPawnImg}
-                      resizeMode="cover"
-                    />
-                    {tok.pos === 56 && (
-                      <View style={styles.crownOverlay}>
-                        <Text style={styles.tokenPawnSymbol}>★</Text>
+                {/* 3D Center Crown/Star Ring or Equipped Piece Image for each of the 4 Gotis */}
+                {(() => {
+                  const pieceTokenImg =
+                    equippedPiece?.tokens?.[tok.player] ||
+                    (tok.player === myColor ? equippedPiece?.image : null);
+
+                  if (pieceTokenImg) {
+                    return (
+                      <View style={styles.equippedPawnWrap}>
+                        <Image
+                          source={
+                            typeof pieceTokenImg === 'string'
+                              ? { uri: pieceTokenImg }
+                              : pieceTokenImg
+                          }
+                          style={styles.equippedPawnImg}
+                          resizeMode="cover"
+                        />
+                        {tok.pos === 56 && (
+                          <View style={styles.crownOverlay}>
+                            <Text style={styles.tokenPawnSymbol}>★</Text>
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                ) : (
-                  <View
-                    style={[
-                      styles.tokenInnerRing,
-                      { backgroundColor: tokenColor.secondary },
-                    ]}
-                  >
-                    {tok.pos === 56 && (
-                      <Text style={styles.tokenPawnSymbol}>★</Text>
-                    )}
-                  </View>
-                )}
+                    );
+                  }
+
+                  return (
+                    <View
+                      style={[
+                        styles.tokenInnerRing,
+                        { backgroundColor: tokenColor.secondary },
+                      ]}
+                    >
+                      {tok.pos === 56 && (
+                        <Text style={styles.tokenPawnSymbol}>★</Text>
+                      )}
+                    </View>
+                  );
+                })()}
               </TouchableOpacity>
             </Animated.View>
           );
@@ -1312,16 +1335,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   boardWrapper: {
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#334155',
+    borderWidth: 2.5,
+    borderColor: '#374151',
     position: 'relative',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
     shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 8,
   },
   boardImage: {
     width: '100%',

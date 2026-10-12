@@ -26,6 +26,8 @@ import { getCountryEmoji } from '../constants/countries';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../components/Toast';
 import DirectChatModal from '../components/DirectChatModal';
+import UserAvatarWithFrame from '../components/UserAvatarWithFrame';
+import { getEquippedLudoFrame, getLudoFrameSkin } from '../constants/ludoFrameAssets';
 
 // 1. Top Icons
 const BackIcon = ({ size = 24, color = '#FFFFFF' }) => (
@@ -172,6 +174,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   const [isFollowing, setIsFollowing] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [directChatVisible, setDirectChatVisible] = useState(false);
+  const [equippedFrame, setEquippedFrame] = useState(null);
 
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -243,6 +246,10 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
         setEditHeight(res.data.user.height || '');
         setEditWeight(res.data.user.weight || '');
         setEditOccupation(res.data.user.occupation || '');
+        if (isSelf) {
+          const storedFrame = await getEquippedLudoFrame();
+          if (storedFrame) setEquippedFrame(storedFrame);
+        }
       }
     } catch (err) {
       if (err.response?.status === 403 && err.response?.data?.isBlocked) {
@@ -861,18 +868,16 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
 
           {/* Hero Avatar & CP Area */}
           <View style={styles.heroAvatarArea}>
-            {/* User Avatar Circle */}
-            <View style={styles.mainAvatarWrapper}>
-              <Image
-                source={{
-                  uri:
-                    profile.avatar ||
-                    'https://api.dicebear.com/7.x/bottts/png?seed=' +
-                      encodeURIComponent(profile.name || 'User'),
-                }}
-                style={styles.mainAvatarImg}
-              />
-            </View>
+            {/* User Avatar Circle with Equipped Frame */}
+            <UserAvatarWithFrame
+              avatarUri={
+                profile.avatar ||
+                'https://api.dicebear.com/7.x/bottts/png?seed=' +
+                  encodeURIComponent(profile.name || 'User')
+              }
+              frame={isSelf ? (equippedFrame || profile.activeFrame) : profile.activeFrame}
+              size={76}
+            />
 
             {/* If user has an active CP partner, show CP interlocking rings + partner avatar */}
             {hasActiveCp && (
@@ -1367,17 +1372,16 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={() => setActiveField('avatar')}
-                style={styles.avatarWrap}
               >
-                <Image
-                  source={{
-                    uri:
-                      editAvatar ||
-                      profile.avatar ||
-                      'https://api.dicebear.com/7.x/bottts/png?seed=' +
-                        encodeURIComponent(editName || 'User'),
-                  }}
-                  style={styles.basicInfoAvatarImg}
+                <UserAvatarWithFrame
+                  avatarUri={
+                    editAvatar ||
+                    profile.avatar ||
+                    'https://api.dicebear.com/7.x/bottts/png?seed=' +
+                      encodeURIComponent(editName || 'User')
+                  }
+                  frame={isSelf ? (equippedFrame || profile.activeFrame) : profile.activeFrame}
+                  size={86}
                 />
               </TouchableOpacity>
               <TouchableOpacity

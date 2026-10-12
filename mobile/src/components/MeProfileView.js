@@ -17,6 +17,8 @@ import { T } from './TranslatedText';
 import { useToast } from './Toast';
 import io from 'socket.io-client';
 import api, { BASE_URL } from '../api/client';
+import UserAvatarWithFrame from './UserAvatarWithFrame';
+import { getEquippedLudoFrame } from '../constants/ludoFrameAssets';
 
 // 1. Right Chevron Arrow
 const ChevronRight = ({ size = 18, color = '#C7C7CC' }) => (
@@ -233,9 +235,13 @@ export default function MeProfileView({
 
   const [profile, setProfile] = useState(myProfile || currentUser);
   const [problemCount, setProblemCount] = useState(0);
+  const [equippedFrame, setEquippedFrame] = useState(null);
 
   const fetchProfile = async () => {
     try {
+      const storedFrame = await getEquippedLudoFrame();
+      if (storedFrame) setEquippedFrame(storedFrame);
+
       const uid = currentUser?._id || currentUser?.id;
       if (!uid) return;
       const res = await api.get(`/users/${uid}/profile`);
@@ -416,19 +422,17 @@ export default function MeProfileView({
           }
         }}
       >
-        {/* User Avatar */}
-        <View style={styles.avatarWrapper}>
-          <Image
-            source={{
-              uri:
-                profile?.avatar ||
-                currentUser?.avatar ||
-                'https://api.dicebear.com/7.x/bottts/png?seed=' +
-                  encodeURIComponent(profile?.name || currentUser?.name || 'User'),
-            }}
-            style={styles.avatarImg}
-          />
-        </View>
+        {/* User Avatar with Equipped Frame */}
+        <UserAvatarWithFrame
+          avatarUri={
+            profile?.avatar ||
+            currentUser?.avatar ||
+            'https://api.dicebear.com/7.x/bottts/png?seed=' +
+              encodeURIComponent(profile?.name || currentUser?.name || 'User')
+          }
+          frame={equippedFrame || profile?.activeFrame || currentUser?.activeFrame}
+          size={66}
+        />
 
         {/* User Name & Subtitle */}
         <View style={styles.profileInfoWrap}>
