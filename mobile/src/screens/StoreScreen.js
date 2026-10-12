@@ -25,6 +25,7 @@ import { DICE_ITEMS_LIST, getEquippedDice, saveEquippedDice } from '../constants
 import { LUDO_BOARD_ITEMS_LIST, getEquippedLudoBoard, saveEquippedLudoBoard } from '../constants/ludoBoardAssets';
 import { LUDO_PIECE_ITEMS_LIST, getEquippedLudoPiece, saveEquippedLudoPiece } from '../constants/ludoPieceAssets';
 import { LUDO_FRAME_ITEMS_LIST, getEquippedLudoFrame, saveEquippedLudoFrame } from '../constants/ludoFrameAssets';
+import AnimatedLudoFrame from '../components/AnimatedLudoFrame';
 
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40) / 2;
@@ -960,11 +961,10 @@ export default function StoreScreen({ navigation, currentUser }) {
                   style={styles.frameCardAvatarImg}
                 />
               </View>
-              {/* 3D Ludo Frame on top */}
-              <Image
-                source={imageSource}
-                style={styles.frameCardOverlayImg}
-                resizeMode="contain"
+              {/* 3D Animated Ludo Frame on top */}
+              <AnimatedLudoFrame
+                skin={item}
+                frameSize={106}
               />
             </View>
           ) : (
@@ -1217,14 +1217,9 @@ export default function StoreScreen({ navigation, currentUser }) {
                       style={styles.previewFrameAvatarImg}
                     />
                   </View>
-                  <Image
-                    source={
-                      typeof previewItem.image === 'string'
-                        ? { uri: previewItem.image }
-                        : previewItem.image
-                    }
-                    style={styles.previewFrameOverlayImg}
-                    resizeMode="contain"
+                  <AnimatedLudoFrame
+                    skin={previewItem}
+                    frameSize={180}
                   />
                 </View>
               ) : (
@@ -1397,14 +1392,9 @@ export default function StoreScreen({ navigation, currentUser }) {
                       style={styles.applyFrameAvatarImg}
                     />
                   </View>
-                  <Image
-                    source={
-                      typeof pendingApplyItem.image === 'string'
-                        ? { uri: pendingApplyItem.image }
-                        : pendingApplyItem.image
-                    }
-                    style={styles.applyFrameOverlayImg}
-                    resizeMode="contain"
+                  <AnimatedLudoFrame
+                    skin={pendingApplyItem}
+                    frameSize={150}
                   />
                 </View>
               ) : (

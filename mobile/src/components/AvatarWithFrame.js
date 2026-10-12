@@ -5,6 +5,7 @@ import AnimatedSeatEmoji from './AnimatedSeatEmoji';
 import { getUserLevelSvg } from '../constants/userLevelSvgFrames';
 import { getLevelTierInfo } from '../constants/userLevelSystem';
 import { getLudoFrameSkin } from '../constants/ludoFrameAssets';
+import AnimatedLudoFrame from './AnimatedLudoFrame';
 
 export default function AvatarWithFrame({
   avatarUri,
@@ -146,24 +147,17 @@ export default function AvatarWithFrame({
         )}
       </View>
 
-      {/* 2. Custom Store Frame (e.g. 3D Ludo Frame) sitting right on the avatar border */}
+      {/* 2. Custom Store Frame (e.g. 3D Animated Ludo Frame) sitting right on the avatar border */}
       {customFrameSkin && (
-        <Image
-          source={
-            typeof customFrameSkin.image === 'string'
-              ? { uri: customFrameSkin.image }
-              : customFrameSkin.image
-          }
+        <AnimatedLudoFrame
+          skin={customFrameSkin}
+          frameSize={customFrameSize}
           style={{
             position: 'absolute',
-            width: customFrameSize,
-            height: customFrameSize,
             left: customFrameLeft,
             top: customFrameTop,
             zIndex: 10,
           }}
-          resizeMode="contain"
-          pointerEvents="none"
         />
       )}
 
