@@ -1,4 +1,4 @@
-require('dotenv').config(); // Live environment configured
+require('dotenv').config(); // Live environment reloaded with Voice Call OTP service
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');

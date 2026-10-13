@@ -4,6 +4,7 @@ const SmsOtpService = require('../services/smsOtpService');
 const WhatsAppOtpService = require('../services/whatsappOtpService');
 const EmailOtpService = require('../services/emailOtpService');
 const { cacheService } = require('../config/redis');
+const axios = require('axios');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'yoyo_super_secret_jwt_key_2026_!@#$%^', {
@@ -11,7 +12,7 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Send 6-Digit OTP to User's WhatsApp
+// @desc    Send 6-Digit Real SMS OTP to User's Mobile (Powered by 2Factor.in)
 // @route   POST /api/auth/send-whatsapp-otp
 exports.sendWhatsAppOtp = async (req, res) => {
   try {
@@ -25,12 +26,11 @@ exports.sendWhatsAppOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
     }
 
-    const result = await WhatsAppOtpService.sendOtp(cleanPhone);
+    const result = await SmsOtpService.sendOtp(cleanPhone, 'voice');
     return res.status(result.success ? 200 : 400).json({
       success: result.success,
-      message: result.message || 'OTP has been sent to your WhatsApp number',
-      deepLinkUrl: result.deepLinkUrl,
-      webUrl: result.webUrl,
+      message: result.message || 'Incoming verification call sent! Please answer the call 📞',
+      channel: result.channel,
     });
   } catch (error) {
     console.error('sendWhatsAppOtp error:', error);
@@ -38,7 +38,33 @@ exports.sendWhatsAppOtp = async (req, res) => {
   }
 };
 
-// @desc    Verify User's Entered WhatsApp OTP
+// @desc    Send 6-Digit OTP to User's Mobile via SMS (Powered by 2Factor.in)
+// @route   POST /api/auth/send-sms-otp
+exports.sendSmsOtp = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
+    }
+
+    const result = await SmsOtpService.sendOtp(cleanPhone, 'sms');
+    return res.status(result.success ? 200 : 400).json({
+      success: result.success,
+      message: result.message || 'SMS OTP code sent to your mobile number! 📨',
+      channel: result.channel,
+    });
+  } catch (error) {
+    console.error('sendSmsOtp error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify User's Entered Mobile SMS OTP (Powered by 2Factor.in)
 // @route   POST /api/auth/verify-whatsapp-otp
 exports.verifyWhatsAppOtp = async (req, res) => {
   try {
@@ -51,7 +77,7 @@ exports.verifyWhatsAppOtp = async (req, res) => {
     }
 
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
-    const verifyResult = await WhatsAppOtpService.verifyOtp(cleanPhone, otp);
+    const verifyResult = await SmsOtpService.verifyOtp(cleanPhone, otp);
 
     if (!verifyResult.valid) {
       return res.status(400).json({
@@ -62,7 +88,7 @@ exports.verifyWhatsAppOtp = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'WhatsApp OTP Verified Successfully! ✅',
+      message: 'Mobile OTP Verified Successfully! ✅',
     });
   } catch (error) {
     console.error('verifyWhatsAppOtp error:', error);
@@ -846,7 +872,6 @@ exports.generateFacebookOtp = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      otp,
       facebookId: cleanFbId,
       messengerUrl,
       message: `OTP code dispatched to Facebook Messenger! 📨`,
@@ -901,6 +926,83 @@ exports.verifyFacebookOtp = async (req, res) => {
     });
   } catch (error) {
     console.error('verifyFacebookOtp error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify Facebook Access Token & Bind Account (Option 1 - 1-Click Facebook OAuth)
+// @route   POST /api/auth/facebook-bind-oauth
+exports.facebookBindOAuth = async (req, res) => {
+  try {
+    const { accessToken, facebookId, name, email, avatar } = req.body;
+
+    let fbUser = null;
+    if (accessToken) {
+      try {
+        const graphRes = await axios.get(
+          `https://graph.facebook.com/me?access_token=${encodeURIComponent(accessToken)}&fields=id,name,email,picture.type(large)`
+        );
+        if (graphRes.data && graphRes.data.id) {
+          fbUser = {
+            id: graphRes.data.id,
+            name: graphRes.data.name,
+            email: graphRes.data.email || '',
+            avatar: graphRes.data.picture?.data?.url || '',
+          };
+        }
+      } catch (graphErr) {
+        console.error('Meta Graph API token verification error:', graphErr?.response?.data || graphErr.message);
+      }
+    }
+
+    const finalId = fbUser?.id || facebookId;
+    const finalName = fbUser?.name || name || 'Facebook User';
+    const finalEmail = fbUser?.email || email || '';
+    const finalAvatar = fbUser?.avatar || avatar || '';
+
+    if (!finalId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Could not verify Facebook account. Please try again.',
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Check if another profile is already bound to this Facebook ID
+    const existing = await User.findOne({ facebookId: finalId, _id: { $ne: user._id } });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: 'This Facebook account is already bound to another profile',
+      });
+    }
+
+    if (!user.boundAccounts) user.boundAccounts = {};
+    user.facebookId = finalId;
+    user.boundAccounts.facebook = {
+      id: finalId,
+      name: finalName,
+      email: finalEmail,
+      avatar: finalAvatar,
+      boundAt: new Date(),
+    };
+
+    user.markModified('boundAccounts');
+    await user.save();
+
+    console.log(`✅ [Facebook OAuth Binding] Successfully bound Facebook [${finalName}] (ID: ${finalId}) to user [${user.name}]`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Facebook account bound successfully! 🎉',
+      user,
+    });
+  } catch (error) {
+    console.error('facebookBindOAuth error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

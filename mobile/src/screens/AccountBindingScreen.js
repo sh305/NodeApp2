@@ -13,6 +13,7 @@ import {
   Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/client';
@@ -92,6 +93,18 @@ const WhatsAppIcon = ({ size = 20, color = '#FFFFFF' }) => (
   </Svg>
 );
 
+const SmsIcon = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z" />
+  </Svg>
+);
+
+const PhoneCallIcon = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-2.2 2.2a15.053 15.053 0 01-6.59-6.59l2.2-2.21a.96.96 0 00.25-1.01A11.36 11.36 0 018.57 3.99c0-.55-.45-1-1-1H4.02c-.55 0-1 .45-1 1C3.02 13.28 10.73 21 20.01 21c.55 0 1-.45 1-1v-3.62c0-.55-.45-1-1-1z" />
+  </Svg>
+);
+
 // 3. Official Google Multicolor G Icon (Matching screenshot)
 const GoogleCircleIcon = ({ size = 36 }) => (
   <Svg width={size} height={size} viewBox="0 0 48 48">
@@ -162,8 +175,10 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   const [googleSending, setGoogleSending] = useState(false);
   const [googleVerifying, setGoogleVerifying] = useState(false);
 
-  // ── 2. Facebook Binding State with Security OTP Verification ──
+  // ── 2. Facebook Binding State (Option 1: 1-Click OAuth + Fallback OTP) ──
   const [fbChooserVisible, setFbChooserVisible] = useState(false);
+  const [fbWebViewVisible, setFbWebViewVisible] = useState(false);
+  const [fbOAuthLoading, setFbOAuthLoading] = useState(false);
   const [fbAccountInput, setFbAccountInput] = useState('');
   const [fbOtpStep, setFbOtpStep] = useState('input'); // 'input' | 'otp'
   const [fbOtp, setFbOtp] = useState('');
@@ -234,7 +249,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   // 1. PHONE HANDLER (WHATSAPP OTP VERIFICATION)
   // ══════════════════════════════════════════════════
   const startPhoneCountdown = () => {
-    setPhoneCountdown(60);
+    setPhoneCountdown(20);
     if (phoneTimerRef.current) clearInterval(phoneTimerRef.current);
     phoneTimerRef.current = setInterval(() => {
       setPhoneCountdown((prev) => {
@@ -257,13 +272,14 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
       setUnbindModalVisible(true);
       return;
     }
-    setPhoneInput(profile?.phone || profile?.phoneNumber || '');
+    // Remember previously typed number so user doesn't have to re-enter it manually
+    setPhoneInput((prev) => prev || profile?.phone || profile?.phoneNumber || '');
     setPhoneOtp('');
     setPhoneOtpStep('input');
     setPhoneModalVisible(true);
   };
 
-  // Step 1: Send OTP to User's WhatsApp number via Meta Cloud API
+  // Step 1: Send OTP to User's mobile number via Automated Voice Call
   const handleSendWhatsAppOtp = async () => {
     const raw = phoneInput.trim().replace(/\D/g, '').slice(-10);
     if (!raw || raw.length !== 10) {
@@ -275,20 +291,21 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     try {
       const res = await api.post('/auth/send-whatsapp-otp', { phoneNumber: raw });
       if (res.data?.success) {
-        showToast(t('OTP code sent to your WhatsApp! 📨'), 'success');
+        showToast(t(res.data?.message || 'Incoming verification call sent! Please answer the call 📞'), 'success');
+        setPhoneOtp('');
         setPhoneOtpStep('otp');
         startPhoneCountdown();
       } else {
-        showToast(t(res.data?.message || 'Failed to send WhatsApp OTP'), 'error');
+        showToast(t(res.data?.message || 'Failed to initiate verification call'), 'error');
       }
     } catch (err) {
-      showToast(t(err.response?.data?.message || 'Failed to send WhatsApp OTP'), 'error');
+      showToast(t(err.response?.data?.message || 'Failed to initiate verification call'), 'error');
     } finally {
       setPhoneSending(false);
     }
   };
 
-  // Step 2: Verify WhatsApp OTP -> Then open "Are you sure do you want to bind..." confirmation prompt
+  // Step 2: Verify SMS OTP -> Then open "Are you sure do you want to bind..." confirmation prompt
   const handleVerifyWhatsAppOtp = async () => {
     const cleanOtp = phoneOtp.trim();
     if (!cleanOtp || cleanOtp.length !== 6) {
@@ -305,7 +322,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
       });
 
       if (res.data?.success) {
-        showToast(t('WhatsApp OTP Verified Successfully! ✅'), 'success');
+        showToast(t('SMS OTP Verified Successfully! ✅'), 'success');
         setPhoneModalVisible(false);
         setPhoneOtpStep('input');
         setPhoneOtp('');
@@ -320,10 +337,10 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
         });
         setConfirmModalVisible(true);
       } else {
-        showToast(t(res.data?.message || 'Wrong OTP code!'), 'error');
+        showToast(t(res.data?.message || 'Wrong OTP code! Please listen to the call and try again.'), 'error');
       }
     } catch (err) {
-      showToast(t(err.response?.data?.message || 'Wrong OTP code! Please check your WhatsApp.'), 'error');
+      showToast(t(err.response?.data?.message || 'Wrong OTP code! Please listen to the call and try again.'), 'error');
     } finally {
       setPhoneVerifying(false);
     }
@@ -433,7 +450,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   };
 
   // ══════════════════════════════════════════════════
-  // 3. FACEBOOK BINDING (MESSENGER OTP VERIFICATION)
+  // ══════════════════════════════════════════════════
+  // 3. FACEBOOK BINDING (OPTION 1: 1-CLICK OFFICIAL OAUTH)
   // ══════════════════════════════════════════════════
   const handleFacebookClick = () => {
     if (facebookBoundValue) {
@@ -449,6 +467,53 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     setFbOtp('');
     setFbOtpStep('input');
     setFbChooserVisible(true);
+  };
+
+  const handleStartFacebookOAuth = () => {
+    setFbChooserVisible(false);
+    setFbWebViewVisible(true);
+  };
+
+  const handleFbNavigationStateChange = async (navState) => {
+    const url = navState.url;
+    if (!url) return;
+
+    if (url.includes('access_token=')) {
+      setFbWebViewVisible(false);
+      setFbOAuthLoading(true);
+      showToast(t('Verifying Facebook account...'), 'info');
+
+      try {
+        const match = url.match(/access_token=([^&]+)/);
+        const accessToken = match ? match[1] : null;
+
+        if (!accessToken) {
+          showToast(t('Could not verify Facebook account. Please try again.'), 'error');
+          setFbOAuthLoading(false);
+          return;
+        }
+
+        const res = await api.post('/auth/facebook-bind-oauth', { accessToken });
+        if (res.data?.success && res.data.user) {
+          setProfile(res.data.user);
+          await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+          setFbChooserVisible(false);
+          showToast(t('Facebook account bound successfully! 🎉'), 'success');
+        } else {
+          showToast(t(res.data?.message || 'Failed to bind Facebook account'), 'error');
+        }
+      } catch (err) {
+        showToast(
+          t(err.response?.data?.message || 'Could not verify Facebook account. Please try again.'),
+          'error'
+        );
+      } finally {
+        setFbOAuthLoading(false);
+      }
+    } else if (url.includes('error=access_denied') || url.includes('error_reason=user_denied')) {
+      setFbWebViewVisible(false);
+      showToast(t('Facebook login cancelled'), 'info');
+    }
   };
 
   const startFbCountdown = () => {
@@ -477,16 +542,9 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     try {
       const res = await api.post('/auth/generate-facebook-otp', { facebookId: raw });
       if (res.data?.success) {
-        showToast(t('Opening Messenger to deliver OTP... 📨'), 'info');
+        showToast(t('OTP code sent to your Messenger! 📨'), 'success');
         setFbOtpStep('otp');
         startFbCountdown();
-
-        // Launch Facebook Messenger app
-        if (res.data.messengerUrl) {
-          Linking.openURL(res.data.messengerUrl).catch(() => {
-            showToast(t('Could not open Messenger app. Please check your Messenger inbox.'), 'info');
-          });
-        }
       } else {
         showToast(t(res.data?.message || 'Failed to send Messenger OTP'), 'error');
       }
@@ -833,15 +891,15 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
           >
             <View style={styles.fbHeaderRow}>
               <View style={styles.fbHeaderLeft}>
-                <View style={[styles.fbLogoCircle, { backgroundColor: '#25D366' }]}>
-                  <WhatsAppIcon size={22} color="#FFFFFF" />
+                <View style={[styles.fbLogoCircle, { backgroundColor: '#10B981' }]}>
+                  <PhoneCallIcon size={20} color="#FFFFFF" />
                 </View>
                 <View>
-                  <Text style={[styles.fbHeaderTitle, { color: '#128C7E' }]}>
+                  <Text style={[styles.fbHeaderTitle, { color: '#10B981' }]}>
                     <T>Bind Phone Number</T>
                   </Text>
                   <Text style={styles.fbHeaderSub}>
-                    <T>WhatsApp OTP Verification</T>
+                    <T>Voice Call OTP Verification</T>
                   </Text>
                 </View>
               </View>
@@ -857,7 +915,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
               /* STEP 1: Enter 10-digit mobile number */
               <>
                 <Text style={styles.fbIntroText}>
-                  <T>Enter your 10-digit mobile number. We will send a 6-digit OTP code directly to your WhatsApp.</T>
+                  <T>Enter your 10-digit mobile number. You will receive an automated phone call with your 6-digit OTP code.</T>
                 </Text>
 
                 <View style={styles.inputSectionCard}>
@@ -882,6 +940,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                   <TouchableOpacity
                     style={[
                       styles.waVerifyBtn,
+                      { backgroundColor: '#10B981' },
                       (!phoneInput.trim() || phoneSending) && styles.submitGmailBtnDisabled,
                     ]}
                     disabled={!phoneInput.trim() || phoneSending}
@@ -892,9 +951,9 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <>
-                        <WhatsAppIcon size={20} color="#FFFFFF" />
-                        <Text style={styles.waVerifyBtnText}>
-                          <T>Get OTP on WhatsApp</T>
+                        <PhoneCallIcon size={18} color="#FFFFFF" />
+                        <Text style={[styles.waVerifyBtnText, { marginLeft: 6 }]}>
+                          <T>Get OTP via Call</T>
                         </Text>
                       </>
                     )}
@@ -902,11 +961,11 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 </View>
               </>
             ) : (
-              /* STEP 2: Enter 6-digit OTP from WhatsApp */
+              /* STEP 2: Enter 6-digit OTP from Voice Call */
               <View style={styles.inputSectionCard}>
                 <View style={styles.otpHeaderRow}>
                   <Text style={styles.inputSectionLabel}>
-                    <T>Enter 6-digit OTP sent to your WhatsApp:</T>
+                    <T>Enter 6-digit OTP received on phone call:</T>
                   </Text>
                   <TouchableOpacity
                     onPress={() => setPhoneOtpStep('input')}
@@ -935,15 +994,22 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 <View style={styles.resendRow}>
                   {phoneCountdown > 0 ? (
                     <Text style={styles.resendTimerText}>
-                      <T>Resend OTP in</T> {phoneCountdown}s
+                      <T>Resend call in</T> {phoneCountdown}s
                     </Text>
                   ) : (
                     <TouchableOpacity
                       onPress={handleSendWhatsAppOtp}
                       disabled={phoneSending}
+                      activeOpacity={0.7}
+                      style={{ flexDirection: 'row', alignItems: 'center', padding: 6 }}
                     >
-                      <Text style={styles.resendActionText}>
-                        <T>Resend OTP</T>
+                      {phoneSending ? (
+                        <ActivityIndicator size="small" color="#10B981" style={{ marginRight: 6 }} />
+                      ) : (
+                        <PhoneCallIcon size={16} color="#10B981" style={{ marginRight: 4 }} />
+                      )}
+                      <Text style={[styles.resendActionText, { color: '#10B981' }]}>
+                        <T>Resend Call OTP</T>
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -1176,15 +1242,15 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
           >
             <View style={styles.fbHeaderRow}>
               <View style={styles.fbHeaderLeft}>
-                <View style={[styles.fbLogoCircle, { backgroundColor: '#0084FF' }]}>
-                  <MessengerIcon size={22} color="#FFFFFF" />
+                <View style={[styles.fbLogoCircle, { backgroundColor: '#1877F2' }]}>
+                  <FacebookBrandIcon size={22} color="#FFFFFF" />
                 </View>
                 <View>
-                  <Text style={[styles.fbHeaderTitle, { color: '#0084FF' }]}>
+                  <Text style={[styles.fbHeaderTitle, { color: '#1877F2' }]}>
                     <T>Bind Facebook Account</T>
                   </Text>
                   <Text style={styles.fbHeaderSub}>
-                    <T>Facebook Messenger OTP Verification</T>
+                    <T>1-Click Facebook Connect</T>
                   </Text>
                 </View>
               </View>
@@ -1196,129 +1262,75 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
               </TouchableOpacity>
             </View>
 
-            {fbOtpStep === 'input' ? (
-              /* STEP 1: Enter Facebook ID or Username */
-              <>
-                <Text style={styles.fbIntroText}>
-                  <T>Enter your Facebook profile ID or username. We will deliver a 6-digit OTP directly to your Facebook Messenger.</T>
-                </Text>
-
-                <View style={styles.inputSectionCard}>
-                  <Text style={styles.inputSectionLabel}>
-                    <T>Facebook ID or Username</T>
-                  </Text>
-                  <TextInput
-                    style={styles.gmailTextInput}
-                    placeholder="e.g. rahul.sharma or fb-username"
-                    placeholderTextColor="#9CA3AF"
-                    autoCapitalize="none"
-                    value={fbAccountInput}
-                    onChangeText={setFbAccountInput}
-                  />
-
-                  <TouchableOpacity
-                    style={[
-                      styles.messengerBtn,
-                      (!fbAccountInput.trim() || fbSending) && styles.submitGmailBtnDisabled,
-                    ]}
-                    disabled={!fbAccountInput.trim() || fbSending}
-                    activeOpacity={0.85}
-                    onPress={handleSendFbOtp}
-                  >
-                    {fbSending ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <MessengerIcon size={20} color="#FFFFFF" />
-                        <Text style={styles.messengerBtnText}>
-                          <T>Get OTP on Messenger</T>
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+            {/* ══ 1-CLICK OFFICIAL FACEBOOK CONNECT HERO CARD ══ */}
+            <View style={styles.fbHeroCard}>
+              <View style={styles.fbHeroIconRow}>
+                <View style={styles.fbHeroIconCircle}>
+                  <FacebookBrandIcon size={24} color="#FFFFFF" />
                 </View>
-              </>
-            ) : (
-              /* STEP 2: Enter 6-digit OTP from Messenger */
-              <View style={styles.inputSectionCard}>
-                <View style={styles.otpHeaderRow}>
-                  <Text style={styles.inputSectionLabel}>
-                    <T>Enter 6-digit OTP sent to your Messenger:</T>
+                <View style={styles.fbHeroTextContainer}>
+                  <Text style={styles.fbHeroTitle}>
+                    <T>Connect Facebook in 1 Tap</T>
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => setFbOtpStep('input')}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <Text style={styles.changeEmailText}>
-                      <T>Change</T>
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.targetAccountHighlight}>
-                  @{fbAccountInput}
-                </Text>
-
-                <TextInput
-                  style={[styles.gmailTextInput, styles.otpTextInput]}
-                  placeholder="• • • • • •"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  value={fbOtp}
-                  onChangeText={setFbOtp}
-                  autoFocus
-                />
-
-                {/* Check Messenger Re-open button */}
-                <TouchableOpacity
-                  style={styles.reopenMessengerBtn}
-                  activeOpacity={0.8}
-                  onPress={handleReopenMessenger}
-                >
-                  <MessengerIcon size={18} color="#0084FF" />
-                  <Text style={styles.reopenMessengerBtnText}>
-                    <T>Check Facebook Messenger</T>
+                  <Text style={styles.fbHeroSub}>
+                    <T>Tap the button below to connect with your official Facebook profile securely. No OTP or Messenger needed.</T>
                   </Text>
-                </TouchableOpacity>
-
-                <View style={styles.resendRow}>
-                  {fbCountdown > 0 ? (
-                    <Text style={styles.resendTimerText}>
-                      <T>Resend OTP in</T> {fbCountdown}s
-                    </Text>
-                  ) : (
-                    <TouchableOpacity
-                      onPress={handleSendFbOtp}
-                      disabled={fbSending}
-                    >
-                      <Text style={styles.resendActionText}>
-                        <T>Resend OTP</T>
-                      </Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.submitGmailBtn,
-                    (fbOtp.length !== 6 || fbVerifying) && styles.submitGmailBtnDisabled,
-                  ]}
-                  disabled={fbOtp.length !== 6 || fbVerifying}
-                  activeOpacity={0.8}
-                  onPress={handleVerifyFbOtp}
-                >
-                  {fbVerifying ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.submitGmailBtnText}>
-                      ✅ <T>Verify OTP & Continue</T>
-                    </Text>
-                  )}
-                </TouchableOpacity>
               </View>
-            )}
+
+              <TouchableOpacity
+                style={styles.fbOneClickBtn}
+                activeOpacity={0.85}
+                disabled={fbOAuthLoading}
+                onPress={handleStartFacebookOAuth}
+              >
+                {fbOAuthLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <FacebookBrandIcon size={20} color="#FFFFFF" />
+                    <Text style={styles.fbOneClickBtnText}>
+                      <T>Continue with Facebook</T>
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ══ OFFICIAL FACEBOOK OAUTH WEBVIEW MODAL ══ */}
+      <Modal
+        visible={fbWebViewVisible}
+        animationType="slide"
+        onRequestClose={() => setFbWebViewVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Math.max(16, insets.top) }}>
+          <View style={styles.fbWebHeader}>
+            <TouchableOpacity
+              onPress={() => setFbWebViewVisible(false)}
+              style={styles.fbWebCloseBtn}
+            >
+              <Text style={styles.fbWebCloseText}>✕ <T>Close</T></Text>
+            </TouchableOpacity>
+            <Text style={styles.fbWebTitle}><T>Facebook Connect</T></Text>
+            <View style={{ width: 60 }} />
+          </View>
+          <WebView
+            source={{
+              uri: `https://www.facebook.com/v19.0/dialog/oauth?client_id=852799857889709&redirect_uri=https://google.com&response_type=token,granted_scopes&scope=public_profile,email&display=touch`,
+            }}
+            onNavigationStateChange={handleFbNavigationStateChange}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.fbWebLoadingContainer}>
+                <ActivityIndicator size="large" color="#1877F2" />
+                <Text style={styles.fbWebLoadingText}><T>Connecting to Facebook...</T></Text>
+              </View>
+            )}
+          />
+        </View>
       </Modal>
 
       {/* ══ 3. TWITTER BINDING MODAL ══ */}
@@ -2171,4 +2183,93 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  // ── 1-Click Facebook OAuth Styles ──
+  fbHeroCard: {
+    backgroundColor: '#1E1E2D',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#2D2D42',
+  },
+  fbHeroIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  fbHeroIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1877F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fbHeroTextContainer: {
+    flex: 1,
+  },
+  fbHeroTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  fbHeroSub: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    lineHeight: 17,
+  },
+  fbOneClickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#1877F2',
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  fbOneClickBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  fbWebHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E1E2D',
+    backgroundColor: '#0F0F1A',
+  },
+  fbWebCloseBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#1E1E2D',
+  },
+  fbWebCloseText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  fbWebTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  fbWebLoadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0F0F1A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  fbWebLoadingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
 });
+

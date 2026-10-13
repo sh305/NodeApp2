@@ -16,7 +16,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#0F0F1A"
       },
-      "package": "com.yoyo.voice",
+      "package": "com.funmaza.app",
       "softwareKeyboardLayoutMode": "resize",
       "usesCleartextTraffic": true
     }
