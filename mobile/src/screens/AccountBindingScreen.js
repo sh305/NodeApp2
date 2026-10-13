@@ -144,11 +144,12 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   const [profile, setProfile] = useState(currentUser || null);
   const [loading, setLoading] = useState(false);
 
-  // ── 0. Phone Number Binding State (FunMaza WhatsApp Direct Verification) ──
+  // ── 0. Phone Number Binding State (WhatsApp OTP Verification) ──
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
-  const [phoneStep, setPhoneStep] = useState('input'); // 'input' | 'waiting'
-  const [waCode, setWaCode] = useState('');
+  const [phoneOtpStep, setPhoneOtpStep] = useState('input'); // 'input' | 'otp'
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneCountdown, setPhoneCountdown] = useState(0);
   const [phoneSending, setPhoneSending] = useState(false);
   const [phoneVerifying, setPhoneVerifying] = useState(false);
 
@@ -183,12 +184,14 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   const [pendingUnbind, setPendingUnbind] = useState(null); // { provider, label, value }
 
   // Countdown timer refs
+  const phoneTimerRef = useRef(null);
   const googleTimerRef = useRef(null);
   const fbTimerRef = useRef(null);
 
   useEffect(() => {
     fetchLatestProfile();
     return () => {
+      if (phoneTimerRef.current) clearInterval(phoneTimerRef.current);
       if (googleTimerRef.current) clearInterval(googleTimerRef.current);
       if (fbTimerRef.current) clearInterval(fbTimerRef.current);
     };
@@ -228,25 +231,40 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     profile?.boundAccounts?.phone?.number;
 
   // ══════════════════════════════════════════════════
-  // 1. PHONE HANDLER (FUNMAZA WHATSAPP DIRECT DEEP-LINK)
+  // 1. PHONE HANDLER (WHATSAPP OTP VERIFICATION)
   // ══════════════════════════════════════════════════
+  const startPhoneCountdown = () => {
+    setPhoneCountdown(60);
+    if (phoneTimerRef.current) clearInterval(phoneTimerRef.current);
+    phoneTimerRef.current = setInterval(() => {
+      setPhoneCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(phoneTimerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   const handlePhoneClick = () => {
     if (phoneBoundValue) {
       setPendingUnbind({
         provider: 'phone',
         label: t('Phone Number'),
-        value: phoneBoundValue,
+        value: `+91 ${phoneBoundValue}`,
       });
       setUnbindModalVisible(true);
       return;
     }
     setPhoneInput(profile?.phone || profile?.phoneNumber || '');
-    setPhoneStep('input');
-    setWaCode('');
+    setPhoneOtp('');
+    setPhoneOtpStep('input');
     setPhoneModalVisible(true);
   };
 
-  const handleStartWhatsAppVerify = async () => {
+  // Step 1: Send OTP to User's WhatsApp number via Meta Cloud API
+  const handleSendWhatsAppOtp = async () => {
     const raw = phoneInput.trim().replace(/\D/g, '').slice(-10);
     if (!raw || raw.length !== 10) {
       showToast(t('Please enter a valid 10-digit mobile number'), 'error');
@@ -255,69 +273,57 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
 
     setPhoneSending(true);
     try {
-      const res = await api.post('/auth/generate-whatsapp-code', { phoneNumber: raw });
-      if (res.data?.success && res.data.code) {
-        setWaCode(res.data.code);
-        setPhoneStep('waiting');
-        showToast(t('Opening WhatsApp... Please tap send!'), 'info');
-        if (res.data.deepLinkUrl) {
-          Linking.openURL(res.data.deepLinkUrl).catch(() => {
-            showToast(t('Could not launch WhatsApp. Please check if WhatsApp is installed.'), 'error');
-          });
-        }
+      const res = await api.post('/auth/send-whatsapp-otp', { phoneNumber: raw });
+      if (res.data?.success) {
+        showToast(t('OTP code sent to your WhatsApp! 📨'), 'success');
+        setPhoneOtpStep('otp');
+        startPhoneCountdown();
       } else {
-        showToast(t(res.data?.message || 'Failed to generate code'), 'error');
+        showToast(t(res.data?.message || 'Failed to send WhatsApp OTP'), 'error');
       }
     } catch (err) {
-      showToast(t(err.response?.data?.message || 'Failed to connect to verification service'), 'error');
+      showToast(t(err.response?.data?.message || 'Failed to send WhatsApp OTP'), 'error');
     } finally {
       setPhoneSending(false);
     }
   };
 
-  const handleReopenWhatsApp = () => {
-    if (!waCode) return;
-    const targetNumber = '917982720270';
-    const messageText = `Verify FunMaza Code: #${waCode}`;
-    const url = `https://wa.me/${targetNumber}?text=${encodeURIComponent(messageText)}`;
-    Linking.openURL(url).catch(() => {
-      showToast(t('Could not launch WhatsApp'), 'error');
-    });
-  };
-
-  const handleConfirmPhoneVerify = async () => {
-    const raw = phoneInput.trim().replace(/\D/g, '').slice(-10);
-    if (!raw || !waCode) {
-      showToast(t('Verification code missing'), 'error');
+  // Step 2: Verify WhatsApp OTP -> Then open "Are you sure do you want to bind..." confirmation prompt
+  const handleVerifyWhatsAppOtp = async () => {
+    const cleanOtp = phoneOtp.trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      showToast(t('Please enter the 6-digit OTP code'), 'error');
       return;
     }
 
+    const raw = phoneInput.trim().replace(/\D/g, '').slice(-10);
     setPhoneVerifying(true);
     try {
-      const res = await api.post('/auth/confirm-whatsapp-verify', {
+      const res = await api.post('/auth/verify-whatsapp-otp', {
         phoneNumber: raw,
-        code: waCode,
+        otp: cleanOtp,
       });
 
       if (res.data?.success) {
-        showToast(t('WhatsApp Verified Successfully! ✅'), 'success');
+        showToast(t('WhatsApp OTP Verified Successfully! ✅'), 'success');
         setPhoneModalVisible(false);
-        setPhoneStep('input');
+        setPhoneOtpStep('input');
+        setPhoneOtp('');
 
-        // Open "Are you sure..." confirmation prompt
+        // Open "Are you sure..." confirmation prompt requested by user
         setPendingBind({
           provider: 'phone',
           accountId: raw,
-          name: profile?.name || `User ${raw.slice(-4)}`,
+          name: profile?.name || `+91 ${raw}`,
           phoneNumber: raw,
           promptText: t('Are you sure do you want to bind your account to this phone number?'),
         });
         setConfirmModalVisible(true);
       } else {
-        showToast(t(res.data?.message || 'Verification not completed yet. Please send message in WhatsApp.'), 'error');
+        showToast(t(res.data?.message || 'Wrong OTP code!'), 'error');
       }
     } catch (err) {
-      showToast(t(err.response?.data?.message || 'Verification code expired or invalid'), 'error');
+      showToast(t(err.response?.data?.message || 'Wrong OTP code! Please check your WhatsApp.'), 'error');
     } finally {
       setPhoneVerifying(false);
     }
@@ -809,7 +815,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
         </View>
       </ScrollView>
 
-      {/* ══ 0. PHONE NUMBER BINDING VIA WHATSAPP DEEP-LINK MODAL ══ */}
+      {/* ══ 0. PHONE NUMBER BINDING VIA WHATSAPP OTP MODAL ══ */}
       <Modal
         visible={phoneModalVisible}
         transparent
@@ -835,7 +841,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                     <T>Bind Phone Number</T>
                   </Text>
                   <Text style={styles.fbHeaderSub}>
-                    <T>Direct WhatsApp Verification (FunMaza)</T>
+                    <T>WhatsApp OTP Verification</T>
                   </Text>
                 </View>
               </View>
@@ -847,11 +853,11 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
               </TouchableOpacity>
             </View>
 
-            {phoneStep === 'input' ? (
+            {phoneOtpStep === 'input' ? (
               /* STEP 1: Enter 10-digit mobile number */
               <>
                 <Text style={styles.fbIntroText}>
-                  <T>Verify your mobile number for FunMaza directly via WhatsApp.</T>
+                  <T>Enter your 10-digit mobile number. We will send a 6-digit OTP code directly to your WhatsApp.</T>
                 </Text>
 
                 <View style={styles.inputSectionCard}>
@@ -864,7 +870,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                     </View>
                     <TextInput
                       style={[styles.gmailTextInput, { flex: 1, height: 46 }]}
-                      placeholder="10-digit number"
+                      placeholder={t('10-digit number')}
                       placeholderTextColor="#9CA3AF"
                       keyboardType="number-pad"
                       maxLength={10}
@@ -880,7 +886,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                     ]}
                     disabled={!phoneInput.trim() || phoneSending}
                     activeOpacity={0.85}
-                    onPress={handleStartWhatsAppVerify}
+                    onPress={handleSendWhatsAppOtp}
                   >
                     {phoneSending ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
@@ -888,7 +894,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                       <>
                         <WhatsAppIcon size={20} color="#FFFFFF" />
                         <Text style={styles.waVerifyBtnText}>
-                          <T>Verify via WhatsApp</T>
+                          <T>Get OTP on WhatsApp</T>
                         </Text>
                       </>
                     )}
@@ -896,60 +902,70 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 </View>
               </>
             ) : (
-              /* STEP 2: Waiting for user to send code on WhatsApp */
+              /* STEP 2: Enter 6-digit OTP from WhatsApp */
               <View style={styles.inputSectionCard}>
-                <View style={styles.waSuccessCard}>
-                  <View style={styles.waSuccessHeader}>
-                    <WhatsAppIcon size={24} color="#128C7E" />
-                    <Text style={styles.waSuccessTitle}>
-                      <T>WhatsApp Chat Opened!</T>
-                    </Text>
-                  </View>
-                  <Text style={styles.waSuccessDesc}>
-                    <T>Please send the pre-filled verification message in WhatsApp:</T>
+                <View style={styles.otpHeaderRow}>
+                  <Text style={styles.inputSectionLabel}>
+                    <T>Enter 6-digit OTP sent to your WhatsApp:</T>
                   </Text>
-                  <View style={styles.waCodeBox}>
-                    <Text style={styles.waCodeBoxText}>
-                      Verify FunMaza Code: #{waCode}
+                  <TouchableOpacity
+                    onPress={() => setPhoneOtpStep('input')}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Text style={styles.changeEmailText}>
+                      <T>Change</T>
                     </Text>
-                  </View>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.targetAccountHighlight}>
+                  +91 {phoneInput}
+                </Text>
+
+                <TextInput
+                  style={[styles.gmailTextInput, styles.otpTextInput]}
+                  placeholder="• • • • • •"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={phoneOtp}
+                  onChangeText={setPhoneOtp}
+                  autoFocus
+                />
+
+                <View style={styles.resendRow}>
+                  {phoneCountdown > 0 ? (
+                    <Text style={styles.resendTimerText}>
+                      <T>Resend OTP in</T> {phoneCountdown}s
+                    </Text>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={handleSendWhatsAppOtp}
+                      disabled={phoneSending}
+                    >
+                      <Text style={styles.resendActionText}>
+                        <T>Resend OTP</T>
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                {/* Re-open WhatsApp button */}
                 <TouchableOpacity
-                  style={styles.reopenWaBtn}
-                  activeOpacity={0.8}
-                  onPress={handleReopenWhatsApp}
-                >
-                  <WhatsAppIcon size={18} color="#128C7E" />
-                  <Text style={styles.reopenWaBtnText}>
-                    <T>Re-open WhatsApp Chat</T>
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Confirm Sent button */}
-                <TouchableOpacity
-                  style={styles.waConfirmBtn}
+                  style={[
+                    styles.submitGmailBtn,
+                    { backgroundColor: '#25D366' },
+                    (phoneOtp.length !== 6 || phoneVerifying) && styles.submitGmailBtnDisabled,
+                  ]}
+                  disabled={phoneOtp.length !== 6 || phoneVerifying}
                   activeOpacity={0.85}
-                  disabled={phoneVerifying}
-                  onPress={handleConfirmPhoneVerify}
+                  onPress={handleVerifyWhatsAppOtp}
                 >
                   {phoneVerifying ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.waConfirmBtnText}>
-                      ✅ <T>Confirm Sent & Bind Number</T>
+                    <Text style={styles.submitGmailBtnText}>
+                      ✅ <T>Verify OTP & Continue</T>
                     </Text>
                   )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={{ alignSelf: 'center', marginTop: 12 }}
-                  onPress={() => setPhoneStep('input')}
-                >
-                  <Text style={styles.changeEmailText}>
-                    <T>Change Mobile Number</T>
-                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1393,6 +1409,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 <GoogleCircleIcon size={46} />
               ) : pendingBind?.provider === 'facebook' ? (
                 <FacebookCircleIcon size={46} />
+              ) : pendingBind?.provider === 'phone' ? (
+                <PhoneCircleIcon size={46} />
               ) : (
                 <TwitterCircleIcon size={46} />
               )}
@@ -1410,13 +1428,17 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                   source={{ uri: pendingBind.avatar }}
                   style={styles.previewAvatar}
                 />
+              ) : pendingBind?.provider === 'phone' ? (
+                <PhoneCircleIcon size={36} />
               ) : null}
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, marginLeft: pendingBind?.provider === 'phone' ? 12 : 0 }}>
                 <Text style={styles.previewName}>{pendingBind?.name}</Text>
                 {pendingBind?.email ? (
                   <Text style={styles.previewSub}>{pendingBind.email}</Text>
                 ) : pendingBind?.username ? (
                   <Text style={styles.previewSub}>{pendingBind.username}</Text>
+                ) : pendingBind?.phoneNumber ? (
+                  <Text style={styles.previewSub}>+91 {pendingBind.phoneNumber}</Text>
                 ) : null}
               </View>
             </View>

@@ -11,19 +11,61 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Send Real SMS OTP to User's Mobiles Data
-// @route   POST /api/auth/send-whatsapp-otp & /api/auth/send-sms-otps
+// @desc    Send 6-Digit OTP to User's WhatsApp
+// @route   POST /api/auth/send-whatsapp-otp
 exports.sendWhatsAppOtp = async (req, res) => {
   try {
-    const { phoneNumber, channel } = req.body;
+    const { phoneNumber } = req.body;
     if (!phoneNumber) {
       return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
 
-    const result = await SmsOtpService.sendOtp(phoneNumber, channel || 'whatsapp');
-    return res.status(result.success ? 200 : 400).json(result);
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
+    }
+
+    const result = await WhatsAppOtpService.sendOtp(cleanPhone);
+    return res.status(result.success ? 200 : 400).json({
+      success: result.success,
+      message: result.message || 'OTP has been sent to your WhatsApp number',
+      deepLinkUrl: result.deepLinkUrl,
+      webUrl: result.webUrl,
+    });
   } catch (error) {
-    console.error('sendSmsOtp error:', error);
+    console.error('sendWhatsAppOtp error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify User's Entered WhatsApp OTP
+// @route   POST /api/auth/verify-whatsapp-otp
+exports.verifyWhatsAppOtp = async (req, res) => {
+  try {
+    const { phoneNumber, otp } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'OTP code is required' });
+    }
+
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    const verifyResult = await WhatsAppOtpService.verifyOtp(cleanPhone, otp);
+
+    if (!verifyResult.valid) {
+      return res.status(400).json({
+        success: false,
+        message: verifyResult.message || 'Wrong OTP! Please enter correct 6 digit OTP',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'WhatsApp OTP Verified Successfully! ✅',
+    });
+  } catch (error) {
+    console.error('verifyWhatsAppOtp error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -58,7 +100,11 @@ exports.verifyOtpOnly = async (req, res) => {
     }
 
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
-    const verifyResult = await SmsOtpService.verifyOtp(cleanPhone, otp);
+    let verifyResult = await WhatsAppOtpService.verifyOtp(cleanPhone, otp);
+    if (!verifyResult.valid) {
+      verifyResult = await SmsOtpService.verifyOtp(cleanPhone, otp);
+    }
+
     if (!verifyResult.valid) {
       return res.status(400).json({
         success: false,
@@ -566,9 +612,31 @@ exports.bindAccount = async (req, res) => {
         boundAt: new Date(),
       };
     } else if (provider === 'phone') {
-      user.phone = accountId;
+      const cleanPhone = accountId.replace(/\D/g, '').slice(-10);
+      if (!cleanPhone || cleanPhone.length !== 10) {
+        return res.status(400).json({ success: false, message: 'Invalid phone number format' });
+      }
+
+      const existing = await User.findOne({
+        $or: [
+          { phoneNumber: cleanPhone },
+          { phone: cleanPhone },
+          { 'boundAccounts.phone.number': cleanPhone },
+        ],
+        _id: { $ne: user._id },
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'This mobile number is already bound to another profile',
+        });
+      }
+
+      user.phone = cleanPhone;
+      user.phoneNumber = cleanPhone;
       user.boundAccounts.phone = {
-        number: accountId,
+        number: cleanPhone,
         boundAt: new Date(),
       };
     }
@@ -609,6 +677,8 @@ exports.unbindAccount = async (req, res) => {
       user.twitterId = undefined;
       user.boundAccounts.twitter = undefined;
     } else if (provider === 'phone') {
+      user.phone = undefined;
+      user.phoneNumber = undefined;
       user.boundAccounts.phone = undefined;
     }
 

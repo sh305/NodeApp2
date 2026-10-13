@@ -99,3 +99,5 @@ if (process.env.MONGO_URI && !process.env.MONGO_URI.includes('<username>')) {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 YoYo Voice Backend Server running on port ${PORT} (0.0.0.0)`);
 });
+// WhatsApp Meta Cloud API Integrated
+

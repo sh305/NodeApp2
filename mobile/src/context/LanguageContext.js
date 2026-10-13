@@ -64,6 +64,23 @@ export const LanguageProvider = ({ children }) => {
   // Dynamic set of all phrases used in the app (auto-accumulated at runtime)
   const knownPhrases = useRef(
     new Set([
+      'Bind Phone Number',
+      'WhatsApp OTP Verification',
+      'Enter your 10-digit mobile number. We will send a 6-digit OTP code directly to your WhatsApp.',
+      'Your 10-Digit Mobile Number',
+      '10-digit number',
+      'Get OTP on WhatsApp',
+      'Open WhatsApp Chat',
+      'Opening WhatsApp... Please check your OTP! 📨',
+      'Enter 6-digit OTP sent to your WhatsApp:',
+      'OTP code sent to your WhatsApp! 📨',
+      'WhatsApp OTP Verified Successfully! ✅',
+      'Are you sure do you want to bind your account to this phone number?',
+      'Phone number bound successfully!',
+      'Please enter a valid 10-digit mobile number',
+      'Please enter the 6-digit OTP code',
+      'Failed to send WhatsApp OTP',
+      'Wrong OTP code! Please check your WhatsApp.',
       'Voice Chat, Play Games, Make Friends',
       'Sexual and violent contents are not allowed. All violators will be banned. Please report and do not expose personal info.',
       'Basic tools',

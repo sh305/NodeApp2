@@ -3,17 +3,20 @@ const { cacheService } = require('../config/redis');
 
 /**
  * Meta WhatsApp Cloud API Service
- * Free Tier: 1,000 Free WhatsApp messages/conversations per month!
  */
 class WhatsAppOtpService {
   /**
-   * Send 6-Digit OTP to User's WhatsApp
-   * @param {string} rawPhoneNumber - 10 digit Indian number (e.g. 9876543210)
+   * Send 6-Digit OTP directly to User's WhatsApp inbox via Meta Cloud API
+   * @param {string} rawPhoneNumber - 10 digit Indian number (e.g. 7982720270)
    * @param {string} countryCode - Country code without + (default: 91)
    */
   static async sendOtp(rawPhoneNumber, countryCode = '91') {
     try {
-      const cleanPhone = rawPhoneNumber.replace(/\D/g, '');
+      const cleanPhone = (rawPhoneNumber || '').replace(/\D/g, '').slice(-10);
+      if (!cleanPhone || cleanPhone.length !== 10) {
+        return { success: false, message: 'Please enter a valid 10-digit Indian mobile number' };
+      }
+
       const fullRecipientNumber = cleanPhone.startsWith(countryCode)
         ? cleanPhone
         : `${countryCode}${cleanPhone}`;
@@ -23,54 +26,65 @@ class WhatsAppOtpService {
 
       // Store in memory cache for 5 minutes (300 seconds)
       await cacheService.set(`otp:${cleanPhone}`, otp, 300);
+      await cacheService.set(`wa_otp:${cleanPhone}`, otp, 300);
 
       const phoneNumberId = process.env.META_WHATSAPP_PHONE_ID;
       const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
 
-      // If Meta credentials are provided in .env, call Meta Graph API
-      if (phoneNumberId && accessToken) {
-        const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
-
-        const payload = {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: fullRecipientNumber,
-          type: 'text',
-          text: {
-            preview_url: false,
-            body: `🔐 *YoYo Voice Verification*\n\nYour Login OTP code is: *${otp}*\n\nThis code is valid for 5 minutes. Do not share it with anyone.`,
-          },
+      if (!phoneNumberId || !accessToken) {
+        console.warn('⚠️ Meta WhatsApp credentials missing in backend/.env');
+        return {
+          success: false,
+          message: 'WhatsApp verification service not configured',
         };
-
-        const response = await axios.post(url, payload, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000,
-        });
-
-        console.log(`✅ WhatsApp OTP sent to +${fullRecipientNumber}: Message ID ${response.data?.messages?.[0]?.id}`);
-      } else {
-        // Development Simulation Log
-        console.log(`\n======================================================`);
-        console.log(`📱 [WhatsApp OTP Simulation] Sent to: +${fullRecipientNumber}`);
-        console.log(`🔑 OTP Code: ${otp} (Valid for 5 Minutes)`);
-        console.log(`💡 Note: To send real WhatsApp messages, add META_WHATSAPP_PHONE_ID & META_WHATSAPP_ACCESS_TOKEN in backend/.env`);
-        console.log(`======================================================\n`);
       }
+
+      const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+      const messageBody = `🔐 *YoYo Voice Verification*\n\nYour Verification OTP code is: *${otp}*\n\nThis code is valid for 5 minutes. Do not share it with anyone.`;
+
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: fullRecipientNumber,
+        type: 'text',
+        text: {
+          preview_url: false,
+          body: messageBody,
+        },
+      };
+
+      console.log(`📡 [Meta WhatsApp Cloud API] Dispatching OTP to +${fullRecipientNumber}...`);
+
+      const response = await axios.post(url, payload, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      });
+
+      console.log(`✅ WhatsApp OTP delivered to +${fullRecipientNumber}! Message ID: ${response.data?.messages?.[0]?.id}`);
 
       return {
         success: true,
         message: 'OTP has been sent to your WhatsApp number',
-        // In dev mode or until meta keys added, returning simulated status
-        devOtp: process.env.NODE_ENV === 'production' ? undefined : otp,
       };
     } catch (error) {
-      console.error('Meta WhatsApp API Error:', error.response?.data || error.message);
+      const errDetails = error.response?.data?.error;
+      console.error('Meta WhatsApp API Error:', errDetails || error.message);
+
+      let userMsg = 'Failed to send WhatsApp OTP. Please ensure your number is registered on WhatsApp.';
+      if (errDetails?.message) {
+        if (errDetails.code === 131030) {
+          userMsg = 'Recipient number is not in the allowed list for test mode.';
+        } else if (errDetails.code === 190) {
+          userMsg = 'WhatsApp service access token expired. Please refresh token.';
+        }
+      }
+
       return {
         success: false,
-        message: error.response?.data?.error?.message || 'Failed to send WhatsApp OTP',
+        message: userMsg,
       };
     }
   }
@@ -79,25 +93,34 @@ class WhatsAppOtpService {
    * Verify User's Entered OTP
    */
   static async verifyOtp(rawPhoneNumber, enteredOtp) {
-    const cleanPhone = rawPhoneNumber.replace(/\D/g, '');
+    const cleanPhone = (rawPhoneNumber || '').replace(/\D/g, '').slice(-10);
 
-    // Master dev fallback
-    if (enteredOtp === '123456' || enteredOtp === '000000') {
-      return { valid: true };
+    if (!enteredOtp || enteredOtp.toString().trim().length !== 6) {
+      return { valid: false, message: 'Please enter a valid 6-digit OTP code' };
     }
 
-    const storedOtp = await cacheService.get(`otp:${cleanPhone}`);
+    const cleanOtp = enteredOtp.toString().trim();
+
+    // Check stored OTP in memory cache
+    let storedOtp = await cacheService.get(`otp:${cleanPhone}`);
+    if (!storedOtp) {
+      storedOtp = await cacheService.get(`wa_otp:${cleanPhone}`);
+    }
 
     if (!storedOtp) {
       return { valid: false, message: 'OTP expired or not found. Please request a new OTP.' };
     }
 
-    if (storedOtp.toString().trim() !== enteredOtp.toString().trim()) {
-      return { valid: false, message: 'Invalid OTP code. Please try again.' };
+    if (storedOtp.toString().trim() !== cleanOtp) {
+      return { valid: false, message: 'Wrong OTP! Please enter correct 6 digit OTP' };
     }
 
-    // Delete OTP once successfully verified (Single-use)
+    // Delete single-use OTP
     await cacheService.del(`otp:${cleanPhone}`);
+    await cacheService.del(`wa_otp:${cleanPhone}`);
+
+    // Mark as verified for 15 minutes
+    await cacheService.set(`phone_verified:${cleanPhone}`, 'true', 900);
 
     return { valid: true };
   }

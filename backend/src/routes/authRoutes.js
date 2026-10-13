@@ -8,6 +8,7 @@ const {
   googleLogin,
   facebookLogin,
   sendWhatsAppOtp,
+  verifyWhatsAppOtp,
   sendEmailOtp,
   verifyOtpOnly,
   verifyEmailOtp,
@@ -23,6 +24,7 @@ const {
 const { protect } = require('../middlewares/authMiddleware');
 
 router.post('/send-whatsapp-otp', sendWhatsAppOtp);
+router.post('/verify-whatsapp-otp', verifyWhatsAppOtp);
 router.post('/send-sms-otp', sendWhatsAppOtp);
 router.post('/send-email-otp', sendEmailOtp);
 router.post('/verify-otp', verifyOtpOnly);
