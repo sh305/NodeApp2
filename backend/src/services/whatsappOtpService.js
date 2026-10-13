@@ -28,8 +28,10 @@ class WhatsAppOtpService {
       await cacheService.set(`otp:${cleanPhone}`, otp, 300);
       await cacheService.set(`wa_otp:${cleanPhone}`, otp, 300);
 
-      const phoneNumberId = process.env.META_WHATSAPP_PHONE_ID;
-      const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
+      const phoneNumberId = process.env.META_WHATSAPP_PHONE_ID || '1449778534875707';
+      const accessToken =
+        process.env.META_WHATSAPP_ACCESS_TOKEN ||
+        'EAAMHnfCYEa0BSsCl4hUm78GP1zJVOEZAgng8Bx82g8AupjXirobH9UCvWBBcCpId0ZCxJ4KqhS3wfJOPaTLODG8hYSMQ8nZBvHrdBu7w6yi2hBZAyw0m8P9xv9RwhelAekWC9uueHNoI8N39SMXjvJW9JKoJmpYd0A7RdHW47WgrexCK5jVJCqD6XRM9qrEQobm7VafJc8gh8oR8FOd0vb5z1czSJ5gZCsnMQiFIE5tMhHmsVB7nMNGzW3YZC8aaxgkVMvpUrJjdUqWRcFdmAcCwZDZD';
 
       if (!phoneNumberId || !accessToken) {
         console.warn('⚠️ Meta WhatsApp credentials missing in backend/.env');

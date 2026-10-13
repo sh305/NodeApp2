@@ -2,6 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const SmsOtpService = require('../services/smsOtpService');
 const WhatsAppOtpService = require('../services/whatsappOtpService');
+const VoiceOtpService = require('../services/voiceOtpService');
 const EmailOtpService = require('../services/emailOtpService');
 const { cacheService } = require('../config/redis');
 
@@ -70,6 +71,82 @@ exports.verifyWhatsAppOtp = async (req, res) => {
   }
 };
 
+// @desc    Send 6-Digit Voice Call OTP via 2Factor.in
+// @route   POST /api/auth/send-voice-otp
+exports.sendVoiceOtp = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
+    }
+
+    const result = await VoiceOtpService.sendVoiceOtp(cleanPhone);
+    return res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    console.error('sendVoiceOtp error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify 6-Digit Voice Call OTP via 2Factor.in
+// @route   POST /api/auth/verify-voice-otp
+exports.verifyVoiceOtp = async (req, res) => {
+  try {
+    const { phoneNumber, otp } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'OTP code is required' });
+    }
+
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    const verifyResult = await VoiceOtpService.verifyVoiceOtp(cleanPhone, otp);
+
+    if (!verifyResult.valid) {
+      return res.status(400).json({
+        success: false,
+        message: verifyResult.message || 'Wrong OTP! Please enter correct 6 digit OTP',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Voice OTP Verified Successfully! ✅',
+    });
+  } catch (error) {
+    console.error('verifyVoiceOtp error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Send SMS OTP via 2Factor.in
+// @route   POST /api/auth/send-sms-otp
+exports.sendSmsOtp = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
+    }
+
+    const result = await SmsOtpService.sendOtp(cleanPhone);
+    return res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    console.error('sendSmsOtp error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Send 6-Digit OTP to User's Gmail / Email
 // @route   POST /api/auth/send-email-otp
 exports.sendEmailOtp = async (req, res) => {
@@ -87,7 +164,7 @@ exports.sendEmailOtp = async (req, res) => {
   }
 };
 
-// @desc    Verify SMS / Phone OTP
+// @desc    Verify SMS / Phone / Voice OTP
 // @route   POST /api/auth/verify-otp
 exports.verifyOtpOnly = async (req, res) => {
   try {
@@ -100,9 +177,12 @@ exports.verifyOtpOnly = async (req, res) => {
     }
 
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
-    let verifyResult = await WhatsAppOtpService.verifyOtp(cleanPhone, otp);
+    let verifyResult = await VoiceOtpService.verifyVoiceOtp(cleanPhone, otp);
     if (!verifyResult.valid) {
       verifyResult = await SmsOtpService.verifyOtp(cleanPhone, otp);
+    }
+    if (!verifyResult.valid) {
+      verifyResult = await WhatsAppOtpService.verifyOtp(cleanPhone, otp);
     }
 
     if (!verifyResult.valid) {
@@ -489,6 +569,64 @@ exports.googleLogin = async (req, res) => {
   } catch (error) {
     console.error('Google login error:', error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify Facebook Access Token & Return Profile
+// @route   POST /api/auth/facebook-verify-token
+exports.verifyFacebookToken = async (req, res) => {
+  try {
+    let { accessToken, code } = req.body;
+
+    // Exchange OAuth code for accessToken if code was returned
+    if (!accessToken && code) {
+      const fbAppId = process.env.FACEBOOK_APP_ID || '28841648478806812';
+      const fbAppSecret = process.env.FACEBOOK_APP_SECRET || '87ac5abdd4d4db0a66d5df9f6eda558b';
+      const redirectUri = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+
+      const tokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
+        params: {
+          client_id: fbAppId,
+          client_secret: fbAppSecret,
+          redirect_uri: redirectUri,
+          code,
+        },
+        timeout: 10000,
+      });
+      if (tokenRes.data?.access_token) {
+        accessToken = tokenRes.data.access_token;
+      }
+    }
+
+    if (!accessToken) {
+      return res.status(400).json({ success: false, message: 'Facebook Access Token or Code is required' });
+    }
+
+    const graphUrl = `https://graph.facebook.com/v19.0/me?fields=id,name,email,picture.width(200).height(200)&access_token=${accessToken}`;
+    const response = await axios.get(graphUrl, { timeout: 10000 });
+
+    if (!response.data || !response.data.id) {
+      return res.status(400).json({ success: false, message: 'Invalid Facebook Access Token' });
+    }
+
+    const { id, name, email, picture } = response.data;
+    const avatar = picture?.data?.url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+
+    return res.status(200).json({
+      success: true,
+      profile: {
+        id,
+        name,
+        email: email || '',
+        avatar,
+      },
+    });
+  } catch (error) {
+    console.error('verifyFacebookToken error:', error.response?.data || error.message);
+    return res.status(400).json({
+      success: false,
+      message: error.response?.data?.error?.message || 'Failed to authenticate with Facebook',
+    });
   }
 };
 
