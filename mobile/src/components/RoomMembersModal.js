@@ -499,7 +499,7 @@ export default function RoomMembersModal({
               {activeTab === 'applicants' && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
 
-            {/* Tab 2: On Seatss */}
+            {/* Tab 2: On Seatsss */}
             <TouchableOpacity
               style={styles.tabBtn}
               activeOpacity={0.8}
