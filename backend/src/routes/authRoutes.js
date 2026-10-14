@@ -8,8 +8,10 @@ const {
   googleLogin,
   facebookLogin,
   sendWhatsAppOtp,
-  sendSmsOtp,
   verifyWhatsAppOtp,
+  sendVoiceOtp,
+  verifyVoiceOtp,
+  sendSmsOtp,
   sendEmailOtp,
   verifyOtpOnly,
   verifyEmailOtp,
@@ -21,26 +23,28 @@ const {
   confirmWhatsAppVerify,
   generateFacebookOtp,
   verifyFacebookOtp,
-  facebookBindOAuth,
+  verifyFacebookToken,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
+router.post('/send-voice-otp', sendVoiceOtp);
+router.post('/verify-voice-otp', verifyVoiceOtp);
+router.post('/send-phone-otp', sendVoiceOtp);
+router.post('/send-sms-otp', sendSmsOtp);
 router.post('/send-whatsapp-otp', sendWhatsAppOtp);
 router.post('/verify-whatsapp-otp', verifyWhatsAppOtp);
-router.post('/send-sms-otp', sendSmsOtp);
 router.post('/send-email-otp', sendEmailOtp);
 router.post('/verify-otp', verifyOtpOnly);
 router.post('/verify-email-otp', verifyEmailOtp);
 router.post('/generate-whatsapp-code', generateWhatsAppCode);
 router.post('/confirm-whatsapp-verify', confirmWhatsAppVerify);
 router.post('/generate-facebook-otp', generateFacebookOtp);
-router.post('/verify-facebook-otp', verifyFacebookOtp);
-router.post('/facebook-bind-oauth', protect, facebookBindOAuth);
 router.post('/phone-login', phoneLogin);
 router.post('/phone-register', phoneRegister);
 router.post('/email-login', emailLogin);
 router.post('/email-register', emailRegister);
 router.post('/google-login', googleLogin);
+router.post('/facebook-verify-token', verifyFacebookToken);
 router.post('/facebook-login', facebookLogin);
 router.post('/twitter-login', twitterLogin);
 router.post('/bind-account', protect, bindAccount);
