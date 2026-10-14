@@ -9,7 +9,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -185,7 +185,7 @@ export default function LevelScreen({ navigation, route, currentUser }) {
     'https://api.dicebear.com/7.x/bottts/png?seed=UserLevel';
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* ══ 1. DYNAMIC TOP HEADER WITH GRADIENT (MATCHING SCREENSHOTS 1 & 2) ══ */}
       <LinearGradient
         colors={
@@ -195,10 +195,7 @@ export default function LevelScreen({ navigation, route, currentUser }) {
         }
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[
-          styles.headerContainer,
-          { paddingTop: Math.max(12, insets.top) },
-        ]}
+        style={styles.headerContainer}
       >
         {/* Background Watermark */}
         {isFortune ? <CoinWatermark size={175} /> : <StarWatermark size={180} />}
@@ -574,7 +571,7 @@ export default function LevelScreen({ navigation, route, currentUser }) {
           </View>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -231,6 +231,35 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   const [isCommentDisabled, setIsCommentDisabled] = useState(false);
   const [isBlockedByYou, setIsBlockedByYou] = useState(false);
   const [profileActionMenuVisible, setProfileActionMenuVisible] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const hasNavigatedBack = useRef(false);
+
+  const handleGoBackOrHome = useCallback(() => {
+    if (hasNavigatedBack.current) return;
+    hasNavigatedBack.current = true;
+
+    // Allow 350ms for native transition animation to settle before popping
+    setTimeout(() => {
+      try {
+        if (navigation?.canGoBack && navigation.canGoBack()) {
+          navigation.goBack();
+        } else if (navigation?.navigate) {
+          navigation.navigate('Home');
+        }
+      } catch (e) {
+        navigation?.navigate?.('Home');
+      }
+    }, 350);
+
+    // Guaranteed fallback after 600ms: ensure user is never left stranded
+    setTimeout(() => {
+      try {
+        navigation?.navigate?.('Home');
+      } catch (e) {
+        // ignore
+      }
+    }, 600);
+  }, [navigation]);
 
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -277,6 +306,8 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   };
 
   const fetchProfile = async () => {
+    hasNavigatedBack.current = false;
+    setIsBlocked(false);
     try {
       const res = await api.get(`/users/${userId}/profile`);
       if (res.data.success) {
@@ -311,15 +342,12 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
       }
     } catch (err) {
       if (err.response?.status === 403 && err.response?.data?.isBlocked) {
-        showToast(
-          t(err.response?.data?.message || 'You have been blocked. You cannot view this profile'),
-          'error'
-        );
-        if (navigation?.navigate) {
-          navigation.navigate('Home');
-        } else {
-          navigation.goBack();
-        }
+        setIsBlocked(true);
+        const msg =
+          err.response?.data?.message || 'You have been blocked. You cannot view this profile';
+        showToast(t(msg), 'error');
+        handleGoBackOrHome();
+        return;
       } else {
         showToast(err.response?.data?.message || t('Failed to load user profile'), 'error');
       }
@@ -327,10 +355,6 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchProfile();
-  }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -891,15 +915,35 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
     return String(num);
   };
 
-  if (loading) {
+  if (isBlocked) {
+    return (
+      <View style={[styles.screen, { backgroundColor: '#0F0F1A' }]}>
+        <View style={{ paddingTop: Math.max(16, insets.top), paddingHorizontal: 16 }}>
+          <TouchableOpacity
+            style={styles.navCircleBtn}
+            activeOpacity={0.8}
+            onPress={() => {
+              if (navigation?.canGoBack && navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation?.navigate?.('Home');
+              }
+            }}
+          >
+            <BackIcon size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (loading || !profile) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#00C853" />
       </View>
     );
   }
-
-  if (!profile) return null;
 
   const displayId = profile.customId || (profile._id ? String(parseInt(profile._id.slice(-6), 16)).padStart(8, '0').slice(-8) : '10000001');
   const cpList = profile.cpRelationships || [];

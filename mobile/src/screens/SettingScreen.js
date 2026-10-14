@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useLanguage, LANGUAGES } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
@@ -346,9 +346,9 @@ export default function SettingScreen({ navigation, onLogout }) {
   ];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* ══ TOP HEADER ══ */}
-      <View style={[styles.header, { paddingTop: Math.max(12, insets.top) }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
           activeOpacity={0.75}
@@ -554,7 +554,7 @@ export default function SettingScreen({ navigation, onLogout }) {
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -75,7 +75,12 @@ export default function App() {
         <ToastProvider>
           <NavigationContainer>
             <StatusBar style="light" />
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Navigator
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: '#0F0F1A' },
+              }}
+            >
               {!currentUser ? (
                 <Stack.Screen name="Auth">
                   {(props) => (

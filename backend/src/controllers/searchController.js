@@ -84,12 +84,17 @@ exports.globalSearch = async (req, res) => {
 
       const userLimit = type === 'user' ? 60 : 3;
       const foundUsers = await User.find(userCondition)
-        .select('name avatar wealthLevel gender activeFrame customId')
+        .select('name avatar wealthLevel gender activeFrame customId blockedUsers')
         .limit(userLimit)
         .lean();
 
       results.users = foundUsers.map((u) => {
         const uIdStr = u._id.toString();
+        const isBlockedByAuthor = Boolean(
+          currentUserId &&
+          Array.isArray(u.blockedUsers) &&
+          u.blockedUsers.some((b) => b && b.toString() === currentUserId.toString())
+        );
         return {
           _id: u._id,
           name: u.name,
@@ -100,6 +105,7 @@ exports.globalSearch = async (req, res) => {
           displayId: u.customId || getDisplayId(u),
           isFollowing: followingIds.has(uIdStr),
           isSelf: currentUserId ? currentUserId.toString() === uIdStr : false,
+          isBlockedByAuthor,
         };
       });
     }

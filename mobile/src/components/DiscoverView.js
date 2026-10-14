@@ -469,6 +469,10 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
 
   // Open Comments Modal
   const handleOpenComments = async (post) => {
+    if (post.isCommentDisabled) {
+      showToast(t('The author has disabled your ability to comment on their posts.'), 'info');
+      return;
+    }
     setSelectedPostForComments(post);
     setCommentsList([]);
     setLoadingComments(true);
@@ -476,6 +480,11 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
       const res = await api.get(`/posts/${post._id}/comments`);
       if (res.data?.success) {
         setCommentsList(res.data.comments || []);
+        if (res.data.isCommentDisabled !== undefined) {
+          setSelectedPostForComments((prev) =>
+            prev ? { ...prev, isCommentDisabled: res.data.isCommentDisabled } : null
+          );
+        }
       }
     } catch (err) {
       console.error('Error fetching comments:', err);
@@ -487,6 +496,10 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
   // Add Comment to Post
   const handleAddComment = async () => {
     if (!newCommentText.trim() || !selectedPostForComments) return;
+    if (selectedPostForComments.isCommentDisabled) {
+      showToast(t('The author has disabled your ability to comment on their posts.'), 'error');
+      return;
+    }
     try {
       setSubmittingComment(true);
       const res = await api.post(`/posts/${selectedPostForComments._id}/comment`, {
@@ -505,7 +518,7 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
         );
       }
     } catch (err) {
-      showToast(t('Failed to post comment'), 'error');
+      showToast(t(err.response?.data?.message || 'Failed to post comment'), 'error');
     } finally {
       setSubmittingComment(false);
     }
@@ -633,6 +646,10 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => {
+              if (item.isBlockedByAuthor) {
+                showToast(t('You have been blocked. You cannot view this profile'), 'error');
+                return;
+              }
               if (user._id && navigation) {
                 navigation.navigate('UserProfile', { userId: user._id });
               }
@@ -654,6 +671,10 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => {
+                if (item.isBlockedByAuthor) {
+                  showToast(t('You have been blocked. You cannot view this profile'), 'error');
+                  return;
+                }
                 if (user._id && navigation) {
                   navigation.navigate('UserProfile', { userId: user._id });
                 }
@@ -755,12 +776,29 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.75}
-              onPress={() => handleOpenComments(item)}
+              style={[
+                styles.actionBtn,
+                item.isCommentDisabled && { opacity: 0.35 },
+              ]}
+              activeOpacity={item.isCommentDisabled ? 1 : 0.75}
+              disabled={!!item.isCommentDisabled}
+              onPress={() => {
+                if (item.isCommentDisabled) return;
+                handleOpenComments(item);
+              }}
             >
-              <CommentBubbleIcon size={20} color="#64748B" />
-              <Text style={styles.actionCountText}>{item.commentCount || 0}</Text>
+              <CommentBubbleIcon
+                size={20}
+                color={item.isCommentDisabled ? '#475569' : '#64748B'}
+              />
+              <Text
+                style={[
+                  styles.actionCountText,
+                  item.isCommentDisabled && { color: '#475569' },
+                ]}
+              >
+                {item.commentCount || 0}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1565,29 +1603,37 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
               />
             )}
 
-            <View style={styles.commentInputRow}>
-              <TextInput
-                style={styles.commentTextInput}
-                placeholder={t('Write a comment...')}
-                placeholderTextColor="#94A3B8"
-                value={newCommentText}
-                onChangeText={setNewCommentText}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.commentSendBtn,
-                  !newCommentText.trim() && { opacity: 0.4 },
-                ]}
-                onPress={handleAddComment}
-                disabled={submittingComment || !newCommentText.trim()}
-              >
-                {submittingComment ? (
-                  <ActivityIndicator size="small" color="#00C853" />
-                ) : (
-                  <SendIcon size={20} color="#00C853" />
-                )}
-              </TouchableOpacity>
-            </View>
+            {selectedPostForComments?.isCommentDisabled ? (
+              <View style={styles.commentDisabledBar}>
+                <Text style={styles.commentDisabledText}>
+                  <T>The author has disabled your ability to comment on their posts.</T>
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.commentInputRow}>
+                <TextInput
+                  style={styles.commentTextInput}
+                  placeholder={t('Write a comment...')}
+                  placeholderTextColor="#94A3B8"
+                  value={newCommentText}
+                  onChangeText={setNewCommentText}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.commentSendBtn,
+                    !newCommentText.trim() && { opacity: 0.4 },
+                  ]}
+                  onPress={handleAddComment}
+                  disabled={submittingComment || !newCommentText.trim()}
+                >
+                  {submittingComment ? (
+                    <ActivityIndicator size="small" color="#00C853" />
+                  ) : (
+                    <SendIcon size={20} color="#00C853" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -2528,6 +2574,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  commentDisabledBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentDisabledText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textAlign: 'center',
   },
 
   // 10. Fullscreen Image Modal

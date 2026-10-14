@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
 import api from '../api/client';
@@ -102,11 +102,11 @@ export default function OnlineStatusScreen({ navigation, route, currentUser }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F6FA" />
 
       {/* ══ TOP NAVIGATION HEADER ══ */}
-      <View style={[styles.header, { paddingTop: Math.max(12, insets.top) }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
           activeOpacity={0.75}
@@ -160,7 +160,7 @@ export default function OnlineStatusScreen({ navigation, route, currentUser }) {
       <Text style={styles.footerNote}>
         <T>Available exclusively to Super King</T>
       </Text>
-    </View>
+    </SafeAreaView>
   );
 }
 

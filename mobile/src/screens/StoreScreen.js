@@ -13,7 +13,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1183,9 +1183,9 @@ export default function StoreScreen({ navigation, route, currentUser }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* 1. TOP HEADER IN VIBRANT EMERALD GREEN */}
-      <View style={[styles.headerContainer, { paddingTop: Math.max(12, insets.top) }]}>
+      <View style={styles.headerContainer}>
         {activeCurrencyTab === 'Game Coins' || (isTools && toolsSection === 'Game') ? (
           <GamepadWatermark size={135} />
         ) : (
@@ -1694,7 +1694,7 @@ export default function StoreScreen({ navigation, route, currentUser }) {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

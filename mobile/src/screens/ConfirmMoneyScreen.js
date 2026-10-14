@@ -13,7 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import io from 'socket.io-client';
 import api, { BASE_URL } from '../api/client';
@@ -302,11 +302,11 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
   const totalNeedsReview = pendingCount + proofSubmittedCount;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* ══ HEADER ══ */}
       <LinearGradient
         colors={['#1E1E2D', '#141420']}
-        style={[styles.header, { paddingTop: Math.max(16, insets.top) }]}
+        style={styles.header}
       >
         <TouchableOpacity
           style={styles.headerBtn}
@@ -1340,7 +1340,7 @@ export default function ConfirmMoneyScreen({ navigation, currentUser }) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

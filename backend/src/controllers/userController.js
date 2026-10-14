@@ -8,7 +8,11 @@ const mongoose = require('mongoose');
 exports.getUserProfile = async (req, res) => {
   try {
     const targetUserId = req.params.id;
-    const requesterId = req.user._id;
+    const requesterId = req.user?._id;
+
+    if (!targetUserId || !mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
 
     const targetUser = await User.findById(targetUserId)
       .select('-phoneNumber -email')
@@ -19,8 +23,8 @@ exports.getUserProfile = async (req, res) => {
     }
 
     // Check if target user has blocked requester
-    const isBlockedByTarget = targetUser.blockedUsers.some(
-      (blockedId) => blockedId.toString() === requesterId.toString()
+    const isBlockedByTarget = (targetUser.blockedUsers || []).some(
+      (blockedId) => blockedId && requesterId && blockedId.toString() === requesterId.toString()
     );
 
     if (isBlockedByTarget) {
@@ -32,34 +36,48 @@ exports.getUserProfile = async (req, res) => {
     }
 
     // Check if requester has blocked target
-    const isRequesterBlockedTarget = req.user.blockedUsers.some(
-      (bId) => bId.toString() === targetUserId.toString()
+    const isRequesterBlockedTarget = (req.user?.blockedUsers || []).some(
+      (bId) => bId && bId.toString() === targetUserId.toString()
     );
 
     // Check if requester has disabled comments for target user
-    const isCommentDisabled = (req.user.commentDisabledUsers || []).some(
-      (dId) => dId.toString() === targetUserId.toString()
+    const isCommentDisabled = (req.user?.commentDisabledUsers || []).some(
+      (dId) => dId && dId.toString() === targetUserId.toString()
+    );
+
+    // Check if requester is following target user
+    const isFollowing = (targetUser.followers || []).some(
+      (fId) => fId && requesterId && (fId._id ? fId._id.toString() : fId.toString()) === requesterId.toString()
     );
 
     // Track profile visitors when another user visits (with timestamp)
     if (requesterId && requesterId.toString() !== targetUserId.toString()) {
-      if (!targetUser.visitors) targetUser.visitors = [];
-      const existingIdx = targetUser.visitors.findIndex((v) => {
-        const vid = v && (v.user ? v.user.toString() : v.toString());
-        return vid === requesterId.toString();
-      });
-      if (existingIdx >= 0) {
-        targetUser.visitors[existingIdx] = {
+      try {
+        const visitorEntry = {
           user: requesterId,
           visitedAt: new Date(),
         };
-      } else {
-        targetUser.visitors.unshift({
-          user: requesterId,
-          visitedAt: new Date(),
-        });
+        await User.updateOne(
+          { _id: targetUserId },
+          {
+            $pull: { visitors: { user: requesterId } },
+          }
+        );
+        await User.updateOne(
+          { _id: targetUserId },
+          {
+            $push: {
+              visitors: {
+                $each: [visitorEntry],
+                $position: 0,
+                $slice: 100,
+              },
+            },
+          }
+        );
+      } catch (visitorErr) {
+        console.warn('Error recording profile visitor:', visitorErr.message);
       }
-      await targetUser.save();
     }
 
     // Top 3 Supporters who gifted to targetUser
@@ -124,6 +142,7 @@ exports.getUserProfile = async (req, res) => {
         wealthExp: targetUser.wealthExp || 0,
         charmLevel: targetUser.charmLevel || 1,
         charmExp: targetUser.charmExp || 0,
+        userLevel: targetUser.userLevel || 1,
         coins: targetUser.coins || 0,
         diamonds: targetUser.diamonds || 0,
         gameCoins: targetUser.gameCoins || 0,
@@ -140,9 +159,16 @@ exports.getUserProfile = async (req, res) => {
         height: targetUser.height || '',
         weight: targetUser.weight || '',
         occupation: targetUser.occupation || '',
+        isRealPersonVerified: !!targetUser.isRealPersonVerified,
+        realPersonVerifiedAt: targetUser.realPersonVerifiedAt,
+        isAvatarVerified: !!targetUser.isAvatarVerified,
+        avatarVerifiedAt: targetUser.avatarVerifiedAt,
+        onlineStatus: targetUser.onlineStatus || 'online',
+        nobleLevel: targetUser.nobleLevel || 'Super King',
         cpRelationships: targetUser.cpRelationships || [],
         topSupporters: topSupporters || [],
         totalContributed: totalContributed || 0,
+        isFollowing: isFollowing,
         isBlockedByYou: isRequesterBlockedTarget,
         isCommentDisabled: isCommentDisabled,
         followersCount: targetUser.followers ? targetUser.followers.length : 0,
@@ -153,6 +179,7 @@ exports.getUserProfile = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error('Error in getUserProfile:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -410,13 +437,28 @@ exports.recordRecentRoom = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid room ID' });
     }
 
-    const roomExists = await Room.findById(roomId).select('_id');
+    const roomExists = await Room.findById(roomId).select('_id owner');
     if (!roomExists) {
       return res.status(404).json({ success: false, message: 'Room not found' });
     }
 
+    // Do NOT record user's own room in recently visited rooms history
+    if (
+      roomExists.owner &&
+      currentUserId &&
+      roomExists.owner.toString() === currentUserId.toString()
+    ) {
+      // Clean up if it was previously in recentRooms
+      await User.findByIdAndUpdate(currentUserId, {
+        $pull: { recentRooms: roomId },
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Own room skipped from recent history',
+      });
+    }
+
     // Atomic update: removes if already present, prepends to top, limits to 25
-    // Avoids full user document re-validation, password hashing issues, and null pointer crashes
     await User.findByIdAndUpdate(currentUserId, {
       $pull: { recentRooms: roomId },
     });
@@ -447,36 +489,63 @@ exports.getRecentRooms = async (req, res) => {
   try {
     const currentUserId = req.user?._id || req.user?.id;
     const user = await User.findById(currentUserId).select('recentRooms');
-    const recentRoomIds = (user?.recentRooms || []).filter(
-      (id) => id && mongoose.Types.ObjectId.isValid(id)
-    );
+    const rawRoomIds = user?.recentRooms || [];
 
-    if (recentRoomIds.length === 0) {
+    // Deduplicate IDs while preserving recency order
+    const seenIds = new Set();
+    const uniqueRecentRoomIds = [];
+    for (const id of rawRoomIds) {
+      const idStr = id?.toString();
+      if (idStr && mongoose.Types.ObjectId.isValid(idStr) && !seenIds.has(idStr)) {
+        seenIds.add(idStr);
+        uniqueRecentRoomIds.push(idStr);
+      }
+    }
+
+    if (uniqueRecentRoomIds.length === 0) {
       return res.status(200).json({
         success: true,
         rooms: [],
       });
     }
 
-    // Fetch rooms and preserve order
+    // Fetch rooms and exclude any room owned by the current user
     const rooms = await Room.find({
-      _id: { $in: recentRoomIds },
+      _id: { $in: uniqueRecentRoomIds },
+      owner: { $ne: currentUserId },
       isEnded: { $ne: true },
     }).populate('owner', 'name avatar wealthLevel activeFrame');
 
-    // Sort by recentRoomIds order
+    // Sort by uniqueRecentRoomIds order
     const roomMap = new Map();
     rooms.forEach((r) => roomMap.set(r._id.toString(), r));
 
     const orderedRooms = [];
-    for (const rId of recentRoomIds) {
-      if (!rId) continue;
-      const found = roomMap.get(rId.toString());
+    const addedToOutput = new Set();
+    for (const rId of uniqueRecentRoomIds) {
+      const idStr = rId.toString();
+      if (addedToOutput.has(idStr)) continue;
+      const found = roomMap.get(idStr);
       if (found) {
+        // Guard against any own room
+        const rOwnerStr = found.owner?._id
+          ? found.owner._id.toString()
+          : found.owner
+          ? found.owner.toString()
+          : '';
+        if (currentUserId && rOwnerStr === currentUserId.toString()) continue;
+
+        addedToOutput.add(idStr);
         const rObj = found.toObject ? found.toObject() : found;
         rObj.activeMemberCount = found.activeMembers ? found.activeMembers.length : 0;
         orderedRooms.push(rObj);
       }
+    }
+
+    // Clean up database recentRooms if duplicates or own rooms were present
+    const cleanDbRoomIds = Array.from(addedToOutput);
+    if (rawRoomIds.length !== cleanDbRoomIds.length) {
+      User.updateOne({ _id: currentUserId }, { recentRooms: cleanDbRoomIds }).catch(() => {});
     }
 
     return res.status(200).json({

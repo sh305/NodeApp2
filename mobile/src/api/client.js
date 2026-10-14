@@ -142,11 +142,20 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const target = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
-    console.warn(`🚨 [API Error] ${error.message} -> Target: ${target}`);
-    if (error.response && error.response.status === 403 && error.response.data?.banned) {
-      console.warn('BAN DETECTED:', error.response.data.message);
+    const isHandledBlock = error.response?.status === 403 && error.response?.data?.isBlocked;
+    const isHandledBan = error.response?.status === 403 && error.response?.data?.banned;
+    const isHandledComment =
+      error.response?.status === 403 &&
+      (error.response?.data?.isCommentDisabled ||
+        error.response?.data?.message?.includes?.('disabled your ability to comment'));
+
+    // Suppress noisy console warnings for handled normal business logic flows
+    if (!isHandledBlock && !isHandledBan && !isHandledComment) {
+      const target = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
+      const errMsg = error.response?.data?.message ? ` (${error.response.data.message})` : '';
+      console.warn(`🚨 [API Error] ${error.message}${errMsg} -> Target: ${target}`);
     }
+
     return Promise.reject(error);
   }
 );

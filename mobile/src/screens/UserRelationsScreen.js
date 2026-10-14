@@ -11,7 +11,7 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import api from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
@@ -186,7 +186,13 @@ export default function UserRelationsScreen({ route, navigation, currentUser }) 
     }
   };
 
-  const handleNavigateProfile = (userId) => {
+  const handleNavigateProfile = (userOrId) => {
+    const item = typeof userOrId === 'object' ? userOrId : null;
+    const userId = item ? item._id : userOrId;
+    if (item?.isBlockedByAuthor) {
+      showToast(t('You have been blocked. You cannot view this profile'), 'error');
+      return;
+    }
     if (userId) {
       navigation.push('UserProfile', { userId });
     }
@@ -218,7 +224,7 @@ export default function UserRelationsScreen({ route, navigation, currentUser }) 
         {/* Avatar */}
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => handleNavigateProfile(item._id)}
+          onPress={() => handleNavigateProfile(item)}
           style={styles.avatarWrap}
         >
           <Image
@@ -234,7 +240,7 @@ export default function UserRelationsScreen({ route, navigation, currentUser }) 
         {/* User Details */}
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => handleNavigateProfile(item._id)}
+          onPress={() => handleNavigateProfile(item)}
           style={styles.infoCol}
         >
           {/* User Name */}
@@ -310,7 +316,7 @@ export default function UserRelationsScreen({ route, navigation, currentUser }) 
   };
 
   return (
-    <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Top Header */}
@@ -360,7 +366,7 @@ export default function UserRelationsScreen({ route, navigation, currentUser }) 
           showsVerticalScrollIndicator
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

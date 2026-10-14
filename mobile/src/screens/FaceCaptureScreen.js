@@ -10,7 +10,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -324,11 +324,11 @@ export default function FaceCaptureScreen({ navigation, route, currentUser }) {
   // IF CAMERA PERMISSION IS NOT GRANTED:
   if (!permission || !permission.granted) {
     return (
-      <View style={[styles.container, styles.permissionCenter]}>
+      <SafeAreaView style={[styles.container, styles.permissionCenter]} edges={['top', 'bottom']}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
         {/* Header */}
-        <View style={[styles.header, { paddingTop: Math.max(16, insets.top), width: '100%' }]}>
+        <View style={[styles.header, { width: '100%' }]}>
           <TouchableOpacity
             style={styles.backButton}
             activeOpacity={0.7}
@@ -379,17 +379,17 @@ export default function FaceCaptureScreen({ navigation, route, currentUser }) {
         </View>
 
         <View style={{ height: Math.max(20, insets.bottom) }} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   // CAMERA PERMISSION IS GRANTED: Run live face capture flow
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Top Header with Back button and Countdown Timer */}
-      <View style={[styles.header, { paddingTop: Math.max(16, insets.top) }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           activeOpacity={0.7}
@@ -561,7 +561,7 @@ export default function FaceCaptureScreen({ navigation, route, currentUser }) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

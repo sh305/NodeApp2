@@ -138,6 +138,10 @@ export default function SearchScreen({ route, navigation, currentUser }) {
   // Navigate to User Profile
   const handleOpenUserProfile = (user) => {
     Keyboard.dismiss();
+    if (user.isBlockedByAuthor) {
+      showToast(t('You have been blocked. You cannot view this profile'), 'error');
+      return;
+    }
     navigation.navigate('UserProfile', { userId: user._id });
   };
 

@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Rect, Defs, LinearGradient as SvgGradient, Stop, G } from 'react-native-svg';
 import api from '../api/client';
@@ -182,7 +182,7 @@ export default function VerificationCenterScreen({ navigation, route, currentUse
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: '#5B8DF5' }]} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Top Gradient Banner with 3D Shield */}
@@ -353,7 +353,7 @@ export default function VerificationCenterScreen({ navigation, route, currentUse
           </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

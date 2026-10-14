@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import api from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
@@ -126,9 +126,9 @@ export default function BlacklistScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* ══ HEADER (MATCHING USER SCREENSHOT) ══ */}
-      <View style={[styles.header, { paddingTop: Math.max(14, insets.top) }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
           activeOpacity={0.7}
@@ -178,7 +178,7 @@ export default function BlacklistScreen({ navigation }) {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

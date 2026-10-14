@@ -10,7 +10,7 @@ exports.getTrendingPosts = async (req, res) => {
     const myFollowingSet = new Set((currentUser?.following || []).map((id) => id.toString()));
 
     const posts = await Post.find()
-      .populate('user', 'name avatar signature bio customId')
+      .populate('user', 'name avatar signature bio customId commentDisabledUsers blockedUsers')
       .sort({ createdAt: -1 })
       .limit(50);
 
@@ -19,8 +19,19 @@ exports.getTrendingPosts = async (req, res) => {
       .map((p) => {
         const uId = p.user._id.toString();
         const isLiked = (p.likes || []).some(
-          (id) => id.toString() === currentUserId.toString()
+          (id) => id && currentUserId && id.toString() === currentUserId.toString()
         );
+        const isAuthor = currentUserId && uId === currentUserId.toString();
+        const isCommentDisabled =
+          !isAuthor &&
+          (p.user.commentDisabledUsers || []).some(
+            (id) => id && currentUserId && id.toString() === currentUserId.toString()
+          );
+        const isBlockedByAuthor =
+          !isAuthor &&
+          (p.user.blockedUsers || []).some(
+            (id) => id && currentUserId && id.toString() === currentUserId.toString()
+          );
         return {
           _id: p._id.toString(),
           user: {
@@ -36,6 +47,8 @@ exports.getTrendingPosts = async (req, res) => {
           commentCount: p.commentCount || 0,
           isLiked,
           isFollowing: myFollowingSet.has(uId),
+          isCommentDisabled: !!isCommentDisabled,
+          isBlockedByAuthor: !!isBlockedByAuthor,
           createdAt: p.createdAt,
         };
       });
@@ -66,16 +79,28 @@ exports.getFollowingPosts = async (req, res) => {
     }
 
     const posts = await Post.find({ user: { $in: followingIds } })
-      .populate('user', 'name avatar signature bio customId')
+      .populate('user', 'name avatar signature bio customId commentDisabledUsers blockedUsers')
       .sort({ createdAt: -1 })
       .limit(50);
 
     const formatted = posts
       .filter((p) => p.user)
       .map((p) => {
+        const uId = p.user._id.toString();
         const isLiked = (p.likes || []).some(
-          (id) => id.toString() === currentUserId.toString()
+          (id) => id && currentUserId && id.toString() === currentUserId.toString()
         );
+        const isAuthor = currentUserId && uId === currentUserId.toString();
+        const isCommentDisabled =
+          !isAuthor &&
+          (p.user.commentDisabledUsers || []).some(
+            (id) => id && currentUserId && id.toString() === currentUserId.toString()
+          );
+        const isBlockedByAuthor =
+          !isAuthor &&
+          (p.user.blockedUsers || []).some(
+            (id) => id && currentUserId && id.toString() === currentUserId.toString()
+          );
         return {
           _id: p._id.toString(),
           user: {
@@ -91,6 +116,8 @@ exports.getFollowingPosts = async (req, res) => {
           commentCount: p.commentCount || 0,
           isLiked,
           isFollowing: true,
+          isCommentDisabled: !!isCommentDisabled,
+          isBlockedByAuthor: !!isBlockedByAuthor,
           createdAt: p.createdAt,
         };
       });
@@ -224,15 +251,30 @@ exports.toggleLikePost = async (req, res) => {
 // @route   GET /api/posts/:id/comments
 exports.getComments = async (req, res) => {
   try {
+    const currentUserId = req.user?._id || req.user?.id;
     const { id } = req.params;
-    const post = await Post.findById(id).populate({
-      path: 'comments.user',
-      select: 'name avatar customId',
-    });
+    const post = await Post.findById(id)
+      .populate({
+        path: 'comments.user',
+        select: 'name avatar customId',
+      })
+      .populate({
+        path: 'user',
+        select: 'commentDisabledUsers',
+      });
 
     if (!post) {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
+
+    const isAuthor =
+      post.user && currentUserId && post.user._id.toString() === currentUserId.toString();
+    const isCommentDisabled =
+      !isAuthor &&
+      post.user &&
+      (post.user.commentDisabledUsers || []).some(
+        (uid) => uid && currentUserId && uid.toString() === currentUserId.toString()
+      );
 
     const formatted = (post.comments || [])
       .filter((c) => c.user)
@@ -253,6 +295,7 @@ exports.getComments = async (req, res) => {
       success: true,
       comments: formatted,
       commentCount: formatted.length,
+      isCommentDisabled: !!isCommentDisabled,
     });
   } catch (err) {
     console.error('Error fetching comments:', err);

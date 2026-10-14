@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Defs, LinearGradient as SvgGradient, Stop, Ellipse } from 'react-native-svg';
 import { T } from '../components/TranslatedText';
@@ -70,11 +70,11 @@ export default function RealPersonIntroScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Top Header */}
-      <View style={[styles.header, { paddingTop: Math.max(16, insets.top) }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           activeOpacity={0.7}
@@ -125,7 +125,7 @@ export default function RealPersonIntroScreen({ navigation }) {
           </T>
         </Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -368,7 +368,19 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
     try {
       const res = await api.get('/users/recent-rooms');
       if (res.data.success) {
-        setRecentRooms(res.data.rooms || []);
+        const cUserId = currentUser?._id ? currentUser._id.toString() : '';
+        const unique = [];
+        const seen = new Set();
+        (res.data.rooms || []).forEach((r) => {
+          const id = r?._id?.toString();
+          const rOwner = r.owner?._id ? r.owner._id.toString() : (r.owner ? r.owner.toString() : '');
+          if (cUserId && rOwner === cUserId) return; // Exclude own room
+          if (id && !seen.has(id)) {
+            seen.add(id);
+            unique.push(r);
+          }
+        });
+        setRecentRooms(unique);
       }
     } catch (e) {
       console.log('Fetch recent rooms error:', e);
@@ -379,7 +391,16 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
     try {
       const res = await api.get('/users/following/rooms');
       if (res.data.success) {
-        setFollowingRooms(res.data.rooms || []);
+        const unique = [];
+        const seen = new Set();
+        (res.data.rooms || []).forEach((r) => {
+          const id = r?._id?.toString();
+          if (id && !seen.has(id)) {
+            seen.add(id);
+            unique.push(r);
+          }
+        });
+        setFollowingRooms(unique);
       }
     } catch (e) {
       console.log('Fetch following rooms error:', e);
@@ -420,11 +441,14 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
   };
 
   const handleRoomClick = (room) => {
-    // Record this room in user's recent rooms
-    api.post(`/users/recent-rooms/${room._id}`).catch(() => {});
     const rOwnerId = room?.owner?._id ? room.owner._id.toString() : (room?.owner ? room.owner.toString() : '');
     const cUserId = currentUser?._id ? currentUser._id.toString() : '';
     const isOwner = Boolean(rOwnerId && cUserId && rOwnerId === cUserId);
+
+    // Only record in recent rooms history if not the user's own room
+    if (!isOwner) {
+      api.post(`/users/recent-rooms/${room._id}`).catch(() => {});
+    }
 
     if (room.isLocked && !isOwner) {
       setLockedRoomTarget(room);
@@ -726,9 +750,9 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                 </View>
               ) : (
                 <View style={styles.subTabRoomList}>
-                  {recentRooms.map((room) => (
+                  {recentRooms.map((room, index) => (
                     <TouchableOpacity
-                      key={`recent-${room._id}`}
+                      key={`recent-${room._id || index}-${index}`}
                       style={styles.subTabRoomCard}
                       activeOpacity={0.8}
                       onPress={() => handleRoomClick(room)}
@@ -799,9 +823,9 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                 </View>
               ) : (
                 <View style={styles.subTabRoomList}>
-                  {followingRooms.map((room) => (
+                  {followingRooms.map((room, index) => (
                     <TouchableOpacity
-                      key={`following-${room._id}`}
+                      key={`following-${room._id || index}-${index}`}
                       style={styles.subTabRoomCard}
                       activeOpacity={0.8}
                       onPress={() => handleRoomClick(room)}

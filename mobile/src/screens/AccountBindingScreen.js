@@ -12,7 +12,7 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -730,9 +730,9 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* ══ TOP HEADER ══ */}
-      <View style={[styles.header, { paddingTop: Math.max(12, insets.top) }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
           activeOpacity={0.75}
@@ -1696,7 +1696,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect, G, Polygon } from 'react-native-svg';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
@@ -420,10 +421,11 @@ export default function MeProfileView({
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.contentContainer, { paddingBottom: 95 + insets.bottom }]}
-      showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: 95 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -706,6 +708,7 @@ export default function MeProfileView({
         ))}
       </View>
     </ScrollView>
+  </SafeAreaView>
   );
 }
 

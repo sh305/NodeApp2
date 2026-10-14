@@ -15,7 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
@@ -1070,8 +1070,9 @@ export default function WalletScreen({ navigation, route, currentUser }) {
       end={{ x: 0.2, y: 1 }}
       style={styles.container}
     >
-      {/* ══ HEADER ══ */}
-      <View style={[styles.header, { paddingTop: Math.max(16, insets.top) }]}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        {/* ══ HEADER ══ */}
+        <View style={styles.header}>
         <TouchableOpacity
           style={styles.headerBtn}
           onPress={() => navigation?.goBack()}
@@ -1528,6 +1529,7 @@ export default function WalletScreen({ navigation, route, currentUser }) {
           </TouchableOpacity>
         </Modal>
       </Modal>
+    </SafeAreaView>
     </LinearGradient>
   );
 }
