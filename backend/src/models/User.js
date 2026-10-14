@@ -246,6 +246,40 @@ const userSchema = new mongoose.Schema(
         },
       },
     ],
+    // Verification Center System
+    isRealPersonVerified: {
+      type: Boolean,
+      default: false,
+    },
+    realPersonVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+    isAvatarVerified: {
+      type: Boolean,
+      default: false,
+    },
+    avatarVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+    // Online Status System (Online / Invisible for Super King)
+    onlineStatus: {
+      type: String,
+      enum: ['online', 'invisible'],
+      default: 'online',
+    },
+    nobleLevel: {
+      type: String,
+      default: 'Super King',
+    },
+    // Users whose comments on this user's posts are disabled
+    commentDisabledUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     // Timestamp when user last opened/viewed their notifications tab
     notificationsLastSeenAt: {
       type: Date,

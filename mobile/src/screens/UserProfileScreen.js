@@ -24,6 +24,7 @@ import ReportModal from '../components/ReportModal';
 import CountryPickerModal from '../components/CountryPickerModal';
 import { getCountryEmoji } from '../constants/countries';
 import { useLanguage } from '../context/LanguageContext';
+import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
 import DirectChatModal from '../components/DirectChatModal';
 import UserAvatarWithFrame from '../components/UserAvatarWithFrame';
@@ -104,6 +105,58 @@ const ChevronRight = ({ size = 18, color = '#9E9E9E' }) => (
   </Svg>
 );
 
+const ThreeDotsIcon = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="5" r="2" fill={color} />
+    <Circle cx="12" cy="12" r="2" fill={color} />
+    <Circle cx="12" cy="19" r="2" fill={color} />
+  </Svg>
+);
+
+const BlacklistMenuIcon = ({ size = 20, color = '#2C2C2E' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="9" cy="7" r="4" fill={color} />
+    <Path
+      d="M2 19c0-3.3 3.1-6 7-6 .9 0 1.8.15 2.6.45"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <Circle cx="17" cy="16" r="4.5" stroke={color} strokeWidth="1.8" />
+    <Path d="M14 13l6 6" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+  </Svg>
+);
+
+const CommentDisabledMenuIcon = ({ size = 20, color = '#2C2C2E' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M20 14a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h13a2 2 0 012 2v9z"
+      stroke={color}
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Circle cx="12" cy="9.5" r="3.2" stroke={color} strokeWidth="1.6" />
+    <Path d="M10 7.5l4 4" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+  </Svg>
+);
+
+const ReportMenuIcon = ({ size = 20, color = '#2C2C2E' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M12 2.5L1.5 20.5h21L12 2.5z"
+      fill={color}
+    />
+    <Path
+      d="M12 8.5v5.5"
+      stroke="#FFFFFF"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <Circle cx="12" cy="17.2" r="1.1" fill="#FFFFFF" />
+  </Svg>
+);
+
 // Basic Information Custom Icons (Matching Screenshot)
 const CoverImageIcon = ({ size = 22, color = '#2C2C2E' }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -175,6 +228,9 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
   const [savingEdit, setSavingEdit] = useState(false);
   const [directChatVisible, setDirectChatVisible] = useState(false);
   const [equippedFrame, setEquippedFrame] = useState(null);
+  const [isCommentDisabled, setIsCommentDisabled] = useState(false);
+  const [isBlockedByYou, setIsBlockedByYou] = useState(false);
+  const [profileActionMenuVisible, setProfileActionMenuVisible] = useState(false);
 
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -226,6 +282,8 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
       if (res.data.success) {
         setProfile(res.data.user);
         setIsFollowing(res.data.user.isFollowing || false);
+        setIsCommentDisabled(res.data.user.isCommentDisabled || false);
+        setIsBlockedByYou(res.data.user.isBlockedByYou || false);
         setEditName(res.data.user.name || '');
         setEditSignature(res.data.user.signature || '');
         setEditGender(
@@ -253,8 +311,15 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
       }
     } catch (err) {
       if (err.response?.status === 403 && err.response?.data?.isBlocked) {
-        showToast(t('Profile Inaccessible: User has blocked you'), 'error');
-        navigation.goBack();
+        showToast(
+          t(err.response?.data?.message || 'You have been blocked. You cannot view this profile'),
+          'error'
+        );
+        if (navigation?.navigate) {
+          navigation.navigate('Home');
+        } else {
+          navigation.goBack();
+        }
       } else {
         showToast(err.response?.data?.message || t('Failed to load user profile'), 'error');
       }
@@ -283,6 +348,56 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
       }
     } catch (e) {
       showToast(t(e.response?.data?.message || 'Follow action failed'), 'error');
+    }
+  };
+
+  const handleToggleCommentDisabled = async () => {
+    setProfileActionMenuVisible(false);
+    try {
+      if (isCommentDisabled) {
+        const res = await api.post(`/users/${userId}/enable-comment`);
+        if (res.data?.success) {
+          setIsCommentDisabled(false);
+          showToast(t('Comments enabled for this user'), 'success');
+        } else {
+          showToast(t(res.data?.message || 'Failed to enable comments'), 'error');
+        }
+      } else {
+        const res = await api.post(`/users/${userId}/disable-comment`);
+        if (res.data?.success) {
+          setIsCommentDisabled(true);
+          showToast(t('Comments disabled for this user'), 'success');
+        } else {
+          showToast(t(res.data?.message || 'Failed to disable comments'), 'error');
+        }
+      }
+    } catch (e) {
+      showToast(t(e.response?.data?.message || 'Action failed'), 'error');
+    }
+  };
+
+  const handleToggleBlockUser = async () => {
+    setProfileActionMenuVisible(false);
+    try {
+      if (isBlockedByYou) {
+        const res = await api.post(`/users/${userId}/unblock`);
+        if (res.data?.success) {
+          setIsBlockedByYou(false);
+          showToast(t('User unblocked successfully.'), 'success');
+        } else {
+          showToast(t(res.data?.message || 'Failed to unblock user'), 'error');
+        }
+      } else {
+        const res = await api.post(`/users/${userId}/block`);
+        if (res.data?.success) {
+          setIsBlockedByYou(true);
+          showToast(t('User blocked successfully. They cannot view your profile.'), 'success');
+        } else {
+          showToast(t(res.data?.message || 'Failed to block user'), 'error');
+        }
+      }
+    } catch (e) {
+      showToast(t(e.response?.data?.message || 'Action failed'), 'error');
     }
   };
 
@@ -837,13 +952,21 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
                 <ShareIcon size={18} color="#FFFFFF" />
               </TouchableOpacity>
 
-              {isSelf && (
+              {isSelf ? (
                 <TouchableOpacity
                   style={styles.navSquareBtn}
                   activeOpacity={0.8}
                   onPress={() => setEditModalVisible(true)}
                 >
                   <EditIcon size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.navCircleBtn}
+                  activeOpacity={0.8}
+                  onPress={() => setProfileActionMenuVisible(true)}
+                >
+                  <ThreeDotsIcon size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               )}
             </View>
@@ -975,6 +1098,13 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               {!!(profile.isVip || (profile.vipLevel && profile.vipLevel > 0)) && (
                 <View style={styles.vipBadge}>
                   <Text style={styles.vipBadgeText}>👑 {t('VIP')}</Text>
+                </View>
+              )}
+
+              {/* Real Person Verification Badge */}
+              {!!profile.isRealPersonVerified && (
+                <View style={styles.realPersonBadge}>
+                  <Text style={styles.realPersonBadgeText}>🛡️ {t('Real Person')}</Text>
                 </View>
               )}
 
@@ -1646,6 +1776,96 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
         }}
         targetUserName={profile.name}
       />
+
+      {/* 14. TOP-RIGHT DROPDOWN POPUP MENU (MATCHING EXACT SCREENSHOTS) */}
+      <Modal
+        visible={profileActionMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProfileActionMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.dropdownModalOverlay}
+          activeOpacity={1}
+          onPress={() => setProfileActionMenuVisible(false)}
+        >
+          <View
+            style={[
+              styles.dropdownMenuCard,
+              { top: Math.max(16, insets.top) + 42 },
+            ]}
+          >
+            {isBlockedByYou ? (
+              /* State 3 (Screenshot 3): Blocked -> Shows Unblock & Report */
+              <>
+                <TouchableOpacity
+                  style={styles.dropdownMenuItem}
+                  activeOpacity={0.7}
+                  onPress={handleToggleBlockUser}
+                >
+                  <BlacklistMenuIcon size={20} color="#2C2C2E" />
+                  <Text style={styles.dropdownMenuText}>
+                    <T>Unblock</T>
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.dropdownMenuItem}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setProfileActionMenuVisible(false);
+                    setReportModalVisible(true);
+                  }}
+                >
+                  <ReportMenuIcon size={20} color="#2C2C2E" />
+                  <Text style={styles.dropdownMenuText}>
+                    <T>Report</T>
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              /* State 1 & 2 (Screenshots 1 & 2): Blacklist, Comment Disabled / Removed, Report */
+              <>
+                <TouchableOpacity
+                  style={styles.dropdownMenuItem}
+                  activeOpacity={0.7}
+                  onPress={handleToggleBlockUser}
+                >
+                  <BlacklistMenuIcon size={20} color="#2C2C2E" />
+                  <Text style={styles.dropdownMenuText}>
+                    <T>blacklist</T>
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.dropdownMenuItem}
+                  activeOpacity={0.7}
+                  onPress={handleToggleCommentDisabled}
+                >
+                  <CommentDisabledMenuIcon size={20} color="#2C2C2E" />
+                  <Text style={styles.dropdownMenuText}>
+                    <T>{isCommentDisabled ? 'Removed' : 'Comment Disabled'}</T>
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.dropdownMenuItem}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setProfileActionMenuVisible(false);
+                    setReportModalVisible(true);
+                  }}
+                >
+                  <ReportMenuIcon size={20} color="#2C2C2E" />
+                  <Text style={styles.dropdownMenuText}>
+                    <T>Report</T>
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -1897,6 +2117,19 @@ const styles = StyleSheet.create({
   },
   charmBadgeText: {
     color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  realPersonBadge: {
+    backgroundColor: '#EBF3FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#4D8BFF',
+  },
+  realPersonBadgeText: {
+    color: '#2D68E6',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -2682,5 +2915,34 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#111111',
+  },
+  dropdownModalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  dropdownMenuCard: {
+    position: 'absolute',
+    right: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 4,
+    minWidth: 175,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  dropdownMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+  },
+  dropdownMenuText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#2C2C2E',
+    marginLeft: 14,
   },
 });

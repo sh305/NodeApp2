@@ -25,11 +25,27 @@ const {
   purchaseStoreItem,
   getFollowerNotifications,
   markFollowersRead,
+  getVerificationStatus,
+  submitRealPersonVerification,
+  submitAvatarVerification,
+  detectFaceFrame,
+  getCommentDisabledUsers,
+  disableUserComments,
+  enableUserComments,
 } = require('../controllers/userController');
 const { getMe } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
 router.get('/me', protect, getMe);
+
+router.get('/comment-disabled', protect, getCommentDisabledUsers);
+router.post('/:id/disable-comment', protect, disableUserComments);
+router.post('/:id/enable-comment', protect, enableUserComments);
+
+router.get('/verification/status', protect, getVerificationStatus);
+router.post('/verification/detect-frame', protect, detectFaceFrame);
+router.post('/verification/real-person', protect, submitRealPersonVerification);
+router.post('/verification/avatar', protect, submitAvatarVerification);
 
 router.get('/wallet/balance', protect, getWalletBalance);
 router.post('/wallet/exchange-game-coins', protect, exchangeGameCoins);
@@ -46,6 +62,7 @@ router.post('/game/award-win', protect, awardGameWin);
 router.post('/game/forfeit', protect, forfeitGame);
 router.post('/game/refund-bet', protect, refundGameBet);
 router.get('/blocked/list', protect, getBlockedUsers);
+router.get('/blacklist', protect, getBlockedUsers);
 router.get('/following/rooms', protect, getFollowingRooms);
 router.get('/recent-rooms', protect, getRecentRooms);
 router.post('/recent-rooms/:roomId', protect, recordRecentRoom);

@@ -277,6 +277,21 @@ exports.addComment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
 
+    // Check if post author has disabled comments from current user
+    if (post.user && post.user.toString() !== currentUserId.toString()) {
+      const author = await User.findById(post.user).select('commentDisabledUsers');
+      if (
+        author &&
+        Array.isArray(author.commentDisabledUsers) &&
+        author.commentDisabledUsers.some((uid) => uid.toString() === currentUserId.toString())
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: 'The author has disabled your ability to comment on their posts.',
+        });
+      }
+    }
+
     const newComment = {
       user: currentUserId,
       text: text.trim(),

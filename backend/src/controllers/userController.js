@@ -27,13 +27,18 @@ exports.getUserProfile = async (req, res) => {
       return res.status(403).json({
         success: false,
         isBlocked: true,
-        message: 'Aap is user ki ID visit nahi kar sakte kyunki unhone aapko block kiya hua hai.',
+        message: 'You have been blocked. You cannot view this profile',
       });
     }
 
     // Check if requester has blocked target
     const isRequesterBlockedTarget = req.user.blockedUsers.some(
       (bId) => bId.toString() === targetUserId.toString()
+    );
+
+    // Check if requester has disabled comments for target user
+    const isCommentDisabled = (req.user.commentDisabledUsers || []).some(
+      (dId) => dId.toString() === targetUserId.toString()
     );
 
     // Track profile visitors when another user visits (with timestamp)
@@ -139,6 +144,7 @@ exports.getUserProfile = async (req, res) => {
         topSupporters: topSupporters || [],
         totalContributed: totalContributed || 0,
         isBlockedByYou: isRequesterBlockedTarget,
+        isCommentDisabled: isCommentDisabled,
         followersCount: targetUser.followers ? targetUser.followers.length : 0,
         followingCount: targetUser.following ? targetUser.following.length : 0,
         giftsSent: targetUser.giftsSent || 0,
@@ -169,7 +175,8 @@ exports.blockUser = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'User ko successfully block kar diya gaya hai. Ab wo aapki ID visit nahi kar payenge.',
+      message: 'User blocked successfully. They cannot view your profile.',
+      isBlocked: true,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -190,7 +197,8 @@ exports.unblockUser = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'User ko successfully unblock kar diya gaya hai.',
+      message: 'User unblocked successfully.',
+      isBlocked: false,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -201,10 +209,15 @@ exports.unblockUser = async (req, res) => {
 // @route   GET /api/users/blocked/list
 exports.getBlockedUsers = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).populate('blockedUsers', 'name avatar wealthLevel activeFrame');
+    const user = await User.findById(req.user._id).populate(
+      'blockedUsers',
+      'name avatar wealthLevel activeFrame customId bio signature'
+    );
+    const list = (user.blockedUsers || []).filter(Boolean);
     return res.status(200).json({
       success: true,
-      blockedUsers: user.blockedUsers || [],
+      blockedUsers: list,
+      count: list.length,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -873,7 +886,7 @@ exports.addTestExp = async (req, res) => {
 // @route   PUT /api/users/profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, signature, gender, birthday, country, avatar, coverImage, height, weight, occupation } = req.body;
+    const { name, signature, gender, birthday, country, avatar, coverImage, height, weight, occupation, onlineStatus } = req.body;
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -891,6 +904,9 @@ exports.updateProfile = async (req, res) => {
     if (height !== undefined) user.height = height;
     if (weight !== undefined) user.weight = weight;
     if (occupation !== undefined) user.occupation = occupation;
+    if (onlineStatus && ['online', 'invisible'].includes(onlineStatus)) {
+      user.onlineStatus = onlineStatus;
+    }
 
     await user.save();
     return res.status(200).json({
@@ -908,6 +924,8 @@ exports.updateProfile = async (req, res) => {
         height: user.height,
         weight: user.weight,
         occupation: user.occupation,
+        onlineStatus: user.onlineStatus,
+        nobleLevel: user.nobleLevel || 'Super King',
       },
     });
   } catch (error) {
@@ -1181,6 +1199,231 @@ exports.markFollowersRead = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Get Verification Center Status
+// @route   GET /api/users/verification/status
+exports.getVerificationStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select(
+      'isRealPersonVerified realPersonVerifiedAt isAvatarVerified avatarVerifiedAt phoneNumber boundAccounts gender'
+    );
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const hasPhone = !!(user.phoneNumber || user.boundAccounts?.phone?.number);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        isRealPersonVerified: !!user.isRealPersonVerified,
+        realPersonVerifiedAt: user.realPersonVerifiedAt,
+        isAvatarVerified: !!user.isAvatarVerified,
+        avatarVerifiedAt: user.avatarVerifiedAt,
+        isPhoneVerified: hasPhone,
+        gender: user.gender || '',
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Detect Face in a Live Camera Frame
+// @route   POST /api/users/verification/detect-frame
+exports.detectFaceFrame = async (req, res) => {
+  try {
+    const { photo } = req.body;
+    if (!photo) {
+      return res.status(400).json({ success: false, hasFace: false, message: 'No photo data provided' });
+    }
+
+    const { detectHumanFace } = require('../services/faceDetectionService');
+    const result = await detectHumanFace(photo);
+
+    return res.status(200).json({
+      success: true,
+      hasFace: !!result.hasFace,
+      confidence: result.confidence || 0,
+      faceCount: result.faceCount || 0,
+      detectedGender: result.detectedGender || 'male',
+      message: result.hasFace
+        ? 'Real human face detected'
+        : 'No human face detected. Please ensure your face is clearly visible inside the circle.',
+    });
+  } catch (error) {
+    console.error('[detectFaceFrame] Error:', error);
+    return res.status(500).json({ success: false, hasFace: false, message: error.message });
+  }
+};
+
+// @desc    Submit Real Person Verification (Strictly validates human face + sets detected gender)
+// @route   POST /api/users/verification/real-person
+exports.submitRealPersonVerification = async (req, res) => {
+  try {
+    const { photo, detectedGender } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    let finalGender = 'male';
+
+    // Strictly validate with Face Detection algorithm if photo is provided
+    if (photo) {
+      const { detectHumanFace } = require('../services/faceDetectionService');
+      const detection = await detectHumanFace(photo);
+
+      if (!detection.hasFace) {
+        return res.status(400).json({
+          success: false,
+          hasFace: false,
+          message: 'Real Person Verification failed: No human face detected in the camera. Please look directly at the camera.',
+        });
+      }
+
+      finalGender = detection.detectedGender || detectedGender || 'male';
+    } else if (detectedGender) {
+      const g = String(detectedGender).toLowerCase();
+      finalGender = (g === 'female' || g === 'girl') ? 'female' : 'male';
+    }
+
+    user.gender = finalGender;
+    user.isRealPersonVerified = true;
+    user.realPersonVerifiedAt = new Date();
+    if (photo && photo.length < 500000) {
+      user.realPersonAvatar = photo;
+    }
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Real Person Verification completed successfully!',
+      user: {
+        _id: user._id,
+        name: user.name,
+        avatar: user.avatar,
+        gender: user.gender,
+        isRealPersonVerified: user.isRealPersonVerified,
+        realPersonVerifiedAt: user.realPersonVerifiedAt,
+      },
+      detectedGender: user.gender,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Submit Avatar Verification
+// @route   POST /api/users/verification/avatar
+exports.submitAvatarVerification = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    user.isAvatarVerified = true;
+    user.avatarVerifiedAt = new Date();
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Avatar Verification completed successfully!',
+      isAvatarVerified: true,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get Comment Disabled Users List
+// @route   GET /api/users/comment-disabled
+exports.getCommentDisabledUsers = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate({
+      path: 'commentDisabledUsers',
+      select: 'name avatar customId bio signature',
+    });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const list = (user.commentDisabledUsers || []).filter(Boolean);
+    return res.status(200).json({
+      success: true,
+      users: list,
+      count: list.length,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Disable comments from a specific user on my posts
+// @route   POST /api/users/:id/disable-comment
+exports.disableUserComments = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    if (targetUserId.toString() === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'You cannot disable comments for yourself' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!user.commentDisabledUsers) {
+      user.commentDisabledUsers = [];
+    }
+
+    const alreadyDisabled = user.commentDisabledUsers.some(
+      (id) => id.toString() === targetUserId.toString()
+    );
+
+    if (!alreadyDisabled) {
+      user.commentDisabledUsers.push(targetUserId);
+      await user.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Comments disabled for this user',
+      isCommentDisabled: true,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Enable comments from a specific user (Remove from disabled list)
+// @route   POST /api/users/:id/enable-comment
+exports.enableUserComments = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.commentDisabledUsers) {
+      user.commentDisabledUsers = user.commentDisabledUsers.filter(
+        (id) => id.toString() !== targetUserId.toString()
+      );
+      await user.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Comments enabled for this user',
+      isCommentDisabled: false,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
 
 

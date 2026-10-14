@@ -345,6 +345,14 @@ export default function MeProfileView({
   };
 
   const handleMenuClick = (menuKey, menuTitle) => {
+    if (menuKey === 'verification') {
+      if (navigation?.navigate) {
+        navigation.navigate('VerificationCenter');
+      } else {
+        showToast(t('Verification Center'), 'info');
+      }
+      return;
+    }
     if (menuKey === 'task') {
       if (onOpenTasks) onOpenTasks();
       return;

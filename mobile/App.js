@@ -19,6 +19,12 @@ import StoreScreen from './src/screens/StoreScreen';
 import LevelScreen from './src/screens/LevelScreen';
 import SettingScreen from './src/screens/SettingScreen';
 import AccountBindingScreen from './src/screens/AccountBindingScreen';
+import VerificationCenterScreen from './src/screens/VerificationCenterScreen';
+import RealPersonIntroScreen from './src/screens/RealPersonIntroScreen';
+import FaceCaptureScreen from './src/screens/FaceCaptureScreen';
+import OnlineStatusScreen from './src/screens/OnlineStatusScreen';
+import CommentDisabledScreen from './src/screens/CommentDisabledScreen';
+import BlacklistScreen from './src/screens/BlacklistScreen';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { ToastProvider } from './src/context/ToastContext';
 
@@ -175,6 +181,54 @@ export default function App() {
                   <Stack.Screen name="AccountBinding">
                     {(props) => (
                       <AccountBindingScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="VerificationCenter">
+                    {(props) => (
+                      <VerificationCenterScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="RealPersonIntro">
+                    {(props) => (
+                      <RealPersonIntroScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="FaceCapture">
+                    {(props) => (
+                      <FaceCaptureScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="OnlineStatus">
+                    {(props) => (
+                      <OnlineStatusScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="CommentDisabled">
+                    {(props) => (
+                      <CommentDisabledScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Blacklist">
+                    {(props) => (
+                      <BlacklistScreen
                         {...props}
                         currentUser={currentUser}
                       />

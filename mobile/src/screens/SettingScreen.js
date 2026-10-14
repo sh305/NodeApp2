@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Modal,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useLanguage, LANGUAGES } from '../context/LanguageContext';
@@ -212,6 +213,26 @@ export default function SettingScreen({ navigation, onLogout }) {
 
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [currentOnlineStatus, setCurrentOnlineStatus] = useState('Online');
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@user_info');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u.onlineStatus === 'invisible') {
+            setCurrentOnlineStatus('Invisible');
+          } else {
+            setCurrentOnlineStatus('Online');
+          }
+        }
+      } catch (e) {}
+    };
+    fetchStatus();
+    const unsub = navigation?.addListener?.('focus', fetchStatus);
+    return unsub;
+  }, [navigation]);
 
   // Find active language display name
   const activeLangObj =
@@ -224,6 +245,30 @@ export default function SettingScreen({ navigation, onLogout }) {
         navigation.navigate('AccountBinding');
       } else {
         showToast(t('Account Binding'), 'info');
+      }
+      return;
+    }
+    if (key === 'onlineStatus') {
+      if (navigation?.navigate) {
+        navigation.navigate('OnlineStatus');
+      } else {
+        showToast(t('Online Status'), 'info');
+      }
+      return;
+    }
+    if (key === 'commentDisabled') {
+      if (navigation?.navigate) {
+        navigation.navigate('CommentDisabled');
+      } else {
+        showToast(t('Comment Disabled'), 'info');
+      }
+      return;
+    }
+    if (key === 'blacklist') {
+      if (navigation?.navigate) {
+        navigation.navigate('Blacklist');
+      } else {
+        showToast(t('Blacklist'), 'info');
       }
       return;
     }
@@ -266,7 +311,7 @@ export default function SettingScreen({ navigation, onLogout }) {
       key: 'onlineStatus',
       title: 'Online Status',
       icon: <OnlineStatusIcon />,
-      rightText: 'Online',
+      rightText: t(currentOnlineStatus),
     },
     {
       key: 'commentDisabled',

@@ -64,6 +64,77 @@ export const LanguageProvider = ({ children }) => {
   // Dynamic set of all phrases used in the app (auto-accumulated at runtime)
   const knownPhrases = useRef(
     new Set([
+      'Verification Center',
+      'Verification Information',
+      'Real Person Verification',
+      'Not Verified',
+      'Verified',
+      'Avatar Verification',
+      'Phone Verification',
+      'Exclusive Privileges',
+      'Complete the above verifications to unlock',
+      'Real person verification badge, unlock personal task rewards',
+      'Avatar verification badge',
+      'We will capture your facial information for gender detection. The captured information is only used for verification and is not visible to other users',
+      'I Want to Verify',
+      'The personal information and images collected during the verification process are only used for system review and will not be publicly displayed',
+      'Please blink',
+      'No human face detected! Please look at the camera.',
+      'Face lost! Please look into the camera',
+      'Position your face inside the circle',
+      'Human face detected! Please blink',
+      'Tap circle if blink is not detected',
+      'Analyzing facial features & detecting gender...',
+      'Verification Successful!',
+      'Gender automatically updated in Basic Information',
+      'Gender automatically detected & updated in Basic Information',
+      'Camera permission is required for face verification',
+      'Grant Permission',
+      'Camera Access Required',
+      'Real Person Verification requires live camera access to capture your facial features and verify liveness. Verification cannot proceed without camera access.',
+      'Enable Camera Access',
+      'Go Back',
+      'Starting camera...',
+      'Camera is not active. Please enable camera.',
+      'Re-verify Real Person',
+      'Could not capture image from camera. Please try again.',
+      'Detection timeout, please try again',
+      'Real Person Verification successful',
+      'Verification Failed',
+      'Please try again',
+      'Done',
+      'Online Status',
+      'Online',
+      'Invisible',
+      'Super King',
+      'Other users will see you as offline',
+      'Available exclusively to Super King',
+      'Online status updated successfully',
+      'Comment Disabled',
+      'Delete',
+      'No comment disabled users',
+      'Disable Comments',
+      'Enable Comments',
+      'Comments disabled for this user',
+      'Comments enabled for this user',
+      'The author has disabled your ability to comment on their posts.',
+      'Allow user to comment on your posts',
+      'Prevent user from commenting on your posts',
+      'Report inappropriate behavior',
+      'Cancel',
+      'Blacklist',
+      'blacklist',
+      'Removed',
+      'No blacklisted users',
+      'User unblocked successfully.',
+      'User blocked successfully. They cannot view your profile.',
+      'You have been blocked. You cannot view this profile',
+      'Block User',
+      'Unblock User',
+      'Prevent user from viewing your profile',
+      'Allow user to view your profile',
+      'Facial Liveness Check',
+      'Look into the camera and blink 3 times naturally',
       'Bind Phone Number',
       'Voice Call OTP Verification',
       'Enter your 10-digit mobile number. You will receive an automated voice call with your 6-digit OTP code.',
@@ -2144,3 +2215,22 @@ const styles = StyleSheet.create({
     borderColor: '#4B5563',
   },
 });
+
+export function T({ children, text, style, numberOfLines, ellipsizeMode, ...props }) {
+  const { t } = useLanguage();
+  const rawText = typeof children === 'string' ? children : (text || '');
+  const translated = t(rawText);
+
+  return (
+    <Text
+      style={style}
+      numberOfLines={numberOfLines}
+      ellipsizeMode={ellipsizeMode}
+      {...props}
+    >
+      {translated}
+    </Text>
+  );
+}
+
+export const TranslatedText = T;
