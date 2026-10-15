@@ -269,6 +269,19 @@ const userSchema = new mongoose.Schema(
       enum: ['online', 'invisible'],
       default: 'online',
     },
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+    currentRoom: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Room',
+      default: null,
+    },
+    lastActiveAt: {
+      type: Date,
+      default: Date.now,
+    },
     nobleLevel: {
       type: String,
       default: 'Super King',

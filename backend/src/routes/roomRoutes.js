@@ -4,6 +4,7 @@ const {
   createRoom,
   getRooms,
   getRoomById,
+  leaveRoom,
   verifyRoomPassword,
   toggleLockRoom,
   kickUser,
@@ -43,6 +44,7 @@ router.post('/:id/remove-host', protect, removeHost);
 router.post('/:id/remove-admin', protect, removeAdmin);
 router.post('/:id/add-host', protect, addHost);
 router.post('/:id/add-admin', protect, addAdmin);
+router.post('/:id/leave', protect, leaveRoom);
 router.post('/:id/verify-password', protect, verifyRoomPassword);
 router.put('/:id/lock-status', protect, toggleLockRoom);
 router.post('/:id/lock', protect, toggleLockRoom);

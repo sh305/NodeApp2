@@ -16,7 +16,8 @@ exports.getUserProfile = async (req, res) => {
 
     const targetUser = await User.findById(targetUserId)
       .select('-phoneNumber -email')
-      .populate('cpRelationships.partner', 'name avatar wealthLevel activeFrame gender');
+      .populate('cpRelationships.partner', 'name avatar wealthLevel activeFrame gender')
+      .populate('currentRoom', '_id title isLocked');
 
     if (!targetUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -164,6 +165,14 @@ exports.getUserProfile = async (req, res) => {
         isAvatarVerified: !!targetUser.isAvatarVerified,
         avatarVerifiedAt: targetUser.avatarVerifiedAt,
         onlineStatus: targetUser.onlineStatus || 'online',
+        isOnline: Boolean(targetUser.isOnline || targetUser.currentRoom),
+        currentRoom: targetUser.currentRoom
+          ? {
+              _id: targetUser.currentRoom._id,
+              title: targetUser.currentRoom.title,
+              isLocked: targetUser.currentRoom.isLocked,
+            }
+          : null,
         nobleLevel: targetUser.nobleLevel || 'Super King',
         cpRelationships: targetUser.cpRelationships || [],
         topSupporters: topSupporters || [],
@@ -411,9 +420,15 @@ exports.getFollowingRooms = async (req, res) => {
       .populate('owner', 'name avatar wealthLevel activeFrame')
       .sort({ updatedAt: -1 });
 
+    const io = req.app.get('io');
     const formattedRooms = (rooms || []).map((r) => {
       const rObj = r.toObject ? r.toObject() : r;
-      rObj.activeMemberCount = r.activeMembers ? r.activeMembers.length : 0;
+      let liveCount = 0;
+      if (io && io.sockets && io.sockets.adapter && io.sockets.adapter.rooms) {
+        const sRoom = io.sockets.adapter.rooms.get(r._id.toString());
+        liveCount = sRoom ? sRoom.size : 0;
+      }
+      rObj.activeMemberCount = liveCount > 0 ? (r.activeMembers ? r.activeMembers.length : liveCount) : 0;
       return rObj;
     });
 
@@ -537,7 +552,13 @@ exports.getRecentRooms = async (req, res) => {
 
         addedToOutput.add(idStr);
         const rObj = found.toObject ? found.toObject() : found;
-        rObj.activeMemberCount = found.activeMembers ? found.activeMembers.length : 0;
+        let liveCount = 0;
+        const io = req.app.get('io');
+        if (io && io.sockets && io.sockets.adapter && io.sockets.adapter.rooms) {
+          const sRoom = io.sockets.adapter.rooms.get(found._id.toString());
+          liveCount = sRoom ? sRoom.size : 0;
+        }
+        rObj.activeMemberCount = liveCount > 0 ? (found.activeMembers ? found.activeMembers.length : liveCount) : 0;
         orderedRooms.push(rObj);
       }
     }

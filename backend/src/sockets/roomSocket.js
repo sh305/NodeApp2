@@ -187,6 +187,21 @@ function initRoomSockets(io) {
   io.on('connection', (socket) => {
     console.log(`⚡ Socket connected: ${socket.id}`);
 
+    // User presence / Notification socket room
+    socket.on('join_user_room', async ({ userId }) => {
+      try {
+        if (!userId) return;
+        socket.userId = userId;
+        socket.join(`user_${userId}`);
+        await User.findByIdAndUpdate(userId, {
+          isOnline: true,
+          lastActiveAt: new Date(),
+        });
+      } catch (err) {
+        console.error('Socket join_user_room error:', err);
+      }
+    });
+
     // Join room
     socket.on('join_room', async ({ roomId, userId }) => {
       try {
@@ -210,16 +225,23 @@ function initRoomSockets(io) {
         socket.roomId = roomId;
         socket.userId = userId;
 
+        // Track user's active room and online status in database
+        await User.findByIdAndUpdate(userId, {
+          currentRoom: roomId,
+          isOnline: true,
+          lastActiveAt: new Date(),
+        }).catch(() => {});
+
         const user = await User.findById(userId).select('name avatar wealthLevel activeFrame customId gender');
         if (user) {
-          // Add user to room's activeMembers if not present
-          const alreadyIn = room.activeMembers.some(
-            (m) => (m._id ? m._id.toString() : m.toString()) === userId.toString()
+          const cleanUserId = userId.toString();
+          // Filter out existing instances of this user or invalid entries
+          room.activeMembers = (room.activeMembers || []).filter(
+            (m) => m && (m._id ? m._id.toString() : m.toString()) !== cleanUserId
           );
-          if (!alreadyIn) {
-            room.activeMembers.push(userId);
-            await room.save();
-          }
+          room.activeMembers.push(userId);
+          await room.save();
+
           const updatedRoom = await Room.findById(roomId)
             .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
           io.to(roomId).emit('active_members_updated', {
@@ -242,26 +264,33 @@ function initRoomSockets(io) {
       try {
         const targetRoomId = roomId || socket.roomId;
         const targetUserId = userId || socket.userId;
+        if (targetUserId) {
+          await User.findByIdAndUpdate(targetUserId, {
+            currentRoom: null,
+            lastActiveAt: new Date(),
+          }).catch(() => {});
+        }
         if (targetRoomId && targetUserId) {
           socket.leave(targetRoomId);
           const room = await Room.findById(targetRoomId);
           if (room) {
+            const cleanUserId = targetUserId.toString();
             let changed = false;
             room.seats.forEach((s) => {
-              if (s.user && s.user.toString() === targetUserId.toString()) {
+              if (s.user && (s.user._id ? s.user._id.toString() : s.user.toString()) === cleanUserId) {
                 s.user = null;
                 changed = true;
               }
             });
             const beforeLen = room.activeMembers.length;
-            room.activeMembers = room.activeMembers.filter(
-              (m) => (m._id ? m._id.toString() : m.toString()) !== targetUserId.toString()
+            room.activeMembers = (room.activeMembers || []).filter(
+              (m) => m && (m._id ? m._id.toString() : m.toString()) !== cleanUserId
             );
             if (room.activeMembers.length !== beforeLen) {
               changed = true;
             }
             let bossSeatChanged = false;
-            if (room.bossSeat && room.bossSeat.user && (room.bossSeat.user._id ? room.bossSeat.user._id.toString() : room.bossSeat.user.toString()) === targetUserId.toString()) {
+            if (room.bossSeat && room.bossSeat.user && (room.bossSeat.user._id ? room.bossSeat.user._id.toString() : room.bossSeat.user.toString()) === cleanUserId) {
               room.bossSeat.user = null;
               bossSeatChanged = true;
               changed = true;
@@ -1940,23 +1969,37 @@ function initRoomSockets(io) {
     // Disconnect handler
     socket.on('disconnect', async () => {
       console.log(`🔌 Socket disconnected: ${socket.id}`);
+      if (socket.userId) {
+        try {
+          await User.findByIdAndUpdate(socket.userId, {
+            currentRoom: null,
+            isOnline: false,
+            lastActiveAt: new Date(),
+          });
+        } catch (e) {}
+      }
       if (socket.roomId && socket.userId) {
         try {
           const room = await Room.findById(socket.roomId);
           if (room) {
+            const cleanUserId = socket.userId.toString();
             let changed = false;
             room.seats.forEach((s) => {
-              if (s.user && s.user.toString() === socket.userId) {
+              if (s.user && (s.user._id ? s.user._id.toString() : s.user.toString()) === cleanUserId) {
                 s.user = null;
                 changed = true;
               }
             });
             // Also remove from activeMembers
             const beforeLen = room.activeMembers.length;
-            room.activeMembers = room.activeMembers.filter(
-              (m) => (m._id ? m._id.toString() : m.toString()) !== socket.userId.toString()
+            room.activeMembers = (room.activeMembers || []).filter(
+              (m) => m && (m._id ? m._id.toString() : m.toString()) !== cleanUserId
             );
             if (room.activeMembers.length !== beforeLen) {
+              changed = true;
+            }
+            if (room.bossSeat && room.bossSeat.user && (room.bossSeat.user._id ? room.bossSeat.user._id.toString() : room.bossSeat.user.toString()) === cleanUserId) {
+              room.bossSeat.user = null;
               changed = true;
             }
 
@@ -1964,7 +2007,8 @@ function initRoomSockets(io) {
               await room.save();
               const updatedRoom = await Room.findById(socket.roomId)
                 .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
-                .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
+                .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender')
+                .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
               io.to(socket.roomId).emit('seats_updated', { seats: updatedRoom.seats });
               io.to(socket.roomId).emit('active_members_updated', { activeMembers: updatedRoom.activeMembers });
             }

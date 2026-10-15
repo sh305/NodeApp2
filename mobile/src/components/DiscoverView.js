@@ -22,6 +22,7 @@ import api from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
+import FindMeAvatar from './FindMeAvatar';
 
 // 1. Icons
 const HeartOutlineIcon = ({ size = 22, color = '#64748B' }) => (
@@ -643,29 +644,29 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
       <View style={styles.postCard}>
         {/* Header */}
         <View style={styles.postHeaderRow}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              if (item.isBlockedByAuthor) {
-                showToast(t('You have been blocked. You cannot view this profile'), 'error');
-                return;
-              }
-              if (user._id && navigation) {
-                navigation.navigate('UserProfile', { userId: user._id });
-              }
-            }}
-            style={styles.avatarWrap}
-          >
-            <Image
-              source={{
-                uri:
-                  user.avatar ||
-                  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+          <View style={styles.avatarWrap}>
+            <FindMeAvatar
+              avatarUri={user.avatar}
+              size={48}
+              isOnline={Boolean(user.isOnline || user.currentRoom)}
+              currentRoom={user.currentRoom}
+              onPress={() => {
+                if (item.isBlockedByAuthor) {
+                  showToast(t('You have been blocked. You cannot view this profile'), 'error');
+                  return;
+                }
+                if (user.currentRoom && (user.currentRoom._id || typeof user.currentRoom === 'string')) {
+                  const targetRoomId = user.currentRoom._id || user.currentRoom;
+                  navigation.navigate('VoiceRoom', {
+                    roomId: targetRoomId,
+                    roomTitle: user.currentRoom.title || '',
+                  });
+                } else if (user._id && navigation) {
+                  navigation.navigate('UserProfile', { userId: user._id });
+                }
               }}
-              style={styles.avatarImg}
-              resizeMode="cover"
             />
-          </TouchableOpacity>
+          </View>
 
           <View style={styles.userInfoWrap}>
             <TouchableOpacity

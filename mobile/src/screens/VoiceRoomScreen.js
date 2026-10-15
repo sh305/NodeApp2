@@ -580,7 +580,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
     socket.on('active_members_updated', ({ activeMembers }) => {
       if (activeMembers) {
-        setRoom((prev) => (prev ? { ...prev, activeMembers } : prev));
+        const seen = new Set();
+        const cleanMembers = (activeMembers || []).filter((m) => {
+          const uId = m?._id ? String(m._id) : String(m || '');
+          if (!uId || seen.has(uId)) return false;
+          seen.add(uId);
+          return true;
+        });
+        setRoom((prev) => (prev ? { ...prev, activeMembers: cleanMembers } : prev));
       }
     });
 
@@ -750,6 +757,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       showSub.remove();
       hideSub.remove();
       musicPlayer.stopAndUnload();
+      api.post(`/rooms/${roomId}/leave`).catch(() => {});
       socket.emit('leave_room', { roomId, userId: currentUser?._id });
       socket.disconnect();
     };
@@ -1424,7 +1432,29 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const isSelf = Boolean(selectedUserIdStr && currentUserIdStr && selectedUserIdStr === currentUserIdStr);
 
   const currentRoomLevel = room?.roomLevel || 1;
-  const memberCount = room?.activeMembers?.length || 1;
+  const uniqueActiveMembers = React.useMemo(() => {
+    if (!room?.activeMembers || !Array.isArray(room.activeMembers)) return [];
+    const map = new Map();
+    room.activeMembers.forEach((m) => {
+      const uId = m?._id ? String(m._id) : (m ? String(m) : '');
+      if (uId && !map.has(uId)) {
+        map.set(uId, m);
+      }
+    });
+    return Array.from(map.values());
+  }, [room?.activeMembers]);
+
+  const memberCount = uniqueActiveMembers.length > 0 ? uniqueActiveMembers.length : 1;
+
+  const handleExitRoom = () => {
+    try {
+      api.post(`/rooms/${roomId}/leave`).catch(() => {});
+      if (socketRef.current) {
+        socketRef.current.emit('leave_room', { roomId, userId: currentUser?._id });
+      }
+    } catch (e) {}
+    navigation.goBack();
+  };
 
   const BOX_THRESHOLDS = [12000, 42000, 92000, 172000, 272000];
   const currentBoxLevel = BOX_THRESHOLDS.findIndex((t) => roomGoldContributed < t) + 1 || 5;
@@ -1535,7 +1565,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             <TouchableOpacity
               style={[styles.headerActionCircle, styles.headerCloseCircle]}
               activeOpacity={0.75}
-              onPress={() => navigation.goBack()}
+              onPress={handleExitRoom}
             >
               <Text style={styles.headerCloseIcon}>✕</Text>
             </TouchableOpacity>

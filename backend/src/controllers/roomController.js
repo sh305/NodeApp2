@@ -45,7 +45,7 @@ exports.createRoom = async (req, res) => {
       isLocked: !!isLocked,
       passwordHash,
       seats: initialSeats,
-      activeMembers: [userId],
+      activeMembers: [],
     });
 
     return res.status(201).json({
@@ -62,6 +62,7 @@ exports.createRoom = async (req, res) => {
 // @route   GET /api/rooms
 exports.getRooms = async (req, res) => {
   try {
+    const io = req.app.get('io');
     const rooms = await Room.find({})
       .populate('owner', 'name avatar wealthLevel activeFrame')
       .select('-passwordHash')
@@ -69,6 +70,38 @@ exports.getRooms = async (req, res) => {
 
     const formattedRooms = rooms.map((r) => {
       const totalSeats = r.calculateTotalSeats();
+      const rIdStr = r._id.toString();
+
+      // Check live real-time presence in Socket.IO
+      let liveCount = 0;
+      if (io && io.sockets && io.sockets.adapter && io.sockets.adapter.rooms) {
+        const socketRoom = io.sockets.adapter.rooms.get(rIdStr);
+        if (socketRoom && socketRoom.size > 0) {
+          const uniqueUsers = new Set();
+          for (const sId of socketRoom) {
+            const sock = io.sockets.sockets.get(sId);
+            if (sock && sock.userId) {
+              uniqueUsers.add(sock.userId.toString());
+            } else {
+              uniqueUsers.add(sId);
+            }
+          }
+          liveCount = uniqueUsers.size;
+        }
+      }
+
+      // If room has 0 live socket connections, count MUST be 0 and auto-clean DB
+      let finalMemberCount = liveCount;
+      if (liveCount === 0) {
+        finalMemberCount = 0;
+        if (r.activeMembers && r.activeMembers.length > 0) {
+          Room.updateOne({ _id: r._id }, { $set: { activeMembers: [] } }).catch(() => {});
+        }
+      } else {
+        const dbCount = r.activeMembers ? r.activeMembers.length : 0;
+        finalMemberCount = Math.max(liveCount, dbCount);
+      }
+
       return {
         _id: r._id,
         title: r.title,
@@ -79,7 +112,7 @@ exports.getRooms = async (req, res) => {
         roomFrame: r.roomFrame,
         isLocked: r.isLocked,
         totalSeats,
-        activeMemberCount: r.activeMembers ? r.activeMembers.length : 0,
+        activeMemberCount: finalMemberCount,
       };
     });
 
@@ -156,16 +189,6 @@ exports.getRoomById = async (req, res) => {
       });
     }
 
-    // Register user in activeMembers if not already present
-    const alreadyActive = room.activeMembers.some(
-      (m) => (m._id ? m._id.toString() : m.toString()) === userId.toString()
-    );
-    if (!alreadyActive) {
-      room.activeMembers.push(userId);
-      await room.save();
-      await room.populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
-    }
-
     room.syncSeats();
 
     const roomData = room.toObject();
@@ -176,6 +199,56 @@ exports.getRoomById = async (req, res) => {
       success: true,
       room: roomData,
     });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Explicitly leave a Voice Room
+// @route   POST /api/rooms/:id/leave
+exports.leaveRoom = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const cleanUserId = userId.toString();
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    // Remove user from activeMembers
+    room.activeMembers = (room.activeMembers || []).filter(
+      (m) => m && (m._id ? m._id.toString() : m.toString()) !== cleanUserId
+    );
+
+    // Remove user from seats if seated
+    (room.seats || []).forEach((s) => {
+      if (s.user && (s.user._id ? s.user._id.toString() : s.user.toString()) === cleanUserId) {
+        s.user = null;
+      }
+    });
+
+    if (room.bossSeat && room.bossSeat.user && (room.bossSeat.user._id ? room.bossSeat.user._id.toString() : room.bossSeat.user.toString()) === cleanUserId) {
+      room.bossSeat.user = null;
+    }
+
+    await room.save();
+
+    // Reset user currentRoom
+    await User.findByIdAndUpdate(userId, { currentRoom: null });
+
+    // Broadcast updated members via socket
+    const io = req.app.get('io');
+    if (io) {
+      const updatedRoom = await Room.findById(id)
+        .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
+        .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
+      io.to(id).emit('seats_updated', { seats: updatedRoom?.seats || [] });
+      io.to(id).emit('active_members_updated', { activeMembers: updatedRoom?.activeMembers || [] });
+    }
+
+    return res.status(200).json({ success: true, message: 'Left room successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

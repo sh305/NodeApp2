@@ -420,6 +420,10 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
       fetchRecentRooms();
       fetchFollowingRooms();
       fetchMyProfile();
+      const timer = setTimeout(() => {
+        fetchRooms();
+      }, 350);
+      return () => clearTimeout(timer);
     }, [currentUser])
   );
 

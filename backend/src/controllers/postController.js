@@ -10,7 +10,14 @@ exports.getTrendingPosts = async (req, res) => {
     const myFollowingSet = new Set((currentUser?.following || []).map((id) => id.toString()));
 
     const posts = await Post.find()
-      .populate('user', 'name avatar signature bio customId commentDisabledUsers blockedUsers')
+      .populate({
+        path: 'user',
+        select: 'name avatar signature bio customId commentDisabledUsers blockedUsers isOnline currentRoom activeFrame wealthLevel',
+        populate: {
+          path: 'currentRoom',
+          select: '_id title isLocked',
+        },
+      })
       .sort({ createdAt: -1 })
       .limit(50);
 
@@ -40,6 +47,16 @@ exports.getTrendingPosts = async (req, res) => {
             avatar: p.user.avatar,
             signature: p.user.signature || p.user.bio || '',
             customId: p.user.customId || '',
+            isOnline: Boolean(p.user.isOnline || p.user.currentRoom),
+            currentRoom: p.user.currentRoom
+              ? {
+                  _id: p.user.currentRoom._id,
+                  title: p.user.currentRoom.title,
+                  isLocked: p.user.currentRoom.isLocked,
+                }
+              : null,
+            activeFrame: p.user.activeFrame || null,
+            wealthLevel: p.user.wealthLevel || 1,
           },
           caption: p.caption,
           media: p.media || [],
@@ -79,7 +96,14 @@ exports.getFollowingPosts = async (req, res) => {
     }
 
     const posts = await Post.find({ user: { $in: followingIds } })
-      .populate('user', 'name avatar signature bio customId commentDisabledUsers blockedUsers')
+      .populate({
+        path: 'user',
+        select: 'name avatar signature bio customId commentDisabledUsers blockedUsers isOnline currentRoom activeFrame wealthLevel',
+        populate: {
+          path: 'currentRoom',
+          select: '_id title isLocked',
+        },
+      })
       .sort({ createdAt: -1 })
       .limit(50);
 
@@ -109,6 +133,16 @@ exports.getFollowingPosts = async (req, res) => {
             avatar: p.user.avatar,
             signature: p.user.signature || p.user.bio || '',
             customId: p.user.customId || '',
+            isOnline: Boolean(p.user.isOnline || p.user.currentRoom),
+            currentRoom: p.user.currentRoom
+              ? {
+                  _id: p.user.currentRoom._id,
+                  title: p.user.currentRoom.title,
+                  isLocked: p.user.currentRoom.isLocked,
+                }
+              : null,
+            activeFrame: p.user.activeFrame || null,
+            wealthLevel: p.user.wealthLevel || 1,
           },
           caption: p.caption,
           media: p.media || [],

@@ -140,7 +140,15 @@ exports.globalSearch = async (req, res) => {
             'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
           roomLevel: r.roomLevel || 1,
           displayRoomId: numId,
-          activeMemberCount: r.activeMembers?.length || 0,
+          activeMemberCount: (() => {
+            const io = req.app.get('io');
+            if (io && io.sockets && io.sockets.adapter && io.sockets.adapter.rooms) {
+              const sRoom = io.sockets.adapter.rooms.get(r._id.toString());
+              if (!sRoom || sRoom.size === 0) return 0;
+              return r.activeMembers?.length || sRoom.size;
+            }
+            return r.activeMembers?.length || 0;
+          })(),
           isLocked: Boolean(r.isLocked),
           ownerName: r.owner?.name || 'Host',
         };

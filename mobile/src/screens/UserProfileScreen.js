@@ -28,6 +28,7 @@ import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
 import DirectChatModal from '../components/DirectChatModal';
 import UserAvatarWithFrame from '../components/UserAvatarWithFrame';
+import FindMeAvatar from '../components/FindMeAvatar';
 import { getEquippedLudoFrame, getLudoFrameSkin } from '../constants/ludoFrameAssets';
 
 // 1. Top Icons
@@ -1035,8 +1036,8 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
 
           {/* Hero Avatar & CP Area */}
           <View style={styles.heroAvatarArea}>
-            {/* User Avatar Circle with Equipped Frame or Default Level Frame */}
-            <UserAvatarWithFrame
+            {/* User Avatar Circle with Equipped Frame, Rotating Online Ring, and Find Me Badge */}
+            <FindMeAvatar
               avatarUri={
                 profile.avatar ||
                 'https://api.dicebear.com/7.x/bottts/png?seed=' +
@@ -1055,6 +1056,17 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               }
               level={profile.wealthLevel || profile.level || 1}
               size={76}
+              isOnline={Boolean(profile.isOnline || profile.currentRoom)}
+              currentRoom={profile.currentRoom}
+              onPress={() => {
+                if (profile.currentRoom && (profile.currentRoom._id || typeof profile.currentRoom === 'string')) {
+                  const targetRoomId = profile.currentRoom._id || profile.currentRoom;
+                  navigation.navigate('VoiceRoom', {
+                    roomId: targetRoomId,
+                    roomTitle: profile.currentRoom.title || '',
+                  });
+                }
+              }}
             />
 
             {/* If user has an active CP partner, show CP interlocking rings + partner avatar */}
@@ -1088,13 +1100,16 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               </Text>
             </View>
 
-            {/* Online Status & ID */}
-            <View style={styles.heroStatusRow}>
-              <View style={styles.onlineStatusWrap}>
+            {/* Online Status: Green dot + Online (Screenshot 2) */}
+            {Boolean(profile.isOnline || profile.currentRoom) && (
+              <View style={styles.onlineStatusRow}>
                 <View style={styles.onlineGreenDot} />
                 <Text style={styles.onlineStatusText}>{t('Online')}</Text>
               </View>
+            )}
 
+            {/* ID Row */}
+            <View style={styles.heroIdRow}>
               <TouchableOpacity
                 style={styles.idCopyBtn}
                 activeOpacity={0.7}
@@ -2064,7 +2079,7 @@ const styles = StyleSheet.create({
   heroNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   heroUserName: {
     fontSize: 22,
@@ -2074,27 +2089,33 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  heroStatusRow: {
+  onlineStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  onlineStatusWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
+    gap: 6,
+    marginBottom: 4,
   },
   onlineGreenDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 7.5,
+    height: 7.5,
+    borderRadius: 4,
     backgroundColor: '#00E676',
+    shadowColor: '#00E676',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 3,
+    elevation: 3,
   },
   onlineStatusText: {
     color: '#00E676',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 12.5,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  heroIdRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   idCopyBtn: {
     flexDirection: 'row',
