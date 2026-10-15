@@ -276,6 +276,54 @@ export default function SettingScreen({ navigation, onLogout }) {
       setLanguageModalVisible(true);
       return;
     }
+    if (key === 'terms') {
+      if (navigation?.navigate) {
+        navigation.navigate('Terms');
+      } else {
+        showToast(t('Terms and Conditions'), 'info');
+      }
+      return;
+    }
+    if (key === 'privacy') {
+      if (navigation?.navigate) {
+        navigation.navigate('Privacy');
+      } else {
+        showToast(t('Privacy Policy'), 'info');
+      }
+      return;
+    }
+    if (key === 'refund') {
+      if (navigation?.navigate) {
+        navigation.navigate('Refund');
+      } else {
+        showToast(t('Refund Policy'), 'info');
+      }
+      return;
+    }
+    if (key === 'ipRights') {
+      if (navigation?.navigate) {
+        navigation.navigate('IpRights');
+      } else {
+        showToast(t('Intellectual Property Rights'), 'info');
+      }
+      return;
+    }
+    if (key === 'about') {
+      if (navigation?.navigate) {
+        navigation.navigate('About');
+      } else {
+        showToast(t('About Us'), 'info');
+      }
+      return;
+    }
+    if (key === 'contact') {
+      if (navigation?.navigate) {
+        navigation.navigate('UserProblem');
+      } else {
+        showToast(t('Contact Us'), 'info');
+      }
+      return;
+    }
     showToast(t(`${title} coming soon`), 'info');
   };
 

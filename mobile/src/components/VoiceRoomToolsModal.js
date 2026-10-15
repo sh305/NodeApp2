@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -87,8 +87,18 @@ export default function VoiceRoomToolsModal({
   onSelectTool,
   roomPkActive = false,
   hasClaimableTasks = false,
+  isOwner = false,
 }) {
   const insets = useSafeAreaInsets();
+
+  // Basic tools are restricted exclusively to the Room Owner.
+  // Admins and all other users only see Entertainment tools & Other tools.
+  const visibleSections = useMemo(() => {
+    if (isOwner) {
+      return SECTIONS;
+    }
+    return SECTIONS.filter((section) => section.key !== 'basic_tools');
+  }, [isOwner]);
 
   // State to manage switches for tools that have toggle buttons
   const [toggleStates, setToggleStates] = useState({
@@ -155,7 +165,7 @@ export default function VoiceRoomToolsModal({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            {SECTIONS.map((section) => (
+            {visibleSections.map((section) => (
               <View key={section.key} style={styles.sectionWrap}>
                 {/* Section Title */}
                 <Text style={styles.sectionTitle}>

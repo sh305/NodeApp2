@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -113,7 +113,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   // Modals state
   const [selectedSeatUser, setSelectedSeatUser] = useState(null);
-  const [isHostActive, setIsHostActive] = useState(true);
+  const [isHostActive, setIsHostActive] = useState(false);
   const [isHostMuted, setIsHostMuted] = useState(false);
   const [giftModalVisible, setGiftModalVisible] = useState(false);
   const [kickModalVisible, setKickModalVisible] = useState(false);
@@ -231,9 +231,22 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       )
   );
 
+  // Check if room owner is actually in the room (in activeMembers or current user is owner)
+  const isOwnerPresent = useMemo(() => {
+    if (!roomOwnerId) return false;
+    if (isOwner) return true;
+    return (room?.activeMembers || []).some((m) => {
+      const mId = m?._id ? m._id.toString() : m?.toString();
+      return mId === roomOwnerId;
+    });
+  }, [roomOwnerId, isOwner, room?.activeMembers]);
+
+  // Host is active ONLY if room owner is actually present in room
+  const effectiveIsHostActive = Boolean(isHostActive && isOwnerPresent);
+
   // Host rights are granted ONLY when host seat is occupied (Conforming to Admin Rights table)
   const isHost = Boolean(
-    isHostActive &&
+    effectiveIsHostActive &&
       mySeatIndex === null &&
       (isOwner ||
         (room?.hosts &&
@@ -243,10 +256,20 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   );
 
   const socketRef = useRef(null);
+  const hasLeftRoomRef = useRef(false);
   const chatInputRef = useRef(null);
   const chatListRef = useRef(null);
   const chatScrollTimeoutRef = useRef(null);
   const isChatAtBottomRef = useRef(true);
+
+  const performLeaveRoom = () => {
+    if (hasLeftRoomRef.current) return;
+    hasLeftRoomRef.current = true;
+    api.post(`/rooms/${roomId}/leave`).catch(() => {});
+    if (socketRef.current) {
+      socketRef.current.emit('leave_room', { roomId, userId: currentUser?._id });
+    }
+  };
 
   const scrollChatToLatest = () => {
     if (!isChatAtBottomRef.current) return;
@@ -757,8 +780,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       showSub.remove();
       hideSub.remove();
       musicPlayer.stopAndUnload();
-      api.post(`/rooms/${roomId}/leave`).catch(() => {});
-      socket.emit('leave_room', { roomId, userId: currentUser?._id });
+      performLeaveRoom();
       socket.disconnect();
     };
   }, [roomId]);
@@ -1380,6 +1402,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   const handleKickUser = async (kickType) => {
     if (!selectedSeatUser) return;
+    if (!isOwner && !isAdmin && !isHost) {
+      showToast(t('Only room owner, admin, or host can kick users'), 'error');
+      return;
+    }
     try {
       const res = await api.post(`/rooms/${roomId}/kick`, {
         targetUserId: selectedSeatUser._id,
@@ -1447,12 +1473,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const memberCount = uniqueActiveMembers.length > 0 ? uniqueActiveMembers.length : 1;
 
   const handleExitRoom = () => {
-    try {
-      api.post(`/rooms/${roomId}/leave`).catch(() => {});
-      if (socketRef.current) {
-        socketRef.current.emit('leave_room', { roomId, userId: currentUser?._id });
-      }
-    } catch (e) {}
+    performLeaveRoom();
     navigation.goBack();
   };
 
@@ -1595,7 +1616,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           <RoomSeatGrid
             seats={room?.seats || []}
             owner={room?.owner}
-            isHostActive={isHostActive}
+            isHostActive={effectiveIsHostActive}
             isHostMuted={isHostMuted}
             onSeatPress={handleSeatPress}
             onHostPress={(hostUser) => {
@@ -2125,7 +2146,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 {/* 👑 1. LEAVE HOSTING / REMOVE HOST (Owner, Admin, or Self) */}
                 {Boolean(
                   (selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) &&
-                    isHostActive &&
+                    effectiveIsHostActive &&
                     (
                       isSelf ||
                       isOwner ||
@@ -2164,7 +2185,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 {/* 👑 1B. TAKE HOST */}
                 {Boolean(
                   (selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) &&
-                    !isHostActive &&
+                    !effectiveIsHostActive &&
                     (isOwner || (room?.hosts && room.hosts.some(h => (h._id ? h._id.toString() : h.toString()) === currentUserIdStr)))
                 ) && (
                   <TouchableOpacity
@@ -2380,7 +2401,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         onClose={() => setRoomToolsModalVisible(false)}
         roomPkActive={Boolean(pkBattle)}
         hasClaimableTasks={hasClaimableTasks}
+        isOwner={isOwner}
         onSelectTool={(tool, toggledState) => {
+          // Strict Guard: Only the Room Owner can access Basic tools (Members, Settings, Broadcast)
+          if (['members', 'room_settings', 'seat_settings', 'seat_setting', 'broadcast'].includes(tool?.id) && !isOwner) {
+            showToast(t('Only the room owner can access Basic tools'), 'info');
+            return;
+          }
+
           if (tool?.id === 'members') {
             setRoomToolsModalVisible(false);
             setRoomMembersModalVisible(true);
@@ -2470,7 +2498,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         visible={roomMembersModalVisible}
         onClose={() => setRoomMembersModalVisible(false)}
         room={room}
-        isHostActive={isHostActive}
+        isHostActive={effectiveIsHostActive}
         isHostMuted={isHostMuted}
         currentUser={currentUser}
         initialTab={roomMembersInitialTab}

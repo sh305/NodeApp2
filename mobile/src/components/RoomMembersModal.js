@@ -20,7 +20,7 @@ export default function RoomMembersModal({
   visible,
   onClose,
   room,
-  isHostActive = true,
+  isHostActive = false,
   isHostMuted = false,
   currentUser = null,
   onSelectUser = null,

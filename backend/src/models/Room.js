@@ -121,10 +121,10 @@ const roomSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-    // Host seat active status
+    // Host seat active status (false by default until room owner enters or takes host)
     isHostActive: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     isHostMuted: {
       type: Boolean,
@@ -213,6 +213,7 @@ const roomSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    versionKey: false,
   }
 );
 

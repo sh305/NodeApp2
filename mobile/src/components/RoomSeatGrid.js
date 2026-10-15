@@ -109,7 +109,7 @@ function PulseRing({ active, color }) {
 export default function RoomSeatGrid({
   seats = [],
   owner = null,
-  isHostActive = true,
+  isHostActive = false,
   isHostMuted = false,
   onSeatPress,
   onHostPress,

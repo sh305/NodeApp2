@@ -94,9 +94,7 @@ exports.getRooms = async (req, res) => {
       let finalMemberCount = liveCount;
       if (liveCount === 0) {
         finalMemberCount = 0;
-        if (r.activeMembers && r.activeMembers.length > 0) {
-          Room.updateOne({ _id: r._id }, { $set: { activeMembers: [] } }).catch(() => {});
-        }
+        Room.updateOne({ _id: r._id }, { $set: { activeMembers: [], isHostActive: false } }).catch(() => {});
       } else {
         const dbCount = r.activeMembers ? r.activeMembers.length : 0;
         finalMemberCount = Math.max(liveCount, dbCount);
@@ -189,6 +187,18 @@ exports.getRoomById = async (req, res) => {
       });
     }
 
+    // Check if room owner is actually present in room
+    const ownerIdStr = (room.owner?._id || room.owner)?.toString();
+    const isOwnerPresent = (room.activeMembers || []).some((m) => {
+      const mId = (m?._id || m)?.toString();
+      return mId === ownerIdStr;
+    });
+    // If owner is not in the room, host seat MUST NOT be active
+    if (!isOwnerPresent && room.isHostActive) {
+      room.isHostActive = false;
+      Room.updateOne({ _id: room._id }, { $set: { isHostActive: false } }).catch(() => {});
+    }
+
     room.syncSeats();
 
     const roomData = room.toObject();
@@ -210,42 +220,51 @@ exports.leaveRoom = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user._id;
-    const cleanUserId = userId.toString();
 
-    const room = await Room.findById(id);
-    if (!room) {
-      return res.status(404).json({ success: false, message: 'Room not found' });
-    }
-
-    // Remove user from activeMembers
-    room.activeMembers = (room.activeMembers || []).filter(
-      (m) => m && (m._id ? m._id.toString() : m.toString()) !== cleanUserId
-    );
-
-    // Remove user from seats if seated
-    (room.seats || []).forEach((s) => {
-      if (s.user && (s.user._id ? s.user._id.toString() : s.user.toString()) === cleanUserId) {
-        s.user = null;
+    // 1. Atomically remove user from activeMembers and any regular seats
+    await Room.updateOne(
+      { _id: id },
+      {
+        $pull: { activeMembers: userId },
+        $set: {
+          'seats.$[elem].user': null,
+        },
+      },
+      {
+        arrayFilters: [{ 'elem.user': userId }],
       }
-    });
+    ).catch(() => {});
 
-    if (room.bossSeat && room.bossSeat.user && (room.bossSeat.user._id ? room.bossSeat.user._id.toString() : room.bossSeat.user.toString()) === cleanUserId) {
-      room.bossSeat.user = null;
-    }
+    // 2. Also clear bossSeat if this user is occupying it
+    await Room.updateOne(
+      { _id: id, 'bossSeat.user': userId },
+      { $set: { 'bossSeat.user': null } }
+    ).catch(() => {});
 
-    await room.save();
+    // 3. If departing user is room owner, deactivate host seat
+    await Room.updateOne(
+      { _id: id, owner: userId },
+      { $set: { isHostActive: false } }
+    ).catch(() => {});
 
     // Reset user currentRoom
-    await User.findByIdAndUpdate(userId, { currentRoom: null });
+    await User.findByIdAndUpdate(userId, { currentRoom: null }).catch(() => {});
 
     // Broadcast updated members via socket
     const io = req.app.get('io');
     if (io) {
       const updatedRoom = await Room.findById(id)
         .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
-        .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender');
-      io.to(id).emit('seats_updated', { seats: updatedRoom?.seats || [] });
-      io.to(id).emit('active_members_updated', { activeMembers: updatedRoom?.activeMembers || [] });
+        .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender')
+        .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
+      if (updatedRoom) {
+        io.to(id).emit('seats_updated', { seats: updatedRoom.seats || [] });
+        io.to(id).emit('active_members_updated', { activeMembers: updatedRoom.activeMembers || [] });
+        io.to(id).emit('host_status_updated', { isHostActive: updatedRoom.isHostActive });
+        if (updatedRoom.bossSeat) {
+          io.to(id).emit('boss_seat_updated', { bossSeat: updatedRoom.bossSeat });
+        }
+      }
     }
 
     return res.status(200).json({ success: true, message: 'Left room successfully' });

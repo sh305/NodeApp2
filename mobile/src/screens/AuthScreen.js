@@ -1726,8 +1726,19 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
           <Text style={styles.termsText}>
             {t('By continuing, you agree to our')}{' '}
-            <Text style={styles.termsLink}>&lt;&lt;{t('Terms of Service')}&gt;&gt;</Text> {t('and')}{' '}
-            <Text style={styles.termsLink}>&lt;&lt;{t('Privacy Policy')}&gt;&gt;</Text>
+            <Text
+              style={styles.termsLink}
+              onPress={() => navigation?.navigate?.('Terms')}
+            >
+              &lt;&lt;{t('Terms of Service')}&gt;&gt;
+            </Text>{' '}
+            {t('and')}{' '}
+            <Text
+              style={styles.termsLink}
+              onPress={() => navigation?.navigate?.('Privacy')}
+            >
+              &lt;&lt;{t('Privacy Policy')}&gt;&gt;
+            </Text>
           </Text>
         </View>
     </ScreenContainer>

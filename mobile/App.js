@@ -25,6 +25,11 @@ import FaceCaptureScreen from './src/screens/FaceCaptureScreen';
 import OnlineStatusScreen from './src/screens/OnlineStatusScreen';
 import CommentDisabledScreen from './src/screens/CommentDisabledScreen';
 import BlacklistScreen from './src/screens/BlacklistScreen';
+import TermsScreen from './src/screens/TermsScreen';
+import PrivacyScreen from './src/screens/PrivacyScreen';
+import RefundPolicyScreen from './src/screens/RefundPolicyScreen';
+import AboutUsScreen from './src/screens/AboutUsScreen';
+import IntellectualPropertyScreen from './src/screens/IntellectualPropertyScreen';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { ToastProvider } from './src/context/ToastContext';
 
@@ -82,14 +87,31 @@ export default function App() {
               }}
             >
               {!currentUser ? (
-                <Stack.Screen name="Auth">
-                  {(props) => (
-                    <AuthScreen
-                      {...props}
-                      onLoginSuccess={(user) => setCurrentUser(user)}
-                    />
-                  )}
-                </Stack.Screen>
+                <>
+                  <Stack.Screen name="Auth">
+                    {(props) => (
+                      <AuthScreen
+                        {...props}
+                        onLoginSuccess={(user) => setCurrentUser(user)}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Terms">
+                    {(props) => <TermsScreen {...props} />}
+                  </Stack.Screen>
+                  <Stack.Screen name="Privacy">
+                    {(props) => <PrivacyScreen {...props} />}
+                  </Stack.Screen>
+                  <Stack.Screen name="Refund">
+                    {(props) => <RefundPolicyScreen {...props} />}
+                  </Stack.Screen>
+                  <Stack.Screen name="About">
+                    {(props) => <AboutUsScreen {...props} />}
+                  </Stack.Screen>
+                  <Stack.Screen name="IpRights">
+                    {(props) => <IntellectualPropertyScreen {...props} />}
+                  </Stack.Screen>
+                </>
               ) : (
                 <>
                   <Stack.Screen name="Home">
@@ -238,6 +260,21 @@ export default function App() {
                         currentUser={currentUser}
                       />
                     )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Terms">
+                    {(props) => <TermsScreen {...props} />}
+                  </Stack.Screen>
+                  <Stack.Screen name="Privacy">
+                    {(props) => <PrivacyScreen {...props} />}
+                  </Stack.Screen>
+                  <Stack.Screen name="Refund">
+                    {(props) => <RefundPolicyScreen {...props} />}
+                  </Stack.Screen>
+                  <Stack.Screen name="About">
+                    {(props) => <AboutUsScreen {...props} />}
+                  </Stack.Screen>
+                  <Stack.Screen name="IpRights">
+                    {(props) => <IntellectualPropertyScreen {...props} />}
                   </Stack.Screen>
                 </>
               )}
