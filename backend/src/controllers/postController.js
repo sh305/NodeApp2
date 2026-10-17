@@ -47,7 +47,7 @@ exports.getTrendingPosts = async (req, res) => {
             avatar: p.user.avatar,
             signature: p.user.signature || p.user.bio || '',
             customId: p.user.customId || '',
-            isOnline: Boolean(p.user.isOnline || p.user.currentRoom),
+            isOnline: Boolean(p.user.currentRoom),
             currentRoom: p.user.currentRoom
               ? {
                   _id: p.user.currentRoom._id,
@@ -133,7 +133,7 @@ exports.getFollowingPosts = async (req, res) => {
             avatar: p.user.avatar,
             signature: p.user.signature || p.user.bio || '',
             customId: p.user.customId || '',
-            isOnline: Boolean(p.user.isOnline || p.user.currentRoom),
+            isOnline: Boolean(p.user.currentRoom),
             currentRoom: p.user.currentRoom
               ? {
                   _id: p.user.currentRoom._id,

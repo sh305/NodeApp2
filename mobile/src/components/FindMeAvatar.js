@@ -37,8 +37,14 @@ export default function FindMeAvatar({
   const { t } = useLanguage();
   const spinValue = useRef(new Animated.Value(0)).current;
 
+  // Only show online indicator and "Find Me" pill badge if user is genuinely inside an active voice room
+  const hasActiveRoom = Boolean(
+    currentRoom && (currentRoom._id || typeof currentRoom === 'string')
+  );
+  const showOnline = hasActiveRoom && Boolean(isOnline);
+
   useEffect(() => {
-    if (!isOnline) {
+    if (!showOnline) {
       spinValue.setValue(0);
       return;
     }
@@ -54,7 +60,7 @@ export default function FindMeAvatar({
     spinAnimation.start();
 
     return () => spinAnimation.stop();
-  }, [isOnline]);
+  }, [showOnline]);
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
@@ -77,9 +83,9 @@ export default function FindMeAvatar({
   const gradientId = useRef(`findMeGrad_${Math.random().toString(36).substring(2, 9)}`).current;
 
   const content = (
-    <View style={[styles.container, { width: ringSize, height: ringSize + (isOnline ? 6 : 0) }, style]}>
-      {/* 1. Rotating Neon Circle Ring (Shown only when online) */}
-      {isOnline && (
+    <View style={[styles.container, { width: ringSize, height: ringSize + (showOnline ? 6 : 0) }, style]}>
+      {/* 1. Rotating Neon Circle Ring (Shown only when user is inside a room and online) */}
+      {showOnline && (
         <Animated.View
           style={[
             styles.ringWrapper,
@@ -145,8 +151,8 @@ export default function FindMeAvatar({
         )}
       </View>
 
-      {/* 3. "Find Me" Pill Badge (Shown only when online) */}
-      {isOnline && (
+      {/* 3. "Find Me" Pill Badge (Shown only when user is inside a room and online) */}
+      {showOnline && (
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onFindMePress || onPress}

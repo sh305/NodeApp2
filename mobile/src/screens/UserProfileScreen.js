@@ -19,7 +19,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
-import api from '../api/client';
+import api, { BASE_URL } from '../api/client';
+import io from 'socket.io-client';
 import ReportModal from '../components/ReportModal';
 import CountryPickerModal from '../components/CountryPickerModal';
 import { getCountryEmoji } from '../constants/countries';
@@ -362,6 +363,38 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
       fetchProfile();
     }, [userId])
   );
+
+  // Real-time synchronization of target user's active room status (Find Me badge & Online dot)
+  useEffect(() => {
+    let socket = null;
+    try {
+      socket = io(BASE_URL, {
+        transports: ['websocket'],
+        reconnection: true,
+      });
+
+      socket.on('user_room_status_changed', (data) => {
+        if (!data || !data.userId) return;
+        if (String(data.userId) === String(userId)) {
+          setProfile((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  currentRoom: data.currentRoom,
+                  isOnline: Boolean(data.currentRoom),
+                }
+              : prev
+          );
+        }
+      });
+    } catch (e) {
+      console.log('UserProfileScreen socket error:', e);
+    }
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [userId]);
 
   const handleToggleFollow = async () => {
     try {
@@ -1056,7 +1089,7 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               }
               level={profile.wealthLevel || profile.level || 1}
               size={76}
-              isOnline={Boolean(profile.isOnline || profile.currentRoom)}
+              isOnline={Boolean(profile.currentRoom && (profile.currentRoom._id || typeof profile.currentRoom === 'string'))}
               currentRoom={profile.currentRoom}
               onPress={() => {
                 if (profile.currentRoom && (profile.currentRoom._id || typeof profile.currentRoom === 'string')) {
@@ -1100,8 +1133,8 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
               </Text>
             </View>
 
-            {/* Online Status: Green dot + Online (Screenshot 2) */}
-            {Boolean(profile.isOnline || profile.currentRoom) && (
+            {/* Online Status: Green dot + Online (Only shown when user is actively inside a room) */}
+            {Boolean(profile.currentRoom && (profile.currentRoom._id || typeof profile.currentRoom === 'string')) && (
               <View style={styles.onlineStatusRow}>
                 <View style={styles.onlineGreenDot} />
                 <Text style={styles.onlineStatusText}>{t('Online')}</Text>

@@ -8,8 +8,12 @@ const giftSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ['popular', 'luxury', 'effects', 'romantic'],
-      default: 'popular',
+      enum: ['hot', 'lucky', 'couple', 'custom', 'vip', 'popular', 'luxury', 'effects', 'romantic'],
+      default: 'hot',
+    },
+    badge: {
+      type: String,
+      default: '',
     },
     coinPrice: {
       type: Number,

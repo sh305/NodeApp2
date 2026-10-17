@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Room = require('../models/Room');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
@@ -80,10 +81,8 @@ exports.getRooms = async (req, res) => {
           const uniqueUsers = new Set();
           for (const sId of socketRoom) {
             const sock = io.sockets.sockets.get(sId);
-            if (sock && sock.userId) {
+            if (sock && sock.connected && sock.userId) {
               uniqueUsers.add(sock.userId.toString());
-            } else {
-              uniqueUsers.add(sId);
             }
           }
           liveCount = uniqueUsers.size;
@@ -95,9 +94,6 @@ exports.getRooms = async (req, res) => {
       if (liveCount === 0) {
         finalMemberCount = 0;
         Room.updateOne({ _id: r._id }, { $set: { activeMembers: [], isHostActive: false } }).catch(() => {});
-      } else {
-        const dbCount = r.activeMembers ? r.activeMembers.length : 0;
-        finalMemberCount = Math.max(liveCount, dbCount);
       }
 
       return {
@@ -177,6 +173,7 @@ exports.getRoomById = async (req, res) => {
       if (changed) {
         await room.save();
       }
+      User.findByIdAndUpdate(userId, { currentRoom: null }).catch(() => {});
 
       return res.status(403).json({
         success: false,
@@ -221,17 +218,22 @@ exports.leaveRoom = async (req, res) => {
     const { id } = req.params;
     const userId = req.user._id;
 
-    // 1. Atomically remove user from activeMembers and any regular seats
+    // 1. Atomically remove user from activeMembers and any regular seats (handles both ObjectId & string)
+    const pullTargets = [userId.toString()];
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      pullTargets.push(new mongoose.Types.ObjectId(userId));
+    }
+
     await Room.updateOne(
       { _id: id },
       {
-        $pull: { activeMembers: userId },
+        $pull: { activeMembers: { $in: pullTargets } },
         $set: {
           'seats.$[elem].user': null,
         },
       },
       {
-        arrayFilters: [{ 'elem.user': userId }],
+        arrayFilters: [{ 'elem.user': { $in: pullTargets } }],
       }
     ).catch(() => {});
 
@@ -253,11 +255,23 @@ exports.leaveRoom = async (req, res) => {
     // Broadcast updated members via socket
     const io = req.app.get('io');
     if (io) {
+      io.emit('user_room_status_changed', {
+        userId: userId.toString(),
+        currentRoom: null,
+        isOnline: false,
+      });
+
       const updatedRoom = await Room.findById(id)
         .populate('seats.user', 'name avatar wealthLevel activeFrame customId gender')
         .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender')
         .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
       if (updatedRoom) {
+        const activeCount = updatedRoom.activeMembers ? updatedRoom.activeMembers.length : 0;
+        io.emit('room_member_count_updated', {
+          roomId: id.toString(),
+          activeMemberCount: activeCount,
+        });
+
         io.to(id).emit('seats_updated', { seats: updatedRoom.seats || [] });
         io.to(id).emit('active_members_updated', { activeMembers: updatedRoom.activeMembers || [] });
         io.to(id).emit('host_status_updated', { isHostActive: updatedRoom.isHostActive });

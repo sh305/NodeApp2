@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Room = require('../models/Room');
 const User = require('../models/User');
 
@@ -239,7 +240,8 @@ function initRoomSockets(io) {
           room.activeMembers = (room.activeMembers || []).filter(
             (m) => m && (m._id ? m._id.toString() : m.toString()) !== cleanUserId
           );
-          room.activeMembers.push(userId);
+          const uIdObj = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+          room.activeMembers.push(uIdObj);
 
           // If room owner joins room, activate host seat
           const isOwner = room.owner && room.owner.toString() === cleanUserId;
@@ -255,6 +257,12 @@ function initRoomSockets(io) {
             activeMembers: updatedRoom?.activeMembers || [],
           });
 
+          // Globally broadcast updated live member count
+          io.emit('room_member_count_updated', {
+            roomId: roomId.toString(),
+            activeMemberCount: updatedRoom?.activeMembers ? updatedRoom.activeMembers.length : 1,
+          });
+
           if (isOwner) {
             io.to(roomId).emit('host_status_updated', { isHostActive: true, userId });
           }
@@ -263,6 +271,17 @@ function initRoomSockets(io) {
           io.to(roomId).emit('user_joined_room', {
             user,
             timestamp: new Date(),
+          });
+
+          // Globally broadcast user's active room status change so Discover and Profile screens update in real-time
+          io.emit('user_room_status_changed', {
+            userId: cleanUserId,
+            currentRoom: {
+              _id: room._id,
+              title: room.title || '',
+              isLocked: !!room.isLocked,
+            },
+            isOnline: true,
           });
         }
       } catch (err) {
@@ -276,35 +295,48 @@ function initRoomSockets(io) {
         const targetRoomId = roomId || socket.roomId;
         const targetUserId = userId || socket.userId;
         if (targetUserId) {
+          const cleanTargetUserId = targetUserId.toString();
           await User.findByIdAndUpdate(targetUserId, {
             currentRoom: null,
             lastActiveAt: new Date(),
           }).catch(() => {});
+
+          // Globally broadcast user's active room status change (left room)
+          io.emit('user_room_status_changed', {
+            userId: cleanTargetUserId,
+            currentRoom: null,
+            isOnline: false,
+          });
         }
         if (targetRoomId && targetUserId) {
           socket.leave(targetRoomId);
 
+          const pullTargets = [targetUserId.toString()];
+          if (mongoose.Types.ObjectId.isValid(targetUserId)) {
+            pullTargets.push(new mongoose.Types.ObjectId(targetUserId));
+          }
+
           await Room.updateOne(
             { _id: targetRoomId },
             {
-              $pull: { activeMembers: targetUserId },
+              $pull: { activeMembers: { $in: pullTargets } },
               $set: {
                 'seats.$[elem].user': null,
               },
             },
             {
-              arrayFilters: [{ 'elem.user': targetUserId }],
+              arrayFilters: [{ 'elem.user': { $in: pullTargets } }],
             }
           ).catch(() => {});
 
           await Room.updateOne(
-            { _id: targetRoomId, 'bossSeat.user': targetUserId },
+            { _id: targetRoomId, 'bossSeat.user': { $in: pullTargets } },
             { $set: { 'bossSeat.user': null } }
           ).catch(() => {});
 
           // If departing user is room owner, vacate host seat
           await Room.updateOne(
-            { _id: targetRoomId, owner: targetUserId },
+            { _id: targetRoomId, owner: { $in: pullTargets } },
             { $set: { isHostActive: false } }
           ).catch(() => {});
 
@@ -313,6 +345,12 @@ function initRoomSockets(io) {
             .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender')
             .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
           if (updatedRoom) {
+            const currentCount = updatedRoom.activeMembers ? updatedRoom.activeMembers.length : 0;
+            io.emit('room_member_count_updated', {
+              roomId: targetRoomId.toString(),
+              activeMemberCount: currentCount,
+            });
+
             io.to(targetRoomId).emit('seats_updated', { seats: updatedRoom.seats || [] });
             io.to(targetRoomId).emit('active_members_updated', { activeMembers: updatedRoom.activeMembers || [] });
             io.to(targetRoomId).emit('host_status_updated', { isHostActive: updatedRoom.isHostActive, userId: targetUserId });
@@ -1983,36 +2021,49 @@ function initRoomSockets(io) {
       console.log(`🔌 Socket disconnected: ${socket.id}`);
       if (socket.userId) {
         try {
+          const cleanDisconnectedUserId = socket.userId.toString();
           await User.findByIdAndUpdate(socket.userId, {
             currentRoom: null,
             isOnline: false,
             lastActiveAt: new Date(),
           });
+
+          // Globally broadcast user room status change on disconnect
+          io.emit('user_room_status_changed', {
+            userId: cleanDisconnectedUserId,
+            currentRoom: null,
+            isOnline: false,
+          });
         } catch (e) {}
       }
       if (socket.roomId && socket.userId) {
         try {
+          const pullTargets = [socket.userId.toString()];
+          if (mongoose.Types.ObjectId.isValid(socket.userId)) {
+            pullTargets.push(new mongoose.Types.ObjectId(socket.userId));
+          }
+
           await Room.updateOne(
             { _id: socket.roomId },
             {
-              $pull: { activeMembers: socket.userId },
+              $pull: { activeMembers: { $in: pullTargets } },
               $set: {
                 'seats.$[elem].user': null,
               },
             },
             {
-              arrayFilters: [{ 'elem.user': socket.userId }],
+              arrayFilters: [{ 'elem.user': { $in: pullTargets } }],
             }
           ).catch(() => {});
 
           await Room.updateOne(
-            { _id: socket.roomId, 'bossSeat.user': socket.userId },
+            { _id: socket.roomId, 'bossSeat.user': { $in: pullTargets } },
             { $set: { 'bossSeat.user': null } }
           ).catch(() => {});
 
           // If disconnected user is room owner, vacate host seat
           await Room.updateOne(
-            { _id: socket.roomId, owner: socket.userId },
+            { _id: socket.roomId, owner: { $in: pullTargets } },
             { $set: { isHostActive: false } }
           ).catch(() => {});
 
@@ -2021,6 +2072,12 @@ function initRoomSockets(io) {
             .populate('activeMembers', 'name avatar wealthLevel activeFrame customId gender')
             .populate('bossSeat.user', 'name avatar wealthLevel activeFrame customId gender');
           if (updatedRoom) {
+            const currentCount = updatedRoom.activeMembers ? updatedRoom.activeMembers.length : 0;
+            io.emit('room_member_count_updated', {
+              roomId: socket.roomId.toString(),
+              activeMemberCount: currentCount,
+            });
+
             io.to(socket.roomId).emit('seats_updated', { seats: updatedRoom.seats || [] });
             io.to(socket.roomId).emit('active_members_updated', { activeMembers: updatedRoom.activeMembers || [] });
             io.to(socket.roomId).emit('host_status_updated', { isHostActive: updatedRoom.isHostActive, userId: socket.userId });

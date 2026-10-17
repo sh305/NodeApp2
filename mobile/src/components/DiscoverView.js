@@ -18,7 +18,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import api from '../api/client';
+import api, { BASE_URL } from '../api/client';
+import io from 'socket.io-client';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
@@ -341,6 +342,42 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
     }
   }, [activeTab, fetchPosts, fetchFamilies]);
 
+  // Real-time synchronization of users' room status (Find Me badge & Online ring on Discover)
+  useEffect(() => {
+    let socket = null;
+    try {
+      socket = io(BASE_URL, {
+        transports: ['websocket'],
+        reconnection: true,
+      });
+
+      socket.on('user_room_status_changed', (data) => {
+        if (!data || !data.userId) return;
+        setPosts((prevPosts) =>
+          prevPosts.map((post) => {
+            if (post.user && String(post.user._id) === String(data.userId)) {
+              return {
+                ...post,
+                user: {
+                  ...post.user,
+                  currentRoom: data.currentRoom,
+                  isOnline: Boolean(data.currentRoom),
+                },
+              };
+            }
+            return post;
+          })
+        );
+      });
+    } catch (e) {
+      console.log('DiscoverView socket error:', e);
+    }
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, []);
+
   const onRefresh = async () => {
     setRefreshing(true);
     if (activeTab === 'Family') {
@@ -648,7 +685,7 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
             <FindMeAvatar
               avatarUri={user.avatar}
               size={48}
-              isOnline={Boolean(user.isOnline || user.currentRoom)}
+              isOnline={Boolean(user.currentRoom && (user.currentRoom._id || typeof user.currentRoom === 'string'))}
               currentRoom={user.currentRoom}
               onPress={() => {
                 if (item.isBlockedByAuthor) {

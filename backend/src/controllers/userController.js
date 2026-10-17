@@ -132,6 +132,33 @@ exports.getUserProfile = async (req, res) => {
       // fallback to giftsSent
     }
 
+    // Verify whether target user is actually active in a voice room right now
+    let activeCurrentRoom = null;
+    if (targetUser.currentRoom) {
+      const targetRoomId = targetUser.currentRoom._id || targetUser.currentRoom;
+      const roomDoc = await Room.findById(targetRoomId).select('_id title isLocked activeMembers owner');
+      if (roomDoc) {
+        const uIdStr = targetUserId.toString();
+        const isOwner = (roomDoc.owner?._id || roomDoc.owner)?.toString() === uIdStr;
+        const isMember = (roomDoc.activeMembers || []).some(
+          (m) => (m?._id || m)?.toString() === uIdStr
+        );
+        if (isOwner || isMember) {
+          activeCurrentRoom = {
+            _id: roomDoc._id,
+            title: roomDoc.title,
+            isLocked: !!roomDoc.isLocked,
+          };
+        } else {
+          // User is no longer active in this room, reset currentRoom
+          User.findByIdAndUpdate(targetUserId, { currentRoom: null }).catch(() => {});
+        }
+      } else {
+        // Room no longer exists, reset currentRoom
+        User.findByIdAndUpdate(targetUserId, { currentRoom: null }).catch(() => {});
+      }
+    }
+
     return res.status(200).json({
       success: true,
       user: {
@@ -165,14 +192,8 @@ exports.getUserProfile = async (req, res) => {
         isAvatarVerified: !!targetUser.isAvatarVerified,
         avatarVerifiedAt: targetUser.avatarVerifiedAt,
         onlineStatus: targetUser.onlineStatus || 'online',
-        isOnline: Boolean(targetUser.isOnline || targetUser.currentRoom),
-        currentRoom: targetUser.currentRoom
-          ? {
-              _id: targetUser.currentRoom._id,
-              title: targetUser.currentRoom.title,
-              isLocked: targetUser.currentRoom.isLocked,
-            }
-          : null,
+        isOnline: Boolean(activeCurrentRoom),
+        currentRoom: activeCurrentRoom,
         nobleLevel: targetUser.nobleLevel || 'Super King',
         cpRelationships: targetUser.cpRelationships || [],
         topSupporters: topSupporters || [],

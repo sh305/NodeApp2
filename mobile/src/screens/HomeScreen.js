@@ -313,6 +313,33 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
           fetchUnreadBadgeCount();
         }
       });
+
+      // Real-time synchronization of room active member counts (Mine card & lists)
+      socket.on('room_member_count_updated', ({ roomId, activeMemberCount }) => {
+        if (!roomId) return;
+        const cleanId = String(roomId);
+        const count = Math.max(0, Number(activeMemberCount || 0));
+        setMyRoom((prev) =>
+          prev && String(prev._id) === cleanId
+            ? { ...prev, activeMemberCount: count }
+            : prev
+        );
+        setRooms((prev) =>
+          prev.map((r) =>
+            String(r._id) === cleanId ? { ...r, activeMemberCount: count } : r
+          )
+        );
+        setRecentRooms((prev) =>
+          prev.map((r) =>
+            String(r._id) === cleanId ? { ...r, activeMemberCount: count } : r
+          )
+        );
+        setFollowingRooms((prev) =>
+          prev.map((r) =>
+            String(r._id) === cleanId ? { ...r, activeMemberCount: count } : r
+          )
+        );
+      });
     } catch (err) {}
 
     return () => {

@@ -28,6 +28,7 @@ import api, { BASE_URL } from '../api/client';
 import RoomSeatGrid from '../components/RoomSeatGrid';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import GiftBottomSheet from '../components/GiftBottomSheet';
+import RoomQuickProfileModal from '../components/RoomQuickProfileModal';
 import KickModal from '../components/KickModal';
 import ReportModal from '../components/ReportModal';
 import TreasureBoxModal from '../components/TreasureBoxModal';
@@ -116,6 +117,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [isHostActive, setIsHostActive] = useState(false);
   const [isHostMuted, setIsHostMuted] = useState(false);
   const [giftModalVisible, setGiftModalVisible] = useState(false);
+  const [quickProfileModalVisible, setQuickProfileModalVisible] = useState(false);
+  const [quickProfileUser, setQuickProfileUser] = useState(null);
   const [kickModalVisible, setKickModalVisible] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [giftBanner, setGiftBanner] = useState(null);
@@ -255,6 +258,39 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           )))
   );
 
+  const roomMembersList = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+
+    if (room?.owner && (room.owner._id || room.owner.name)) {
+      const oId = String(room.owner._id || room.owner);
+      seen.add(oId);
+      list.push(room.owner);
+    }
+
+    (room?.seats || []).forEach((s) => {
+      if (s?.user && (s.user._id || s.user.name)) {
+        const uId = String(s.user._id || s.user.name);
+        if (!seen.has(uId)) {
+          seen.add(uId);
+          list.push(s.user);
+        }
+      }
+    });
+
+    (room?.activeMembers || []).forEach((m) => {
+      if (m && (m._id || m.name)) {
+        const mId = String(m._id || m.name);
+        if (!seen.has(mId)) {
+          seen.add(mId);
+          list.push(m);
+        }
+      }
+    });
+
+    return list;
+  }, [room?.owner, room?.seats, room?.activeMembers]);
+
   const socketRef = useRef(null);
   const hasLeftRoomRef = useRef(false);
   const chatInputRef = useRef(null);
@@ -265,10 +301,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const performLeaveRoom = () => {
     if (hasLeftRoomRef.current) return;
     hasLeftRoomRef.current = true;
-    api.post(`/rooms/${roomId}/leave`).catch(() => {});
     if (socketRef.current) {
-      socketRef.current.emit('leave_room', { roomId, userId: currentUser?._id });
+      try {
+        socketRef.current.emit('leave_room', { roomId, userId: currentUser?._id });
+        socketRef.current.disconnect();
+      } catch (e) {}
     }
+    api.post(`/rooms/${roomId}/leave`).catch(() => {});
   };
 
   const scrollChatToLatest = () => {
@@ -1243,6 +1282,37 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       .catch(() => {});
   };
 
+  const handleMentionUser = (targetUserOrName) => {
+    const mentionName = typeof targetUserOrName === 'string'
+      ? targetUserOrName
+      : (targetUserOrName?.name || 'User');
+    setChatInput(`@${mentionName} `);
+    setIsChatInputActive(true);
+    setIsEmojiPickerOpen(false);
+    setTimeout(() => {
+      chatInputRef.current?.focus();
+    }, 100);
+  };
+
+  const renderStyledMessage = (text) => {
+    if (!text) return null;
+    const parts = text.split(/(@[\w\u0900-\u097F]+)/g);
+    return (
+      <Text style={styles.chatMessageContent}>
+        {parts.map((part, index) => {
+          if (part && part.startsWith('@')) {
+            return (
+              <Text key={`mention_${index}`} style={styles.chatMentionHighlight}>
+                {part}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </Text>
+    );
+  };
+
   const handlePickImage = async (shouldCrop = false) => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1369,34 +1439,77 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     }
   };
 
-  const handleSendGift = async (gift, quantity) => {
+  const handleSendGift = async (payload, maybeQty) => {
     try {
+      let gift = payload;
+      let quantity = maybeQty || 1;
+      let isAll = false;
+      let recipients = [];
+      let totalCost = 0;
+
+      if (payload && payload.gift) {
+        gift = payload.gift;
+        quantity = payload.quantity || 1;
+        isAll = Boolean(payload.isAll);
+        recipients = payload.recipients || [];
+        totalCost = payload.totalCost || 0;
+      }
+
+      const targetReceiver = recipients[0] || selectedSeatUser || room?.owner;
+      const recipientIds = isAll
+        ? recipients.map((r) => r._id || r.id).filter(Boolean)
+        : [targetReceiver?._id];
+
       const res = await api.post('/gifts/send', {
         giftId: gift._id,
-        receiverId: selectedSeatUser ? selectedSeatUser._id : room.owner._id,
+        receiverId: targetReceiver?._id || room?.owner?._id,
         roomId: room._id,
         quantity,
+        isAll,
+        recipientIds,
       });
 
-      if (res.data.success) {
-        setRoomGoldContributed((prev) => prev + gift.coinPrice * quantity);
-        const giftCost = (gift.coinPrice || 10) * (quantity || 1);
-        socketRef.current.emit('broadcast_gift', {
+      if (res.data?.success) {
+        const spentCoins = res.data.totalCost || totalCost || (gift.coinPrice || 10) * quantity;
+        setRoomGoldContributed((prev) => prev + spentCoins);
+
+        if (currentUser && res.data.remainingCoins !== undefined) {
+          currentUser.coins = res.data.remainingCoins;
+        }
+
+        const receiverDisplayName = isAll
+          ? t('Everyone')
+          : (targetReceiver?.name || 'Room');
+
+        socketRef.current?.emit('broadcast_gift', {
           roomId,
           giftData: {
-            senderName: currentUser.name,
-            receiverName: selectedSeatUser ? selectedSeatUser.name : 'Room',
+            senderName: currentUser?.name || 'User',
+            receiverName: receiverDisplayName,
             giftName: gift.name,
             giftIcon: gift.iconUrl,
             quantity,
-            coins: giftCost,
+            isCombo: quantity > 1,
+            coins: spentCoins,
           },
         });
+
         setGiftModalVisible(false);
-        showToast(t(`${gift.name} x${quantity} sent successfully!`), 'success');
+        const comboTxt = quantity > 1 ? ` x${quantity} Combo` : ` x${quantity}`;
+        showToast(t(`${gift.name}${comboTxt} sent to ${receiverDisplayName}!`), 'success');
       }
     } catch (e) {
-      showToast(t(e.response?.data?.message || 'Coin balance low'), 'error');
+      const isInsufficient =
+        e.response?.data?.code === 'INSUFFICIENT_COINS' ||
+        (e.response?.data?.message && e.response.data.message.toLowerCase().includes('insufficient'));
+
+      if (isInsufficient) {
+        showToast(t('Insufficient coins balance. Please recharge your wallet.'), 'error');
+        setGiftModalVisible(false);
+        navigation.navigate('Wallet', { initialTab: 'coins' });
+      } else {
+        showToast(t(e.response?.data?.message || 'Coin balance low'), 'error');
+      }
     }
   };
 
@@ -1593,14 +1706,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           </View>
         </View>
 
-        {/* Gift Banner (floating) */}
+        {/* Gift Banner (floating combo broadcast) */}
         {giftBanner && (
           <View style={styles.giftBanner}>
             <Image source={{ uri: giftBanner.giftIcon }} style={styles.bannerIcon} />
             <Text style={styles.bannerText}>
               <Text style={styles.bold}>{giftBanner.senderName}</Text> sent{' '}
               <Text style={styles.highlight}>
-                {giftBanner.giftName} x{giftBanner.quantity}
+                {giftBanner.giftName} {giftBanner.quantity > 1 ? `${giftBanner.quantity} Combo` : `x${giftBanner.quantity}`}
               </Text>{' '}
               to <Text style={styles.bold}>{giftBanner.receiverName}</Text> 🎉
             </Text>
@@ -1734,9 +1847,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   <Text style={styles.chatSenderName}>
                     Lv.{item.sender?.wealthLevel || 1} {item.sender?.name}:{' '}
                   </Text>
-                  {item.message ? (
-                    <Text style={styles.chatMessageContent}>{item.message}</Text>
-                  ) : null}
+                  {item.message ? renderStyledMessage(item.message) : null}
                   {item.imageUrl ? (
                     <TouchableOpacity
                       activeOpacity={0.85}
@@ -2091,261 +2202,49 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         )}
       </ImageBackground>
 
-      {/* User Interaction Bottom Modal (Gift, Kick, Block, Report) */}
-      {selectedSeatUser && (
-        <Modal visible={!!selectedSeatUser} transparent animationType="slide">
-          <View style={styles.userModalOverlay}>
-            <View style={styles.userModalCard}>
-              <AvatarWithFrame
-                avatarUri={selectedSeatUser.avatar}
-                level={selectedSeatUser.wealthLevel || 1}
-                size={64}
-              />
-              <Text style={styles.modalUserName}>{selectedSeatUser.name}</Text>
-              <Text style={styles.modalUserStats}>
-                Wealth Lv.{selectedSeatUser.wealthLevel || 1} • Charm Lv.{selectedSeatUser.charmLevel || 1}
-              </Text>
-
-              {/* Action Buttons Grid */}
-              <View style={styles.actionGrid}>
-                <TouchableOpacity
-                  style={styles.actionBox}
-                  onPress={() => {
-                    setGiftModalVisible(true);
-                  }}
-                >
-                  <Text style={styles.actionEmoji}>🎁</Text>
-                  <Text style={styles.actionLabel}>Send Gift</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionBox}
-                  onPress={() => {
-                    const uId = selectedSeatUser._id;
-                    setSelectedSeatUser(null);
-                    navigation.navigate('UserProfile', { userId: uId });
-                  }}
-                >
-                  <Text style={styles.actionEmoji}>👤</Text>
-                  <Text style={styles.actionLabel}>View Profile</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.actionBox} onPress={handleBlockUser}>
-                  <Text style={styles.actionEmoji}>🚷</Text>
-                  <Text style={styles.actionLabel}>Block User</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionBox}
-                  onPress={() => setReportModalVisible(true)}
-                >
-                  <Text style={styles.actionEmoji}>🚩</Text>
-                  <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Report ID</Text>
-                </TouchableOpacity>
-
-                {/* 👑 1. LEAVE HOSTING / REMOVE HOST (Owner, Admin, or Self) */}
-                {Boolean(
-                  (selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) &&
-                    effectiveIsHostActive &&
-                    (
-                      isSelf ||
-                      isOwner ||
-                      (isAdmin && selectedUserIdStr !== roomOwnerId)
-                    )
-                ) && (
-                  <TouchableOpacity
-                    style={[
-                      styles.actionBox,
-                      {
-                        borderColor: '#F59E0B',
-                        borderWidth: 1,
-                        backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                      },
-                    ]}
-                    onPress={() => {
-                      if (isSelf) {
-                        handleLeaveHosting();
-                      } else {
-                        socketRef.current?.emit('leave_host', {
-                          roomId,
-                          userId: selectedSeatUser._id,
-                        });
-                        showToast(t('Host stepped down from Host seat'), 'info');
-                        setSelectedSeatUser(null);
-                      }
-                    }}
-                  >
-                    <Text style={styles.actionEmoji}>👑</Text>
-                    <Text style={[styles.actionLabel, { color: '#F59E0B' }]}>
-                      <T>{isSelf ? 'Leave Hosting' : 'Remove Host'}</T>
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* 👑 1B. TAKE HOST */}
-                {Boolean(
-                  (selectedSeatUser?.isHostSeat || selectedUserIdStr === roomOwnerId) &&
-                    !effectiveIsHostActive &&
-                    (isOwner || (room?.hosts && room.hosts.some(h => (h._id ? h._id.toString() : h.toString()) === currentUserIdStr)))
-                ) && (
-                  <TouchableOpacity
-                    style={[
-                      styles.actionBox,
-                      {
-                        borderColor: '#10B981',
-                        borderWidth: 1,
-                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                      },
-                    ]}
-                    onPress={handleTakeHost}
-                  >
-                    <Text style={styles.actionEmoji}>👑</Text>
-                    <Text style={[styles.actionLabel, { color: '#10B981' }]}>
-                      <T>Take Host</T>
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* 🛋️ LEAVE BOSS SEAT */}
-                {Boolean(selectedSeatUser?.isBossSeat && isSelf) && (
-                  <TouchableOpacity
-                    style={[
-                      styles.actionBox,
-                      {
-                        borderColor: '#EF4444',
-                        borderWidth: 1,
-                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                      },
-                    ]}
-                    onPress={() => {
-                      handleLeaveBossSeat();
-                      setSelectedSeatUser(null);
-                    }}
-                  >
-                    <Text style={styles.actionEmoji}>🚪</Text>
-                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>
-                      <T>Leave Boss Seat</T>
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* 🛋️ REMOVE FROM BOSS SEAT (Owner and Admin) */}
-                {Boolean(
-                  selectedSeatUser?.isBossSeat &&
-                    (isOwner || isAdmin) &&
-                    !isSelf &&
-                    selectedUserIdStr !== roomOwnerId
-                ) && (
-                  <TouchableOpacity
-                    style={[
-                      styles.actionBox,
-                      {
-                        borderColor: '#F43F5E',
-                        borderWidth: 1,
-                        backgroundColor: 'rgba(244, 63, 94, 0.15)',
-                      },
-                    ]}
-                    onPress={() => {
-                      socketRef.current?.emit('leave_boss_seat', {
-                        roomId,
-                        userId: selectedSeatUser._id,
-                      });
-                      showToast(t('User removed from Boss Seat'), 'info');
-                      setSelectedSeatUser(null);
-                    }}
-                  >
-                    <Image
-                      source={require('../../assets/icons/SofaSeat.png')}
-                      style={{ width: 22, height: 22, marginBottom: 4 }}
-                      resizeMode="contain"
-                    />
-                    <Text style={[styles.actionLabel, { color: '#F43F5E' }]}>
-                      <T>Remove Seat</T>
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* 🚪 2. LEAVE SEAT (Self on mic seat) */}
-                {Boolean(!selectedSeatUser?.isHostSeat && !selectedSeatUser?.isBossSeat && isSelf && mySeatIndex !== null) && (
-                  <TouchableOpacity
-                    style={[
-                      styles.actionBox,
-                      {
-                        borderColor: '#EF4444',
-                        borderWidth: 1,
-                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                      },
-                    ]}
-                    onPress={() => {
-                      handleLeaveSeat();
-                      setSelectedSeatUser(null);
-                    }}
-                  >
-                    <Text style={styles.actionEmoji}>🚪</Text>
-                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>
-                      <T>Leave Seat</T>
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* 🪑 3. REMOVE FROM SEAT (Kick off the seat: Owner, Admin, Host) */}
-                {Boolean(
-                  !selectedSeatUser?.isHostSeat &&
-                    !selectedSeatUser?.isBossSeat &&
-                    (isOwner || isAdmin || isHost) &&
-                    !isSelf &&
-                    selectedUserIdStr !== roomOwnerId
-                ) && (
-                  <TouchableOpacity
-                    style={[
-                      styles.actionBox,
-                      {
-                        borderColor: '#F43F5E',
-                        borderWidth: 1,
-                        backgroundColor: 'rgba(244, 63, 94, 0.15)',
-                      },
-                    ]}
-                    onPress={handleRemoveUserFromSeat}
-                  >
-                    <Image
-                      source={require('../../assets/icons/SofaSeat.png')}
-                      style={{ width: 22, height: 22, marginBottom: 4 }}
-                      resizeMode="contain"
-                    />
-                    <Text style={[styles.actionLabel, { color: '#F43F5E' }]}>
-                      <T>Remove Seat</T>
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* 👢 4. KICK FROM ROOM (Kick off the room: Owner, Admin, Host) */}
-                {Boolean(
-                  (isOwner || isAdmin || isHost) &&
-                    !isSelf &&
-                    selectedUserIdStr !== roomOwnerId
-                ) && (
-                  <TouchableOpacity
-                    style={[styles.actionBox, styles.kickActionBox]}
-                    onPress={() => setKickModalVisible(true)}
-                  >
-                    <Text style={styles.actionEmoji}>👢</Text>
-                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>
-                      <T>Kick (3d/Perm)</T>
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <TouchableOpacity
-                style={styles.closeUserModalBtn}
-                onPress={() => setSelectedSeatUser(null)}
-              >
-                <Text style={styles.closeUserModalText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
+      {/* ══ ROOM QUICK PROFILE MODAL (Screenshot 4) ══ */}
+      <RoomQuickProfileModal
+        visible={quickProfileModalVisible}
+        onClose={() => setQuickProfileModalVisible(false)}
+        targetUser={quickProfileUser || selectedSeatUser}
+        room={room}
+        currentUser={currentUser}
+        onMentionUser={handleMentionUser}
+        onOpenDirectChat={(u) => {
+          setQuickProfileModalVisible(false);
+          navigation.navigate('UserProfile', { userId: u?._id });
+        }}
+        onOpenGiftSheet={(u) => {
+          setQuickProfileModalVisible(false);
+          setSelectedSeatUser(u);
+          setGiftModalVisible(true);
+        }}
+        onKick={(u) => {
+          setQuickProfileModalVisible(false);
+          setSelectedSeatUser(u);
+          setKickModalVisible(true);
+        }}
+        onBlock={(u) => {
+          setQuickProfileModalVisible(false);
+          setSelectedSeatUser(u);
+          handleBlockUser();
+        }}
+        onReport={(u) => {
+          setQuickProfileModalVisible(false);
+          setSelectedSeatUser(u);
+          setReportModalVisible(true);
+        }}
+        onLeaveHosting={() => {
+          setQuickProfileModalVisible(false);
+          handleLeaveHosting();
+        }}
+        onRemoveHost={(u) => {
+          setQuickProfileModalVisible(false);
+          socketRef.current?.emit('leave_host', { roomId, userId: u?._id });
+          showToast(t('Host stepped down from Host seat'), 'info');
+        }}
+        navigation={navigation}
+      />
 
       {/* Treasure Box Modal */}
       <TreasureBoxModal
@@ -2363,13 +2262,20 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
       />
 
-      {/* Gift Bottom Sheet */}
+      {/* ══ GIFT BOTTOM SHEET (Matching Screenshots 1, 2, 3) ══ */}
       <GiftBottomSheet
         visible={giftModalVisible}
         onClose={() => setGiftModalVisible(false)}
         onSendGift={handleSendGift}
-        receiverName={selectedSeatUser ? selectedSeatUser.name : 'Room'}
-        userCoins={currentUser?.coins || 1000}
+        currentUser={currentUser}
+        targetUser={selectedSeatUser}
+        roomMembers={roomMembersList}
+        onOpenProfile={(u) => {
+          setGiftModalVisible(false);
+          setQuickProfileUser(u || selectedSeatUser);
+          setQuickProfileModalVisible(true);
+        }}
+        navigation={navigation}
       />
 
       {/* Kick Modal */}
@@ -3289,6 +3195,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     flexShrink: 1,
+  },
+  chatMentionHighlight: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   /* ── 5. Floating Translucent Bottom Control Bar ── */
