@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from './TranslatedText';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from './Toast';
@@ -149,6 +150,7 @@ export default function SeatSettingsModal({
   currentUser = null,
   onApplyLayout,
 }) {
+  const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { showToast } = useToast();
 
@@ -266,6 +268,7 @@ export default function SeatSettingsModal({
       visible={visible}
       transparent
       animationType="slide"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
@@ -274,7 +277,7 @@ export default function SeatSettingsModal({
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
 
-        <View style={styles.sheetContainer}>
+        <View style={[styles.sheetContainer, { paddingBottom: Math.max(28, insets.bottom + 14) }]}>
           {/* Header Title */}
           <Text style={styles.headerTitle}>
             <T>Seat Settings</T>
@@ -533,7 +536,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     maxHeight: '84%',
     paddingTop: 18,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.18,

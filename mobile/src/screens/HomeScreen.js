@@ -14,6 +14,8 @@ import {
   Platform,
   Animated,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -978,7 +980,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
       )}
 
       {/* 4. FIXED BOTTOM NAVIGATION BAR (5 TABS: ALWAYS VISIBLE ON ALL TABS) */}
-      <View style={[styles.bottomNavContainer, { paddingBottom: Math.max(10, insets.bottom) }]}>
+      <View style={[styles.bottomNavContainer, { paddingBottom: Math.max(12, insets.bottom + 4) }]}>
         {/* Tab 1: Room */}
         <TouchableOpacity
           style={styles.navItem}
@@ -1099,78 +1101,110 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
       />
 
       {/* 7. CREATE ROOM MODAL */}
-      <Modal visible={createModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalHeader}>🎙️ {t('Create Room')}</Text>
+      <Modal
+        visible={createModalVisible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setCreateModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          {/* Backdrop Dismiss on tap outside */}
+          <TouchableOpacity
+            style={styles.modalBackdropDismiss}
+            activeOpacity={1}
+            onPress={() => {
+              Keyboard.dismiss();
+              setCreateModalVisible(false);
+            }}
+          />
 
-            <Text style={styles.modalLabel}>{t('Room Title')} *</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder={t('e.g. Desi Chill Beats & Masti')}
-              placeholderTextColor="#94A3B8"
-              value={newRoomTitle}
-              onChangeText={setNewRoomTitle}
-            />
+          <View style={[styles.modalBox, { paddingBottom: Math.max(30, insets.bottom + 16) }]}>
+            {/* Top Drag Handle Indicator */}
+            <View style={styles.modalDragHandle} />
 
-            <Text style={styles.modalLabel}>{t('Topic / Bio')}</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder={t('e.g. Singing, Chit-chat, Friends')}
-              placeholderTextColor="#94A3B8"
-              value={newRoomTopic}
-              onChangeText={setNewRoomTopic}
-            />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+              contentContainerStyle={styles.modalScrollContent}
+            >
+              <Text style={styles.modalHeader}>🎙️ {t('Create Room')}</Text>
 
-            {/* Lock / Password Toggle */}
-            <View style={styles.switchRow}>
-              <View>
-                <Text style={styles.switchTitle}>🔒 {t('Lock Room with Password')}</Text>
-                <Text style={styles.switchSubtitle}>{t('Only users with PIN can enter')}</Text>
-              </View>
-              <Switch
-                value={isLockedNewRoom}
-                onValueChange={setIsLockedNewRoom}
-                thumbColor={isLockedNewRoom ? '#10B981' : '#CBD5E1'}
-                trackColor={{ true: '#A7F3D0', false: '#E2E8F0' }}
-              />
-            </View>
-
-            {isLockedNewRoom && (
+              <Text style={styles.modalLabel}>{t('Room Title')} *</Text>
               <TextInput
-                style={[styles.modalInput, { marginTop: 10 }]}
-                placeholder={t('Enter 4-digit Room Password')}
+                style={styles.modalInput}
+                placeholder={t('e.g. Desi Chill Beats & Masti')}
                 placeholderTextColor="#94A3B8"
-                secureTextEntry
-                keyboardType="numeric"
-                maxLength={4}
-                value={newRoomPassword}
-                onChangeText={setNewRoomPassword}
+                value={newRoomTitle}
+                onChangeText={setNewRoomTitle}
               />
-            )}
 
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setCreateModalVisible(false)}
-              >
-                <Text style={styles.cancelBtnText}>{t('Cancel')}</Text>
-              </TouchableOpacity>
+              <Text style={styles.modalLabel}>{t('Topic / Bio')}</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder={t('e.g. Singing, Chit-chat, Friends')}
+                placeholderTextColor="#94A3B8"
+                value={newRoomTopic}
+                onChangeText={setNewRoomTopic}
+              />
 
-              <TouchableOpacity
-                style={styles.submitBtn}
-                onPress={handleCreateRoom}
-                disabled={creating}
-              >
-                {creating ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.submitBtnText}>{t('Launch Room')}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+              {/* Lock / Password Toggle */}
+              <View style={styles.switchRow}>
+                <View>
+                  <Text style={styles.switchTitle}>🔒 {t('Lock Room with Password')}</Text>
+                  <Text style={styles.switchSubtitle}>{t('Only users with PIN can enter')}</Text>
+                </View>
+                <Switch
+                  value={isLockedNewRoom}
+                  onValueChange={setIsLockedNewRoom}
+                  thumbColor={isLockedNewRoom ? '#10B981' : '#CBD5E1'}
+                  trackColor={{ true: '#A7F3D0', false: '#E2E8F0' }}
+                />
+              </View>
+
+              {isLockedNewRoom && (
+                <TextInput
+                  style={[styles.modalInput, { marginTop: 10 }]}
+                  placeholder={t('Enter 4-digit Room Password')}
+                  placeholderTextColor="#94A3B8"
+                  secureTextEntry
+                  keyboardType="numeric"
+                  maxLength={4}
+                  value={newRoomPassword}
+                  onChangeText={setNewRoomPassword}
+                />
+              )}
+
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setCreateModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.cancelBtnText}>{t('Cancel')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.submitBtn}
+                  onPress={handleCreateRoom}
+                  disabled={creating}
+                >
+                  {creating ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>{t('Launch Room')}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1938,15 +1972,32 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
+  modalBackdropDismiss: {
+    flex: 1,
+    width: '100%',
+  },
   modalBox: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 20,
+  },
+  modalDragHandle: {
+    width: 44,
+    height: 4.5,
+    borderRadius: 3,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalScrollContent: {
+    paddingBottom: 8,
   },
   modalHeader: {
     color: '#0F172A',

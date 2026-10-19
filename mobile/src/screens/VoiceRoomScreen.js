@@ -2001,7 +2001,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                   {
                     paddingBottom: isEmojiPickerOpen
                       ? 10
-                      : (Platform.OS === 'android' ? (androidKeyboardOffset > 0 ? 8 : 14) : Math.max(insets.bottom, 14)),
+                      : (Platform.OS === 'android' ? (androidKeyboardOffset > 0 ? 8 : Math.max(insets.bottom + 10, 16)) : Math.max(insets.bottom, 14)),
                   },
                 ]}
               >

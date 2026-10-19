@@ -11,6 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import api from '../api/client';
 import { T } from './TranslatedText';
@@ -233,6 +234,7 @@ export default function PersonalTasksModal({
   roomStaySeconds = 0,
   seatedSeconds = 0,
 }) {
+  const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { showToast } = useToast();
 
@@ -365,6 +367,7 @@ export default function PersonalTasksModal({
       visible={visible}
       transparent={true}
       animationType="slide"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
@@ -374,7 +377,7 @@ export default function PersonalTasksModal({
           onPress={onClose}
         />
 
-        <View style={styles.sheetContainer}>
+        <View style={[styles.sheetContainer, { paddingBottom: Math.max(20, insets.bottom) }]}>
           {/* ══ HEADER WITH MINT GRADIENT & CUTE MASCOT ══ */}
           <LinearGradient
             colors={['#7DF9C7', '#5EEAD4']}

@@ -12,6 +12,7 @@ import {
   FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import api from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
@@ -35,6 +36,7 @@ export default function GiftBottomSheet({
   onOpenProfile,
   navigation,
 }) {
+  const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const { showToast } = useToast();
 
@@ -183,7 +185,7 @@ export default function GiftBottomSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <TouchableOpacity
         style={styles.modalBackdrop}
         activeOpacity={1}
@@ -195,7 +197,11 @@ export default function GiftBottomSheet({
           }
         }}
       >
-        <TouchableOpacity style={styles.sheetContainer} activeOpacity={1} onPress={() => setRecipientPopoverVisible(false)}>
+        <TouchableOpacity
+          style={[styles.sheetContainer, { paddingBottom: Math.max(24, insets.bottom + 12) }]}
+          activeOpacity={1}
+          onPress={() => setRecipientPopoverVisible(false)}
+        >
           {/* ══ 1. TOP CURRENCY & PROFILE BAR (Matching Screenshot 1) ══ */}
           <View style={styles.topCurrencyRow}>
             {/* Currencies Left */}
@@ -541,7 +547,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 12,
-    paddingBottom: 20,
     borderTopWidth: 1.2,
     borderColor: '#26283D',
     minHeight: 460,
