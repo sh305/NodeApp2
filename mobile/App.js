@@ -1,10 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, Component } from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { enableScreens } from 'react-native-screens';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
+
+// Disable native fragment restoration crashes on Android 15 Release APK
+enableScreens(false);
+
+class GlobalErrorBoundary extends Component {
+  state = { hasError: false, errorMessage: '' };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMessage: String(error?.message || error) };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Captured Global Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#0F0F1A', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ color: '#EF4444', fontSize: 20, fontWeight: 'bold', marginBottom: 12 }}>
+            App Notice
+          </Text>
+          <Text style={{ color: '#E2E8F0', fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+            {this.state.errorMessage || 'Something unexpected happened.'}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 import AuthScreen from './src/screens/AuthScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -75,9 +107,10 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <LanguageProvider>
-        <ToastProvider>
+    <GlobalErrorBoundary>
+      <SafeAreaProvider>
+        <LanguageProvider>
+          <ToastProvider>
           <NavigationContainer>
             <StatusBar style="light" />
             <Stack.Navigator
@@ -283,5 +316,6 @@ export default function App() {
         </ToastProvider>
       </LanguageProvider>
     </SafeAreaProvider>
+  </GlobalErrorBoundary>
   );
 }
