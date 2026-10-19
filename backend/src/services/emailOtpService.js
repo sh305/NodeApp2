@@ -1,5 +1,9 @@
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 const { cacheService } = require('../config/redis');
+
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const SENDER_EMAIL = process.env.BREVO_SENDER || process.env.EMAIL_USER || 'shivamraie09@gmail.com';
 
 const getTransporter = () => {
   const emailUser = process.env.EMAIL_USER || 'shivamraie09@gmail.com';
@@ -11,7 +15,7 @@ const getTransporter = () => {
         user: emailUser,
         pass: emailPass,
       },
-      connectionTimeout: 4000, // Fast 4-second timeout to prevent Render cloud port blackholing
+      connectionTimeout: 4000,
       greetingTimeout: 4000,
       socketTimeout: 5000,
     });
@@ -40,6 +44,55 @@ class EmailOtpService {
       // Store in high-speed cache for 5 minutes (300 seconds)
       await cacheService.set(`email_otp:${cleanEmail}`, otp, 300);
 
+      // 1. Primary: Send via Brevo HTTPS REST API (Port 443 - Never blocked on Render cloud)
+      if (BREVO_API_KEY) {
+        try {
+          console.log(`📧 [Brevo HTTPS API] Dispatching OTP [${otp}] to ${cleanEmail}...`);
+          const brevoRes = await axios.post(
+            'https://api.brevo.com/v3/smtp/email',
+            {
+              sender: { name: 'FunMaza YoYo Voice', email: SENDER_EMAIL },
+              to: [{ email: cleanEmail }],
+              subject: `${otp} is your FunMaza verification code`,
+              htmlContent: `
+                <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #ffffff; color: #1f2937; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb;">
+                  <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="color: #6366f1; margin: 0; font-size: 24px;">🎉 FunMaza YoYo Voice</h2>
+                    <p style="color: #6b7280; font-size: 13px; margin-top: 4px;">Voice Chat Rooms & Community</p>
+                  </div>
+                  <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;">
+                    <p style="color: #4b5563; font-size: 13px; margin-bottom: 8px;">Your 6-Digit Login Verification Code:</p>
+                    <div style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #4338ca; font-family: monospace;">${otp}</div>
+                    <p style="color: #9ca3af; font-size: 11px; margin-top: 8px;">Valid for 5 minutes only</p>
+                  </div>
+                  <p style="color: #9ca3af; font-size: 11px; text-align: center; margin-top: 20px;">If you didn't request this code, you can safely ignore this email.</p>
+                </div>
+              `,
+              textContent: `Your FunMaza verification code is: ${otp}\n\nThis code is valid for 5 minutes. Please do not share it with anyone.`,
+            },
+            {
+              headers: {
+                'api-key': BREVO_API_KEY,
+                'Content-Type': 'application/json',
+                accept: 'application/json',
+              },
+              timeout: 8000,
+            }
+          );
+
+          if (brevoRes.data && brevoRes.data.messageId) {
+            console.log(`✅ [Brevo HTTPS API] Real Gmail OTP [${otp}] successfully sent to ${cleanEmail}! MessageId:`, brevoRes.data.messageId);
+            return {
+              success: true,
+              message: 'OTP code sent to your Gmail inbox!',
+            };
+          }
+        } catch (brevoErr) {
+          console.warn('⚠️ [Brevo HTTPS API notice]:', brevoErr.response?.data?.message || brevoErr.message);
+        }
+      }
+
+      // 2. Secondary: Fallback to direct Nodemailer SMTP
       const senderEmail = process.env.EMAIL_USER || 'shivamraie09@gmail.com';
       const mailer = getTransporter();
 
@@ -80,15 +133,12 @@ class EmailOtpService {
           };
         } catch (mailErr) {
           console.error('⚠️ Gmail SMTP cloud delivery notice:', mailErr.message);
-          // If cloud provider (like Render free tier) blocks outbound SMTP ports (25/465/587),
-          // don't break the user experience! The OTP is cached and master OTP 123456 is active.
           return {
             success: true,
             message: 'OTP sent! (Use code 123456 or check inbox)',
           };
         }
       } else {
-        console.log(`📧 [Gmail OTP Service]: ${otp} for ${cleanEmail}`);
         return {
           success: true,
           message: 'OTP sent! (Use code 123456 or check inbox)',
