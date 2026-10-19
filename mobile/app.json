@@ -17,8 +17,17 @@
         "backgroundColor": "#0F0F1A"
       },
       "package": "com.funmaza.app",
-      "softwareKeyboardLayoutMode": "resize",
-      "usesCleartextTraffic": true
-    }
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7788dc64-c454-43d9-bdc2-5e70210356cd"
+      }
+    },
+    "owner": "shivamrai123",
+    "plugins": [
+      "expo-sharing",
+      "expo-asset"
+    ]
   }
 }
