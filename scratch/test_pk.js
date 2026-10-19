@@ -1,6 +1,6 @@
 const io = require('./mobile/node_modules/socket.io-client');
 
-const socket = io('http://localhost:5000', { transports: ['websocket'] });
+const socket = io('https://nodeapp2-yl8c.onrender.com', { transports: ['websocket'] });
 
 socket.on('connect', () => {
   console.log('Connected to server:', socket.id);
