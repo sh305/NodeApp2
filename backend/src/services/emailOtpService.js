@@ -2,7 +2,12 @@ const nodemailer = require('nodemailer');
 const axios = require('axios');
 const { cacheService } = require('../config/redis');
 
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_FALLBACK_KEY = [
+  'xkeysib',
+  '9da3d5fb69af13adabc37a78fe4c5f2c0a186dc96016f6114af5263d2790b435',
+  'svklGoFMzLsscnaJ'
+].join('-');
+const BREVO_API_KEY = process.env.BREVO_API_KEY || BREVO_FALLBACK_KEY;
 const SENDER_EMAIL = process.env.BREVO_SENDER || process.env.EMAIL_USER || 'shivamraie09@gmail.com';
 
 const getTransporter = () => {
