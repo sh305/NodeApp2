@@ -20,6 +20,7 @@ import ScreenContainer from '../components/ScreenContainer';
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
+import { T } from '../components/TranslatedText';
 
 // Official Multi-Color Gmail 'M' Vector Icon (matching user reference screenshot)
 const GmailOfficialIcon = ({ size = 26 }) => (
