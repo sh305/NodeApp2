@@ -38,6 +38,14 @@ ramCache.set(
   'hi:::This Account already exists, please use a different one.',
   'यह अकाउंट पहले से मौजूद है, कृपया दूसरा इस्तेमाल करें।'
 );
+ramCache.set(
+  'hi:::You already have an active room. You cannot create more than one room.',
+  'आपके पास पहले से एक एक्टिव रूम है। आप एक से ज़्यादा रूम नहीं बना सकते।'
+);
+ramCache.set(
+  'hi:::You already have an active room. Entering your room...',
+  'आपके पास पहले से एक एक्टिव रूम है। आपके रूम में जा रहे हैं...'
+);
 
 const LanguageContext = createContext();
 

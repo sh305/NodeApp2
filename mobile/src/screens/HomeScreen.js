@@ -539,7 +539,16 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
         });
       }
     } catch (e) {
-      showToast(e.response?.data?.message || t('Failed to create room'), 'error');
+      if (e.response?.data?.room) {
+        setCreateModalVisible(false);
+        showToast(t(e.response.data.message || 'You already have an active room. You cannot create more than one room.'), 'error');
+        navigation.navigate('VoiceRoom', {
+          roomId: e.response.data.room._id,
+          roomTitle: e.response.data.room.title,
+        });
+      } else {
+        showToast(t(e.response?.data?.message || 'Failed to create room'), 'error');
+      }
     } finally {
       setCreating(false);
     }
@@ -579,7 +588,17 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
             {/* Green Hut Button (Create Room / Launch) */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => setCreateModalVisible(true)}
+              onPress={() => {
+                if (myRoom) {
+                  showToast(t('You already have an active room. Entering your room...'), 'info');
+                  navigation.navigate('VoiceRoom', {
+                    roomId: myRoom._id,
+                    roomTitle: myRoom.title,
+                  });
+                } else {
+                  setCreateModalVisible(true);
+                }
+              }}
               style={styles.topHutBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >

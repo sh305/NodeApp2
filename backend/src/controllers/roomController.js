@@ -12,6 +12,16 @@ exports.createRoom = async (req, res) => {
     const { title, topic, coverImage, isLocked, password } = req.body;
     const userId = req.user._id;
 
+    // Check if user already owns an active room (1 user = 1 room limit)
+    const existingRoom = await Room.findOne({ owner: userId });
+    if (existingRoom) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have an active room. You cannot create more than one room.',
+        room: existingRoom,
+      });
+    }
+
     let passwordHash = null;
     if (isLocked && password) {
       const salt = await bcrypt.genSalt(10);
