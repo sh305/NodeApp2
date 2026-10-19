@@ -116,7 +116,7 @@ exports.sendVoiceOtp = async (req, res) => {
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
+          message: 'This Account already exists, please use a different one.',
         });
       }
     }
@@ -180,7 +180,7 @@ exports.sendSmsOtp = async (req, res) => {
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
+          message: 'This Account already exists, please use a different one.',
         });
       }
     }
@@ -208,7 +208,7 @@ exports.sendEmailOtp = async (req, res) => {
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
+          message: 'This Account already exists, please use a different one.',
         });
       }
     }
@@ -333,7 +333,7 @@ exports.emailRegister = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
+        message: 'This Account already exists, please use a different one.',
       });
     }
 
@@ -478,7 +478,7 @@ exports.phoneRegister = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
+        message: 'This Account already exists, please use a different one.',
       });
     }
 

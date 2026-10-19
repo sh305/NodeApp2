@@ -35,8 +35,8 @@ ramCache.set('hi:::followed you, click here to follow them back and become new f
 ramCache.set('hi:::Chat', 'Chat');
 ramCache.set('hi:::1 days ago', '1 days ago');
 ramCache.set(
-  'hi:::This mobile number / email ID already exists. Please use a different email ID / phone number.',
-  'यह मोबाइल नंबर / ईमेल आईडी पहले से मौजूद है। कृपया दूसरा ईमेल या फोन नंबर इस्तेमाल करें।'
+  'hi:::This Account already exists, please use a different one.',
+  'यह अकाउंट पहले से मौजूद है, कृपया दूसरा इस्तेमाल करें।'
 );
 
 const LanguageContext = createContext();
