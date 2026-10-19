@@ -101,7 +101,7 @@ exports.verifyWhatsAppOtp = async (req, res) => {
 // @route   POST /api/auth/send-voice-otp
 exports.sendVoiceOtp = async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, purpose } = req.body;
     if (!phoneNumber) {
       return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
@@ -109,6 +109,16 @@ exports.sendVoiceOtp = async (req, res) => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!cleanPhone || cleanPhone.length !== 10) {
       return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
+    }
+
+    if (purpose === 'register') {
+      const existingUser = await User.findOne({ phoneNumber: cleanPhone });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
+        });
+      }
     }
 
     const result = await VoiceOtpService.sendVoiceOtp(cleanPhone);
@@ -155,7 +165,7 @@ exports.verifyVoiceOtp = async (req, res) => {
 // @route   POST /api/auth/send-sms-otp
 exports.sendSmsOtp = async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, purpose } = req.body;
     if (!phoneNumber) {
       return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
@@ -163,6 +173,16 @@ exports.sendSmsOtp = async (req, res) => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     if (!cleanPhone || cleanPhone.length !== 10) {
       return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
+    }
+
+    if (purpose === 'register') {
+      const existingUser = await User.findOne({ phoneNumber: cleanPhone });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
+        });
+      }
     }
 
     const result = await SmsOtpService.sendOtp(cleanPhone);
@@ -177,12 +197,23 @@ exports.sendSmsOtp = async (req, res) => {
 // @route   POST /api/auth/send-email-otp
 exports.sendEmailOtp = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, purpose } = req.body;
     if (!email || !email.trim() || !email.includes('@')) {
       return res.status(400).json({ success: false, message: 'Please enter a valid Gmail / Email address' });
     }
 
-    const result = await EmailOtpService.sendOtp(email);
+    const cleanEmail = email.toLowerCase().trim();
+    if (purpose === 'register') {
+      const existingUser = await User.findOne({ email: cleanEmail });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
+        });
+      }
+    }
+
+    const result = await EmailOtpService.sendOtp(cleanEmail);
     return res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     console.error('sendEmailOtp error:', error);
@@ -298,21 +329,20 @@ exports.emailRegister = async (req, res) => {
       });
     }
 
-    let existingUser = await User.findOne({ email: cleanEmail });
-
-    let user;
+    const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser) {
-      existingUser.name = name.trim();
-      existingUser.password = password; // Will be encrypted by pre-save hook
-      user = await existingUser.save();
-    } else {
-      user = await User.create({
-        name: name.trim(),
-        email: cleanEmail,
-        password: password,
-        avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${cleanEmail}`,
+      return res.status(400).json({
+        success: false,
+        message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
       });
     }
+
+    const user = await User.create({
+      name: name.trim(),
+      email: cleanEmail,
+      password: password,
+      avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${cleanEmail}`,
+    });
 
     // Clear verification cache
     await cacheService.del(`email_verified:${cleanEmail}`);
@@ -444,21 +474,20 @@ exports.phoneRegister = async (req, res) => {
       });
     }
 
-    let existingUser = await User.findOne({ phoneNumber: cleanPhone });
-
-    let user;
+    const existingUser = await User.findOne({ phoneNumber: cleanPhone });
     if (existingUser) {
-      existingUser.name = name.trim();
-      existingUser.password = password; // Will be encrypted by pre-save hook
-      user = await existingUser.save();
-    } else {
-      user = await User.create({
-        name: name.trim(),
-        phoneNumber: cleanPhone,
-        password: password,
-        avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${cleanPhone}`,
+      return res.status(400).json({
+        success: false,
+        message: 'This mobile number / email ID already exists. Please use a different email ID / phone number.',
       });
     }
+
+    const user = await User.create({
+      name: name.trim(),
+      phoneNumber: cleanPhone,
+      password: password,
+      avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${cleanPhone}`,
+    });
 
     // Clear verification cache
     await cacheService.del(`phone_verified:${cleanPhone}`);

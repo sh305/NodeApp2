@@ -516,7 +516,10 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
     setPhoneSending(true);
     try {
-      const res = await api.post('/auth/send-sms-otp', { phoneNumber: cleanPhone });
+      const res = await api.post('/auth/send-sms-otp', {
+        phoneNumber: cleanPhone,
+        purpose: phoneMode === 'register' ? 'register' : 'login',
+      });
       if (res.data.success) {
         setPhoneOtpSent(true);
         setIsPhoneOtpVerified(false);
@@ -721,7 +724,10 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
     setEmailSending(true);
     try {
-      const res = await api.post('/auth/send-email-otp', { email: cleanEmail });
+      const res = await api.post('/auth/send-email-otp', {
+        email: cleanEmail,
+        purpose: gmailMode === 'register' ? 'register' : 'login',
+      });
       if (res.data.success) {
         setEmailOtpSent(true);
         setIsEmailOtpVerified(false);

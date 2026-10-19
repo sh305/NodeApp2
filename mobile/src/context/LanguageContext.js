@@ -33,8 +33,11 @@ export const LANGUAGES = [
 const ramCache = new Map();
 ramCache.set('hi:::followed you, click here to follow them back and become new friends! 👏', 'ने आप को फॉलो किया, यहाँ क्लिक से उसको भी फॉलो करें, नया दोस्तों बनें!👏');
 ramCache.set('hi:::Chat', 'Chat');
-ramCache.set('hi:::Followers', 'Followers');
 ramCache.set('hi:::1 days ago', '1 days ago');
+ramCache.set(
+  'hi:::This mobile number / email ID already exists. Please use a different email ID / phone number.',
+  'यह मोबाइल नंबर / ईमेल आईडी पहले से मौजूद है। कृपया दूसरा ईमेल या फोन नंबर इस्तेमाल करें।'
+);
 
 const LanguageContext = createContext();
 
