@@ -111,7 +111,7 @@ exports.sendVoiceOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
     }
 
-    if (purpose === 'register') {
+    if (purpose !== 'login') {
       const existingUser = await User.findOne({ phoneNumber: cleanPhone });
       if (existingUser) {
         return res.status(400).json({
@@ -175,7 +175,7 @@ exports.sendSmsOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number' });
     }
 
-    if (purpose === 'register') {
+    if (purpose !== 'login') {
       const existingUser = await User.findOne({ phoneNumber: cleanPhone });
       if (existingUser) {
         return res.status(400).json({
@@ -203,7 +203,7 @@ exports.sendEmailOtp = async (req, res) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    if (purpose === 'register') {
+    if (purpose !== 'login') {
       const existingUser = await User.findOne({ email: cleanEmail });
       if (existingUser) {
         return res.status(400).json({
