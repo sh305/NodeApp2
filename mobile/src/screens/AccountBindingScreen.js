@@ -30,9 +30,11 @@ const TW_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 const TW_CODE_VERIFIER = 'challenge12345678901234567890123456789012345';
 const TW_AUTH_URL = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${TW_CLIENT_ID}&redirect_uri=${encodeURIComponent(TW_REDIRECT_URI)}&scope=users.read%20tweet.read&state=state&code_challenge=${TW_CODE_VERIFIER}&code_challenge_method=plain`;
 
-const SNAP_CLIENT_ID = '6db4e19b-bb70-460f-9ccb-786f6f9f7504';
+const SNAP_CLIENT_ID = 'fc77f748-6e4f-4cda-9c0f-3669fbf429da';
 const SNAP_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
-const SNAP_AUTH_URL = `https://accounts.snapchat.com/login/oauth2/authorize?client_id=${SNAP_CLIENT_ID}&redirect_uri=${encodeURIComponent(SNAP_REDIRECT_URI)}&response_type=code&scope=https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.display_name%20https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.bitmoji.avatar%20https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.external_id`;
+const SNAP_SCOPES = encodeURIComponent('https://auth.snapchat.com/oauth2/api/user.display_name https://auth.snapchat.com/oauth2/api/user.bitmoji.avatar');
+const SNAP_AUTH_URL = `https://accounts.snapchat.com/accounts/oauth2/auth?client_id=${SNAP_CLIENT_ID}&redirect_uri=${encodeURIComponent(SNAP_REDIRECT_URI)}&response_type=code&scope=${SNAP_SCOPES}&state=funmaza_snap_state`;
+
 
 
 

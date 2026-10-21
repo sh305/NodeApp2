@@ -1098,8 +1098,8 @@ exports.verifySnapchatToken = async (req, res) => {
       );
 
       const me = profileRes.data?.data?.me;
-      if (me && (me.externalId || me.displayName)) {
-        snapData.id = me.externalId || snapData.id;
+      if (me) {
+        snapData.id = me.externalId || me.displayName || snapData.id;
         snapData.name = me.displayName || 'Snapchat User';
         if (me.bitmoji?.avatar) {
           snapData.avatar = me.bitmoji.avatar;
