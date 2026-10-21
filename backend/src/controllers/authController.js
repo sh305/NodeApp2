@@ -911,6 +911,80 @@ exports.unbindAccount = async (req, res) => {
   }
 };
 
+// @desc    Verify Twitter OAuth 2.0 Code & Return User Profile
+// @route   POST /api/auth/twitter-verify-token
+exports.verifyTwitterToken = async (req, res) => {
+  try {
+    const { code, codeVerifier } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'Twitter authorization code is required' });
+    }
+
+    const clientId = process.env.TWITTER_CLIENT_ID || 'N3JzYXhzQ3BNSGVaQWMydnFTU2E6MTpjaQ';
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET || '-idgC5LKFG3pTjYlVYxKaX4N3oNbm2qKZ15HDqCAT4Ggf4Xiuf';
+    const redirectUri = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+    const verifier = codeVerifier || 'challenge12345678901234567890123456789012345';
+
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    const params = new URLSearchParams();
+    params.append('code', code);
+    params.append('grant_type', 'authorization_code');
+    params.append('client_id', clientId);
+    params.append('redirect_uri', redirectUri);
+    params.append('code_verifier', verifier);
+
+    const tokenRes = await axios.post('https://api.twitter.com/2/oauth2/token', params.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${basicAuth}`,
+      },
+      timeout: 10000,
+    });
+
+    const accessToken = tokenRes.data?.access_token;
+    if (!accessToken) {
+      return res.status(400).json({ success: false, message: 'Failed to obtain Twitter access token' });
+    }
+
+    const profileRes = await axios.get(
+      'https://api.twitter.com/2/users/me?user.fields=profile_image_url,name,username',
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        timeout: 10000,
+      }
+    );
+
+    const twData = profileRes.data?.data;
+    if (!twData || !twData.id) {
+      return res.status(400).json({ success: false, message: 'Failed to retrieve Twitter user profile' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      profile: {
+        id: twData.id,
+        username: twData.username,
+        name: twData.name || twData.username || 'Twitter User',
+        avatar: twData.profile_image_url
+          ? twData.profile_image_url.replace('_normal', '_400x400')
+          : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      },
+    });
+  } catch (error) {
+    console.error('verifyTwitterToken error:', error.response?.data || error.message);
+    return res.status(400).json({
+      success: false,
+      message:
+        error.response?.data?.error_description ||
+        error.response?.data?.message ||
+        'Failed to authenticate with Twitter',
+    });
+  }
+};
+
 // @desc    Twitter OAuth Direct Sign-In
 // @route   POST /api/auth/twitter-login
 exports.twitterLogin = async (req, res) => {

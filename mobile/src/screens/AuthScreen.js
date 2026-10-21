@@ -23,6 +23,12 @@ const FB_APP_ID = '4171729949789896';
 const FB_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 const FB_AUTH_URL = `https://www.facebook.com/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email&display=touch`;
 
+const TW_CLIENT_ID = 'N3JzYXhzQ3BNSGVaQWMydnFTU2E6MTpjaQ';
+const TW_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+const TW_CODE_VERIFIER = 'challenge12345678901234567890123456789012345';
+const TW_AUTH_URL = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${TW_CLIENT_ID}&redirect_uri=${encodeURIComponent(TW_REDIRECT_URI)}&scope=users.read%20tweet.read&state=state&code_challenge=${TW_CODE_VERIFIER}&code_challenge_method=plain`;
+
+
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
@@ -397,6 +403,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   // Facebook In-App OAuth WebView Modal
   const [fbWebViewVisible, setFbWebViewVisible] = useState(false);
 
+  // Twitter In-App OAuth WebView Modal
+  const [twWebViewVisible, setTwWebViewVisible] = useState(false);
+
   // Scroll View Ref for automatic keyboard focus scrolling
   const scrollViewRef = useRef(null);
 
@@ -731,27 +740,55 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  const handleDirectTwitterLogin = async () => {
-    setLoading(true);
-    try {
-      const stored = await AsyncStorage.getItem('@user_info');
-      const parsed = stored ? JSON.parse(stored) : null;
-      const twitterId = parsed?.twitterId || parsed?.boundAccounts?.twitter?.id || 'tw_892341908234';
-      const res = await api.post('/auth/twitter-login', {
-        twitterId,
-        username: parsed?.boundAccounts?.twitter?.username || 'user_yo',
-        name: parsed?.name || 'Twitter User',
-      });
-      if (res.data?.success) {
-        showToast(t('Logged in with Twitter successfully! 🎉'), 'success');
-        await AsyncStorage.setItem('@auth_token', res.data.token);
-        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
-        if (onLoginSuccess) onLoginSuccess(res.data.user);
+  const handleDirectTwitterLogin = () => {
+    setTwWebViewVisible(true);
+  };
+
+  const handleTwNavStateChange = async (navState) => {
+    const url = navState.url;
+    if (!url) return;
+
+    if (url.includes('code=')) {
+      let code = null;
+      const codeMatch = url.match(/[?&]code=([^&#]+)/);
+      if (codeMatch && codeMatch[1]) code = codeMatch[1];
+
+      setTwWebViewVisible(false);
+      setLoading(true);
+      try {
+        const verifyRes = await api.post('/auth/twitter-verify-token', {
+          code,
+          codeVerifier: TW_CODE_VERIFIER,
+        });
+
+        if (verifyRes.data?.success && verifyRes.data?.profile) {
+          const profileData = verifyRes.data.profile;
+          const loginRes = await api.post('/auth/twitter-login', {
+            twitterId: profileData.id,
+            username: profileData.username,
+            name: profileData.name || profileData.username || 'Twitter User',
+            avatar: profileData.avatar || undefined,
+          });
+
+          if (loginRes.data?.success) {
+            showToast(t('Logged in with Twitter successfully! 🎉'), 'success');
+            await AsyncStorage.setItem('@auth_token', loginRes.data.token);
+            await AsyncStorage.setItem('@user_info', JSON.stringify(loginRes.data.user));
+            if (onLoginSuccess) onLoginSuccess(loginRes.data.user);
+          } else {
+            showToast(t(loginRes.data?.message || 'Twitter login failed'), 'error');
+          }
+        } else {
+          showToast(t(verifyRes.data?.message || 'Failed to authenticate with Twitter'), 'error');
+        }
+      } catch (err) {
+        showToast(t(err.response?.data?.message || 'Twitter login failed'), 'error');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      showToast(t(err.response?.data?.message || 'Twitter login failed'), 'error');
-    } finally {
-      setLoading(false);
+    } else if (url.includes('error=')) {
+      setTwWebViewVisible(false);
+      showToast(t('Twitter authentication cancelled or failed'), 'error');
     }
   };
 
@@ -1819,6 +1856,39 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               renderLoading={() => (
                 <View style={styles.webLoadingContainer}>
                   <ActivityIndicator size="large" color="#1877F2" />
+                </View>
+              )}
+            />
+          </View>
+        </Modal>
+
+        {/* ══ TWITTER (X) LOGIN WEBVIEW MODAL ══ */}
+        <Modal
+          visible={twWebViewVisible}
+          animationType="slide"
+          onRequestClose={() => setTwWebViewVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Platform.OS === 'android' ? 24 : 44 }}>
+            <View style={styles.fbWebHeader}>
+              <TouchableOpacity
+                onPress={() => setTwWebViewVisible(false)}
+                style={styles.fbWebCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.fbWebCloseText}>✕ <T>Cancel</T></Text>
+              </TouchableOpacity>
+              <Text style={styles.fbWebTitle}><T>Twitter (X) Login</T></Text>
+              <View style={{ width: 60 }} />
+            </View>
+            <WebView
+              source={{ uri: TW_AUTH_URL }}
+              onNavigationStateChange={handleTwNavStateChange}
+              userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+              scalesPageToFit={true}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.webLoadingContainer}>
+                  <ActivityIndicator size="large" color="#1DA1F2" />
                 </View>
               )}
             />

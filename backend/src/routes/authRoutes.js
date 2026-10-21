@@ -24,6 +24,7 @@ const {
   generateFacebookOtp,
   verifyFacebookOtp,
   verifyFacebookToken,
+  verifyTwitterToken,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -46,6 +47,7 @@ router.post('/email-register', emailRegister);
 router.post('/google-login', googleLogin);
 router.post('/facebook-verify-token', verifyFacebookToken);
 router.post('/facebook-login', facebookLogin);
+router.post('/twitter-verify-token', verifyTwitterToken);
 router.post('/twitter-login', twitterLogin);
 router.post('/bind-account', protect, bindAccount);
 router.post('/unbind-account', protect, unbindAccount);

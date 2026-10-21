@@ -25,6 +25,12 @@ const FB_APP_ID = '4171729949789896';
 const FB_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 const FB_AUTH_URL = `https://www.facebook.com/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email&display=touch`;
 
+const TW_CLIENT_ID = 'N3JzYXhzQ3BNSGVaQWMydnFTU2E6MTpjaQ';
+const TW_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+const TW_CODE_VERIFIER = 'challenge12345678901234567890123456789012345';
+const TW_AUTH_URL = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${TW_CLIENT_ID}&redirect_uri=${encodeURIComponent(TW_REDIRECT_URI)}&scope=users.read%20tweet.read&state=state&code_challenge=${TW_CODE_VERIFIER}&code_challenge_method=plain`;
+
+
 // ══ SVG ICONS MATCHING SCREENSHOT ══
 const BackArrowIcon = ({ size = 24, color = '#2C2C2E' }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -192,6 +198,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   // ── 3. Twitter Binding State ──
   const [twChooserVisible, setTwChooserVisible] = useState(false);
   const [customTwInput, setCustomTwInput] = useState('');
+  const [twWebViewVisible, setTwWebViewVisible] = useState(false);
+  const [twVerifying, setTwVerifying] = useState(false);
 
   // ── 4. Final Confirmation Prompt Modal ──
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -635,6 +643,54 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     const defaultTw = profile?.name ? `@${profile.name.toLowerCase().replace(/\s+/g, '')}` : '@twitter_user';
     setCustomTwInput(defaultTw);
     setTwChooserVisible(true);
+  };
+
+  const handleStartTwOAuth = () => {
+    setTwChooserVisible(false);
+    setTwWebViewVisible(true);
+  };
+
+  const handleTwNavStateChange = async (navState) => {
+    const url = navState.url;
+    if (!url) return;
+
+    if (url.includes('code=')) {
+      let code = null;
+      const codeMatch = url.match(/[?&]code=([^&#]+)/);
+      if (codeMatch && codeMatch[1]) code = codeMatch[1];
+
+      setTwWebViewVisible(false);
+      setTwVerifying(true);
+      try {
+        const res = await api.post('/auth/twitter-verify-token', {
+          code,
+          codeVerifier: TW_CODE_VERIFIER,
+        });
+
+        if (res.data?.success && res.data?.profile) {
+          const profileData = res.data.profile;
+          showToast(t('Twitter Account Verified Successfully! ✅'), 'success');
+          setPendingBind({
+            provider: 'twitter',
+            accountId: profileData.id,
+            username: profileData.username.startsWith('@') ? profileData.username : `@${profileData.username}`,
+            name: profileData.name || profileData.username || 'Twitter User',
+            avatar: profileData.avatar,
+            promptText: t('Are you sure do you want to bind your account to this Twitter account?'),
+          });
+          setConfirmModalVisible(true);
+        } else {
+          showToast(t(res.data?.message || 'Failed to authenticate with Twitter'), 'error');
+        }
+      } catch (err) {
+        showToast(t(err.response?.data?.message || 'Failed to verify Twitter account'), 'error');
+      } finally {
+        setTwVerifying(false);
+      }
+    } else if (url.includes('error=')) {
+      setTwWebViewVisible(false);
+      showToast(t('Twitter authentication cancelled or failed'), 'error');
+    }
   };
 
   const handleTwSubmit = () => {
@@ -1494,10 +1550,31 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
             </View>
 
             <Text style={styles.chooserSubtitle}>
-              <T>Enter your Twitter @handle</T>
+              <T>Choose your preferred binding method</T>
             </Text>
 
             <View style={styles.inputSectionCard}>
+              {/* Option 1: Fast 1-Click Official Twitter (X) OAuth */}
+              <TouchableOpacity
+                style={[styles.fbFastBtn, { backgroundColor: '#000000', borderColor: '#333333', borderWidth: 1 }]}
+                activeOpacity={0.85}
+                onPress={handleStartTwOAuth}
+              >
+                <TwitterCircleIcon size={22} />
+                <Text style={styles.fbFastBtnText}>
+                  <T>Continue with Twitter (X)</T>
+                </Text>
+              </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>
+                  <T>Or bind manually with Twitter @handle</T>
+                </Text>
+                <View style={styles.dividerLine} />
+              </View>
+
               <Text style={styles.inputSectionLabel}>
                 <T>Twitter @handle</T>
               </Text>
@@ -1526,6 +1603,39 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ══ 3.1 TWITTER OFFICIAL OAUTH WEBVIEW MODAL ══ */}
+      <Modal
+        visible={twWebViewVisible}
+        animationType="slide"
+        onRequestClose={() => setTwWebViewVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Math.max(16, insets.top) }}>
+          <View style={styles.fbWebHeader}>
+            <TouchableOpacity
+              onPress={() => setTwWebViewVisible(false)}
+              style={styles.fbWebCloseBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.fbWebCloseText}>✕ <T>Cancel</T></Text>
+            </TouchableOpacity>
+            <Text style={styles.fbWebTitle}><T>Twitter (X) Login</T></Text>
+            <View style={{ width: 60 }} />
+          </View>
+          <WebView
+            source={{ uri: TW_AUTH_URL }}
+            onNavigationStateChange={handleTwNavStateChange}
+            userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+            scalesPageToFit={true}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.webLoadingContainer}>
+                <ActivityIndicator size="large" color="#1DA1F2" />
+              </View>
+            )}
+          />
+        </View>
       </Modal>
 
       {/* ══ 4. CONFIRMATION MODAL ("Are you sure do you want to bind...") ══ */}
