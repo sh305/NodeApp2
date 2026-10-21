@@ -14,9 +14,15 @@ import {
   Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WebView } from 'react-native-webview';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import api from '../api/client';
 import ScreenContainer from '../components/ScreenContainer';
+
+const FB_APP_ID = '4171729949789896';
+const FB_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+const FB_AUTH_URL = `https://www.facebook.com/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email`;
+
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
@@ -388,6 +394,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [emailVerifying, setEmailVerifying] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Facebook In-App OAuth WebView Modal
+  const [fbWebViewVisible, setFbWebViewVisible] = useState(false);
+
   // Scroll View Ref for automatic keyboard focus scrolling
   const scrollViewRef = useRef(null);
 
@@ -665,26 +674,60 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  const handleDirectFacebookLogin = async () => {
-    setLoading(true);
-    try {
-      const stored = await AsyncStorage.getItem('@user_info');
-      const parsed = stored ? JSON.parse(stored) : null;
-      const facebookId = parsed?.facebookId || parsed?.boundAccounts?.facebook?.id || 'fb_user_892341908234';
-      const res = await api.post('/auth/facebook-login', {
-        facebookId,
-        name: parsed?.name || 'Facebook User',
-      });
-      if (res.data?.success) {
-        showToast(t('Logged in with Facebook successfully! 🎉'), 'success');
-        await AsyncStorage.setItem('@auth_token', res.data.token);
-        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
-        if (onLoginSuccess) onLoginSuccess(res.data.user);
+  const handleDirectFacebookLogin = () => {
+    setFbWebViewVisible(true);
+  };
+
+  const handleFbNavStateChange = async (navState) => {
+    const url = navState.url;
+    if (!url) return;
+
+    if (url.includes('access_token=') || url.includes('code=')) {
+      let token = null;
+      let code = null;
+
+      const tokenMatch = url.match(/access_token=([^&]+)/);
+      if (tokenMatch && tokenMatch[1]) token = tokenMatch[1];
+
+      const codeMatch = url.match(/[?&]code=([^&#]+)/);
+      if (codeMatch && codeMatch[1]) code = codeMatch[1];
+
+      setFbWebViewVisible(false);
+      setLoading(true);
+      try {
+        const verifyRes = await api.post('/auth/facebook-verify-token', {
+          accessToken: token,
+          code,
+        });
+
+        if (verifyRes.data?.success && verifyRes.data?.profile) {
+          const profileData = verifyRes.data.profile;
+          const loginRes = await api.post('/auth/facebook-login', {
+            facebookId: profileData.id,
+            name: profileData.name || 'Facebook User',
+            email: profileData.email || undefined,
+            avatar: profileData.avatar || undefined,
+          });
+
+          if (loginRes.data?.success) {
+            showToast(t('Logged in with Facebook successfully! 🎉'), 'success');
+            await AsyncStorage.setItem('@auth_token', loginRes.data.token);
+            await AsyncStorage.setItem('@user_info', JSON.stringify(loginRes.data.user));
+            if (onLoginSuccess) onLoginSuccess(loginRes.data.user);
+          } else {
+            showToast(t(loginRes.data?.message || 'Facebook login failed'), 'error');
+          }
+        } else {
+          showToast(t(verifyRes.data?.message || 'Failed to authenticate with Facebook'), 'error');
+        }
+      } catch (err) {
+        showToast(t(err.response?.data?.message || 'Facebook login failed'), 'error');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      showToast(t(err.response?.data?.message || 'Facebook login failed'), 'error');
-    } finally {
-      setLoading(false);
+    } else if (url.includes('error=') || url.includes('error_code=')) {
+      setFbWebViewVisible(false);
+      showToast(t('Facebook authentication cancelled or failed'), 'error');
     }
   };
 
@@ -1748,6 +1791,38 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             </Text>
           </Text>
         </View>
+
+        {/* ══ FACEBOOK LOGIN WEBVIEW MODAL ══ */}
+        <Modal
+          visible={fbWebViewVisible}
+          animationType="slide"
+          onRequestClose={() => setFbWebViewVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Platform.OS === 'android' ? 24 : 44 }}>
+            <View style={styles.fbWebHeader}>
+              <TouchableOpacity
+                onPress={() => setFbWebViewVisible(false)}
+                style={styles.fbWebCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.fbWebCloseText}>✕ <T>Cancel</T></Text>
+              </TouchableOpacity>
+              <Text style={styles.fbWebTitle}><T>Facebook Login</T></Text>
+              <View style={{ width: 60 }} />
+            </View>
+            <WebView
+              source={{ uri: FB_AUTH_URL }}
+              onNavigationStateChange={handleFbNavStateChange}
+              userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1"
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.webLoadingContainer}>
+                  <ActivityIndicator size="large" color="#1877F2" />
+                </View>
+              )}
+            />
+          </View>
+        </Modal>
     </ScreenContainer>
   );
 }
@@ -2375,5 +2450,39 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     textDecorationLine: 'underline',
+  },
+
+  // Facebook In-App OAuth WebView Styles
+  fbWebHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#1E1E2D',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C3E',
+  },
+  fbWebCloseBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  fbWebCloseText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  fbWebTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  webLoadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0F0F1A',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

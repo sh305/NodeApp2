@@ -21,7 +21,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
 
-const FB_APP_ID = '28841648478806812';
+const FB_APP_ID = '4171729949789896';
 const FB_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 const FB_AUTH_URL = `https://www.facebook.com/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email`;
 
