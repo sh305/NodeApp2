@@ -635,8 +635,8 @@ exports.verifyFacebookToken = async (req, res) => {
 
     // Exchange OAuth code for accessToken if code was returned
     if (!accessToken && code) {
-      const fbAppId = process.env.FACEBOOK_APP_ID || '28841648478806812';
-      const fbAppSecret = process.env.FACEBOOK_APP_SECRET || '87ac5abdd4d4db0a66d5df9f6eda558b';
+      const fbAppId = process.env.FACEBOOK_APP_ID || '4171729949789896';
+      const fbAppSecret = process.env.FACEBOOK_APP_SECRET || '3a1542d32cad765d08107386a726659a';
       const redirectUri = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 
       const tokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {

@@ -21,7 +21,7 @@ import ScreenContainer from '../components/ScreenContainer';
 
 const FB_APP_ID = '4171729949789896';
 const FB_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
-const FB_AUTH_URL = `https://www.facebook.com/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email`;
+const FB_AUTH_URL = `https://www.facebook.com/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email&display=touch`;
 
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
@@ -1813,7 +1813,8 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <WebView
               source={{ uri: FB_AUTH_URL }}
               onNavigationStateChange={handleFbNavStateChange}
-              userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1"
+              userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+              scalesPageToFit={true}
               startInLoadingState
               renderLoading={() => (
                 <View style={styles.webLoadingContainer}>
