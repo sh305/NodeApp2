@@ -30,6 +30,7 @@ const {
   getRoomLuckyPackets,
   claimLuckyPacket,
 } = require('../controllers/luckyPacketController');
+const { getVoiceToken } = require('../controllers/voiceTokenController');
 const { protect } = require('../middlewares/authMiddleware');
 
 router.route('/')
@@ -64,5 +65,7 @@ router.post('/:id/broadcast', protect, sendRoomBroadcast);
 router.post('/:id/lucky-packets', protect, sendLuckyPacket);
 router.get('/:id/lucky-packets', protect, getRoomLuckyPackets);
 router.post('/:id/lucky-packets/:packetId/claim', protect, claimLuckyPacket);
+router.post('/:id/voice-token', protect, getVoiceToken);
+router.get('/:id/voice-token', protect, getVoiceToken);
 
 module.exports = router;

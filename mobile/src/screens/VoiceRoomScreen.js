@@ -58,6 +58,7 @@ import MyMusicModal from '../components/MyMusicModal';
 import SoundEffectsModal from '../components/SoundEffectsModal';
 import PersonalTasksModal from '../components/PersonalTasksModal';
 import { musicPlayer } from '../services/musicPlayerService';
+import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
@@ -458,6 +459,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         );
         setMySeatIndex(mySeat !== -1 ? mySeat : null);
         fetchRoomLuckyPackets();
+        initAgoraVoice(res.data.room);
       }
     } catch (err) {
       if (err.response?.data?.kicked) {
@@ -470,6 +472,32 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const initAgoraVoice = async (roomData) => {
+    try {
+      const res = await api.post(`/rooms/${roomId}/voice-token`);
+      if (res.data?.success && res.data?.token) {
+        const mySeat = roomData?.seats?.findIndex(
+          (s) => s.user && String(s.user._id) === String(currentUser?._id)
+        );
+        const isOwnerSeated = isOwner && (roomData?.isHostActive !== false);
+        const isSpeaker = mySeat !== -1 || isOwnerSeated;
+
+        await agoraVoiceService.joinRoom({
+          appId: res.data.appId,
+          channelName: res.data.channelName,
+          token: res.data.token,
+          uid: res.data.uid,
+          isSpeaker,
+          onSpeakersUpdate: (activeUids) => {
+            // Real-time audio speaker update
+          },
+        });
+      }
+    } catch (err) {
+      console.log('Voice session init notice:', err?.response?.data?.message || err?.message);
     }
   };
 
@@ -540,17 +568,24 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setMySeatIndex(mySeat !== -1 ? mySeat : null);
       if (mySeat !== -1 && seats[mySeat]?.isMuted !== undefined) {
         setIsMicMuted(Boolean(seats[mySeat].isMuted));
+        agoraVoiceService.setRole(true, Boolean(seats[mySeat].isMuted));
+      } else if (!isOwner) {
+        agoraVoiceService.setRole(false, true);
       }
     });
 
     socket.on('host_status_updated', ({ isHostActive: hActive }) => {
       setIsHostActive(hActive);
+      if (isOwner) {
+        agoraVoiceService.setRole(Boolean(hActive), isMicMuted);
+      }
     });
 
     socket.on('host_mute_status_changed', ({ isHostMuted: hMuted }) => {
       setIsHostMuted(hMuted);
       if (isOwner) {
         setIsMicMuted(hMuted);
+        agoraVoiceService.setMute(hMuted);
       }
     });
 
@@ -562,6 +597,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           newSeats[seatIndex] = { ...newSeats[seatIndex], isMuted };
           if (newSeats[seatIndex].user?._id === currentUser?._id) {
             setIsMicMuted(isMuted);
+            agoraVoiceService.setMute(isMuted);
           }
         }
         return { ...prev, seats: newSeats };
@@ -819,6 +855,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       showSub.remove();
       hideSub.remove();
       musicPlayer.stopAndUnload();
+      agoraVoiceService.leaveRoom();
       performLeaveRoom();
       socket.disconnect();
     };
@@ -1217,6 +1254,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     if (mySeatIndex !== null) {
       const nextState = !isMicMuted;
       setIsMicMuted(nextState);
+      agoraVoiceService.setMute(nextState);
       socketRef.current?.emit('toggle_mic_mute', {
         roomId,
         seatIndex: mySeatIndex,
@@ -1232,6 +1270,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       const nextState = !isMicMuted;
       setIsMicMuted(nextState);
       setIsHostMuted(nextState);
+      agoraVoiceService.setMute(nextState);
       socketRef.current?.emit('toggle_mic_mute', {
         roomId,
         isHost: true,
