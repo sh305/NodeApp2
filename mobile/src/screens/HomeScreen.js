@@ -16,6 +16,7 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -186,8 +187,30 @@ const NavMeIcon = ({ active }) => {
 
 export default function HomeScreen({ navigation, currentUser, onLogout }) {
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
   const { t } = useLanguage();
   const { showToast } = useToast();
+
+  // Keyboard height tracking for Create Room Modal
+  const [createModalKeyboardHeight, setCreateModalKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      const kh = e?.endCoordinates?.height || 0;
+      setCreateModalKeyboardHeight(kh);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setCreateModalKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Top Tabs: 'Related' | 'Party' | 'Activity'
   const [topTab, setTopTab] = useState('Related');
@@ -1106,11 +1129,19 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
         transparent
         animationType="slide"
         statusBarTranslucent
-        onRequestClose={() => setCreateModalVisible(false)}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setCreateModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalOverlay}
+          style={[
+            styles.modalOverlay,
+            Platform.OS === 'android' && createModalKeyboardHeight > 0 && {
+              paddingBottom: createModalKeyboardHeight,
+            },
+          ]}
         >
           {/* Backdrop Dismiss on tap outside */}
           <TouchableOpacity
@@ -1122,7 +1153,23 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
             }}
           />
 
-          <View style={[styles.modalBox, { paddingBottom: Math.max(30, insets.bottom + 16) }]}>
+          <View
+            style={[
+              styles.modalBox,
+              {
+                paddingBottom:
+                  createModalKeyboardHeight > 0
+                    ? 16
+                    : (Platform.OS === 'android'
+                        ? Math.max(54, (insets?.bottom || 0) + 26)
+                        : Math.max(34, (insets?.bottom || 0) + 16)),
+                maxHeight:
+                  createModalKeyboardHeight > 0
+                    ? Math.max(280, screenHeight - createModalKeyboardHeight - (insets?.top || 24) - 20)
+                    : '85%',
+              },
+            ]}
+          >
             {/* Top Drag Handle Indicator */}
             <View style={styles.modalDragHandle} />
 
@@ -1182,6 +1229,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
               <View style={styles.modalBtnRow}>
                 <TouchableOpacity
                   style={styles.cancelBtn}
+                  activeOpacity={0.75}
                   onPress={() => {
                     Keyboard.dismiss();
                     setCreateModalVisible(false);
@@ -1192,6 +1240,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
 
                 <TouchableOpacity
                   style={styles.submitBtn}
+                  activeOpacity={0.75}
                   onPress={handleCreateRoom}
                   disabled={creating}
                 >
@@ -1997,7 +2046,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   modalScrollContent: {
-    paddingBottom: 8,
+    paddingBottom: 16,
   },
   modalHeader: {
     color: '#0F172A',
@@ -2042,6 +2091,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 22,
+    marginBottom: 8,
   },
   cancelBtn: {
     flex: 1,
