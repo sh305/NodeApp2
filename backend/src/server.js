@@ -60,8 +60,8 @@ app.use('/api/families', familyRoutes);
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'online',
-    version: 'fb-fix-v2',
-    appId: process.env.FACEBOOK_APP_ID || 'fallback-4171729949789896',
+    version: 'fb-fix-v3',
+    appId: '4171729949789896',
     message: 'YoYo Voice Backend Engine is running smoothly 🚀',
     timestamp: new Date(),
   });
