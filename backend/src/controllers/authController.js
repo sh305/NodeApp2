@@ -696,13 +696,35 @@ exports.facebookLogin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Facebook ID is required' });
     }
 
+    // 1. First find by facebookId
     let user = await User.findOne({ facebookId });
 
+    // 2. If not found by facebookId, check if a user with this email already exists and link them
+    if (!user && email && email.trim()) {
+      const cleanEmail = email.trim().toLowerCase();
+      user = await User.findOne({ email: cleanEmail });
+      if (user) {
+        user.facebookId = facebookId;
+        user.boundAccounts = user.boundAccounts || {};
+        user.boundAccounts.facebook = {
+          id: facebookId,
+          name: name || user.name,
+          email: cleanEmail,
+          boundAt: new Date(),
+        };
+        if (!user.avatar || user.avatar.includes('dicebear') || user.avatar.includes('unsplash')) {
+          if (avatar) user.avatar = avatar;
+        }
+        await user.save();
+      }
+    }
+
+    // 3. If still no existing user, create new user safely
     if (!user) {
       user = await User.create({
         name: name || 'Facebook User',
         facebookId,
-        email: email || undefined,
+        email: email && email.trim() ? email.trim().toLowerCase() : undefined,
         avatar: avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
       });
     }
