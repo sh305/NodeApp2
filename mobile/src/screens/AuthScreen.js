@@ -28,6 +28,11 @@ const TW_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 const TW_CODE_VERIFIER = 'challenge12345678901234567890123456789012345';
 const TW_AUTH_URL = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${TW_CLIENT_ID}&redirect_uri=${encodeURIComponent(TW_REDIRECT_URI)}&scope=users.read%20tweet.read&state=state&code_challenge=${TW_CODE_VERIFIER}&code_challenge_method=plain`;
 
+const SNAP_CLIENT_ID = '6db4e19b-bb70-460f-9ccb-786f6f9f7504';
+const SNAP_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+const SNAP_AUTH_URL = `https://accounts.snapchat.com/login/oauth2/authorize?client_id=${SNAP_CLIENT_ID}&redirect_uri=${encodeURIComponent(SNAP_REDIRECT_URI)}&response_type=code&scope=https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.display_name%20https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.bitmoji.avatar%20https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.external_id`;
+
+
 
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
@@ -87,6 +92,20 @@ const SocialTwitterIcon = ({ size = 24 }) => (
     <Circle cx="18" cy="18" r="18" fill="#1DA1F2" />
     <Path
       d="M25 12.8a6.2 6.2 0 01-1.8.5 3.1 3.1 0 001.4-1.7 6.2 6.2 0 01-2 .8 3.1 3.1 0 00-5.4 2.8 8.9 8.9 0 01-6.5-3.3 3.1 3.1 0 001 4.2 3.1 3.1 0 01-1.4-.4v.1a3.1 3.1 0 002.5 3.1 3.2 3.2 0 01-1.4.1 3.1 3.1 0 002.9 2.2 6.3 6.3 0 01-3.9 1.3H10a8.8 8.8 0 004.8 1.4c5.7 0 8.9-4.7 8.9-8.9v-.4a6.3 6.3 0 001.3-1.5z"
+      fill="#FFFFFF"
+    />
+  </Svg>
+);
+
+const SocialSnapchatIcon = ({ size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#FFFC00" />
+    <Path
+      d="M18 9.5c-3.5 0-5.8 2.3-5.8 5.6 0 .9.2 1.8.5 2.4-.6.3-1.4.7-1.6 1.4-.2.7.2 1.3.8 1.5.6.2 1.3.1 1.8-.2.4 1 1.1 1.8 2 2.1-.6.4-1.5.8-2 1.4-.4.5-.4 1.2 0 1.6.4.5 1.2.6 2 .5.7 1.4 2.1 1.9 3.8 1.9.7 0 1.4-.1 2-.4.6.3 1.3.4 2 .4 1.7 0 3.1-.5 3.8-1.9.8.1 1.6 0 2-.5.4-.4.4-1.1 0-1.6-.5-.6-1.4-1-2-1.4.9-.3 1.6-1.1 2-2.1.5.3 1.2.4 1.8.2.6-.2 1-.8.8-1.5-.2-.7-1-1.1-1.6-1.4.3-.6.5-1.5.5-2.4 0-3.3-2.3-5.6-5.8-5.6z"
+      fill="#000000"
+    />
+    <Path
+      d="M18 10.7c-2.8 0-4.6 1.8-4.6 4.4 0 .7.2 1.5.4 2 .2.4 0 .9-.3 1.1-.5.3-1.1.6-1.3 1.1-.1.4.1.8.5.9.5.1 1 .1 1.4-.1.4-.2 1-.1 1.2.3.4.8 1 1.4 1.7 1.6.4.1.7.6.5 1-.5.4-1.2.7-1.6 1.1-.2.3-.2.7.1.9.3.3.9.4 1.5.3.5-.1 1 .2 1.2.6.5 1.1 1.6 1.5 2.8 1.5.6 0 1.1-.1 1.6-.3.4-.2.8-.2 1.2 0 .5.2 1 .3 1.6.3 1.2 0 2.3-.4 2.8-1.5.2-.4.7-.7 1.2-.6.6.1 1.2 0 1.5-.3.3-.2.3-.6.1-.9-.4-.4-1.1-.7-1.6-1.1-.2-.4.1-.9.5-1 .7-.2 1.3-.8 1.7-1.6.2-.4.8-.5 1.2-.3.4.2.9.2 1.4.1.4-.1.6-.5.5-.9-.2-.5-.8-.8-1.3-1.1-.3-.2-.5-.7-.3-1.1.2-.5.4-1.3.4-2 0-2.6-1.8-4.4-4.6-4.4z"
       fill="#FFFFFF"
     />
   </Svg>
@@ -405,6 +424,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   // Twitter In-App OAuth WebView Modal
   const [twWebViewVisible, setTwWebViewVisible] = useState(false);
+
+  // Snapchat In-App OAuth WebView Modal
+  const [snapWebViewVisible, setSnapWebViewVisible] = useState(false);
 
   // Scroll View Ref for automatic keyboard focus scrolling
   const scrollViewRef = useRef(null);
@@ -792,6 +814,54 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
+  const handleDirectSnapchatLogin = () => {
+    setSnapWebViewVisible(true);
+  };
+
+  const handleSnapNavStateChange = async (navState) => {
+    const url = navState.url;
+    if (!url) return;
+
+    if (url.includes('code=')) {
+      let code = null;
+      const codeMatch = url.match(/[?&]code=([^&#]+)/);
+      if (codeMatch && codeMatch[1]) code = codeMatch[1];
+
+      setSnapWebViewVisible(false);
+      setLoading(true);
+      try {
+        const verifyRes = await api.post('/auth/snapchat-verify-token', { code });
+
+        if (verifyRes.data?.success && verifyRes.data?.profile) {
+          const profileData = verifyRes.data.profile;
+          const loginRes = await api.post('/auth/snapchat-login', {
+            snapchatId: profileData.id,
+            name: profileData.name || 'Snapchat User',
+            avatar: profileData.avatar || undefined,
+          });
+
+          if (loginRes.data?.success) {
+            showToast(t('Logged in with Snapchat successfully! 🎉'), 'success');
+            await AsyncStorage.setItem('@auth_token', loginRes.data.token);
+            await AsyncStorage.setItem('@user_info', JSON.stringify(loginRes.data.user));
+            if (onLoginSuccess) onLoginSuccess(loginRes.data.user);
+          } else {
+            showToast(t(loginRes.data?.message || 'Snapchat login failed'), 'error');
+          }
+        } else {
+          showToast(t(verifyRes.data?.message || 'Failed to authenticate with Snapchat'), 'error');
+        }
+      } catch (err) {
+        showToast(t(err.response?.data?.message || 'Snapchat login failed'), 'error');
+      } finally {
+        setLoading(false);
+      }
+    } else if (url.includes('error=')) {
+      setSnapWebViewVisible(false);
+      showToast(t('Snapchat authentication cancelled or failed'), 'error');
+    }
+  };
+
   // ---------------- GMAIL / EMAIL AUTH HANDLERS ----------------
 
   // 1. Send OTP to Gmail
@@ -1040,6 +1110,15 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   onPress={handleDirectTwitterLogin}
                 >
                   <SocialTwitterIcon size={36} />
+                </TouchableOpacity>
+
+                {/* Snapchat Direct Login */}
+                <TouchableOpacity
+                  style={styles.socialCircleBtn}
+                  activeOpacity={0.8}
+                  onPress={handleDirectSnapchatLogin}
+                >
+                  <SocialSnapchatIcon size={36} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1889,6 +1968,39 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               renderLoading={() => (
                 <View style={styles.webLoadingContainer}>
                   <ActivityIndicator size="large" color="#1DA1F2" />
+                </View>
+              )}
+            />
+          </View>
+        </Modal>
+
+        {/* ══ SNAPCHAT LOGIN WEBVIEW MODAL ══ */}
+        <Modal
+          visible={snapWebViewVisible}
+          animationType="slide"
+          onRequestClose={() => setSnapWebViewVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Platform.OS === 'android' ? 24 : 44 }}>
+            <View style={styles.fbWebHeader}>
+              <TouchableOpacity
+                onPress={() => setSnapWebViewVisible(false)}
+                style={styles.fbWebCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.fbWebCloseText}>✕ <T>Cancel</T></Text>
+              </TouchableOpacity>
+              <Text style={styles.fbWebTitle}><T>Snapchat Login</T></Text>
+              <View style={{ width: 60 }} />
+            </View>
+            <WebView
+              source={{ uri: SNAP_AUTH_URL }}
+              onNavigationStateChange={handleSnapNavStateChange}
+              userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+              scalesPageToFit={true}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.webLoadingContainer}>
+                  <ActivityIndicator size="large" color="#FFFC00" />
                 </View>
               )}
             />

@@ -30,6 +30,11 @@ const TW_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 const TW_CODE_VERIFIER = 'challenge12345678901234567890123456789012345';
 const TW_AUTH_URL = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${TW_CLIENT_ID}&redirect_uri=${encodeURIComponent(TW_REDIRECT_URI)}&scope=users.read%20tweet.read&state=state&code_challenge=${TW_CODE_VERIFIER}&code_challenge_method=plain`;
 
+const SNAP_CLIENT_ID = '6db4e19b-bb70-460f-9ccb-786f6f9f7504';
+const SNAP_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+const SNAP_AUTH_URL = `https://accounts.snapchat.com/login/oauth2/authorize?client_id=${SNAP_CLIENT_ID}&redirect_uri=${encodeURIComponent(SNAP_REDIRECT_URI)}&response_type=code&scope=https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.display_name%20https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.bitmoji.avatar%20https%3A%2F%2Fauth.snapchat.com%2Foauth2%2Fapi%2Fuser.external_id`;
+
+
 
 // ══ SVG ICONS MATCHING SCREENSHOT ══
 const BackArrowIcon = ({ size = 24, color = '#2C2C2E' }) => (
@@ -159,6 +164,21 @@ const VkCircleIcon = ({ size = 36 }) => (
   </Svg>
 );
 
+// 6. Snapchat Circle Icon
+const SnapchatCircleIcon = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#FFFC00" />
+    <Path
+      d="M18 9.5c-3.5 0-5.8 2.3-5.8 5.6 0 .9.2 1.8.5 2.4-.6.3-1.4.7-1.6 1.4-.2.7.2 1.3.8 1.5.6.2 1.3.1 1.8-.2.4 1 1.1 1.8 2 2.1-.6.4-1.5.8-2 1.4-.4.5-.4 1.2 0 1.6.4.5 1.2.6 2 .5.7 1.4 2.1 1.9 3.8 1.9.7 0 1.4-.1 2-.4.6.3 1.3.4 2 .4 1.7 0 3.1-.5 3.8-1.9.8.1 1.6 0 2-.5.4-.4.4-1.1 0-1.6-.5-.6-1.4-1-2-1.4.9-.3 1.6-1.1 2-2.1.5.3 1.2.4 1.8.2.6-.2 1-.8.8-1.5-.2-.7-1-1.1-1.6-1.4.3-.6.5-1.5.5-2.4 0-3.3-2.3-5.6-5.8-5.6z"
+      fill="#000000"
+    />
+    <Path
+      d="M18 10.7c-2.8 0-4.6 1.8-4.6 4.4 0 .7.2 1.5.4 2 .2.4 0 .9-.3 1.1-.5.3-1.1.6-1.3 1.1-.1.4.1.8.5.9.5.1 1 .1 1.4-.1.4-.2 1-.1 1.2.3.4.8 1 1.4 1.7 1.6.4.1.7.6.5 1-.5.4-1.2.7-1.6 1.1-.2.3-.2.7.1.9.3.3.9.4 1.5.3.5-.1 1 .2 1.2.6.5 1.1 1.6 1.5 2.8 1.5.6 0 1.1-.1 1.6-.3.4-.2.8-.2 1.2 0 .5.2 1 .3 1.6.3 1.2 0 2.3-.4 2.8-1.5.2-.4.7-.7 1.2-.6.6.1 1.2 0 1.5-.3.3-.2.3-.6.1-.9-.4-.4-1.1-.7-1.6-1.1-.2-.4.1-.9.5-1 .7-.2 1.3-.8 1.7-1.6.2-.4.8-.5 1.2-.3.4.2.9.2 1.4.1.4-.1.6-.5.5-.9-.2-.5-.8-.8-1.3-1.1-.3-.2-.5-.7-.3-1.1.2-.5.4-1.3.4-2 0-2.6-1.8-4.4-4.6-4.4z"
+      fill="#FFFFFF"
+    />
+  </Svg>
+);
+
 export default function AccountBindingScreen({ navigation, currentUser }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -200,6 +220,12 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   const [customTwInput, setCustomTwInput] = useState('');
   const [twWebViewVisible, setTwWebViewVisible] = useState(false);
   const [twVerifying, setTwVerifying] = useState(false);
+
+  // ── 3.1 Snapchat Binding State ──
+  const [snapChooserVisible, setSnapChooserVisible] = useState(false);
+  const [customSnapInput, setCustomSnapInput] = useState('');
+  const [snapWebViewVisible, setSnapWebViewVisible] = useState(false);
+  const [snapVerifying, setSnapVerifying] = useState(false);
 
   // ── 4. Final Confirmation Prompt Modal ──
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -250,6 +276,11 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   const twitterBoundValue =
     profile?.twitterId ||
     profile?.boundAccounts?.twitter?.username;
+
+  const snapchatBoundValue =
+    profile?.snapchatId ||
+    profile?.boundAccounts?.snapchat?.displayName ||
+    profile?.boundAccounts?.snapchat?.id;
 
   const phoneBoundValue =
     profile?.phone ||
@@ -708,13 +739,88 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     setConfirmModalVisible(true);
   };
 
-  // 5. VK Click
+  // ══════════════════════════════════════════════════
+  // 5. SNAPCHAT BINDING FLOW
+  // ══════════════════════════════════════════════════
+  const handleSnapchatClick = () => {
+    if (snapchatBoundValue) {
+      setPendingUnbind({
+        provider: 'snapchat',
+        label: t('Snapchat'),
+        value: snapchatBoundValue,
+      });
+      setUnbindModalVisible(true);
+      return;
+    }
+    const defaultSnap = profile?.name ? profile.name.toLowerCase().replace(/\s+/g, '') : 'snap_user';
+    setCustomSnapInput(defaultSnap);
+    setSnapChooserVisible(true);
+  };
+
+  const handleStartSnapOAuth = () => {
+    setSnapChooserVisible(false);
+    setSnapWebViewVisible(true);
+  };
+
+  const handleSnapNavStateChange = async (navState) => {
+    const url = navState.url;
+    if (!url) return;
+
+    if (url.includes('code=')) {
+      let code = null;
+      const codeMatch = url.match(/[?&]code=([^&#]+)/);
+      if (codeMatch && codeMatch[1]) code = codeMatch[1];
+
+      setSnapWebViewVisible(false);
+      setSnapVerifying(true);
+      try {
+        const res = await api.post('/auth/snapchat-verify-token', { code });
+
+        if (res.data?.success && res.data?.profile) {
+          const profileData = res.data.profile;
+          showToast(t('Snapchat Account Verified Successfully! ✅'), 'success');
+          setPendingBind({
+            provider: 'snapchat',
+            accountId: profileData.id,
+            name: profileData.name || 'Snapchat User',
+            avatar: profileData.avatar,
+            promptText: t('Are you sure do you want to bind your account to this Snapchat account?'),
+          });
+          setConfirmModalVisible(true);
+        } else {
+          showToast(t(res.data?.message || 'Failed to authenticate with Snapchat'), 'error');
+        }
+      } catch (err) {
+        showToast(t(err.response?.data?.message || 'Failed to verify Snapchat account'), 'error');
+      } finally {
+        setSnapVerifying(false);
+      }
+    } else if (url.includes('error=')) {
+      setSnapWebViewVisible(false);
+      showToast(t('Snapchat authentication cancelled or failed'), 'error');
+    }
+  };
+
+  const handleSnapSubmit = () => {
+    let clean = customSnapInput.trim();
+    setSnapChooserVisible(false);
+    setPendingBind({
+      provider: 'snapchat',
+      accountId: `snap_${Date.now()}`,
+      name: clean || profile?.name || 'Snapchat User',
+      avatar: profile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120',
+      promptText: t('Are you sure do you want to bind your account to this Snapchat account?'),
+    });
+    setConfirmModalVisible(true);
+  };
+
+  // 6. VK Click
   const handleVkClick = () => {
     showToast(t('VK account binding coming soon'), 'info');
   };
 
   // ══════════════════════════════════════════════════
-  // 5. FINAL BINDING CONFIRMATION ("Yes, Bind")
+  // 7. FINAL BINDING CONFIRMATION ("Yes, Bind")
   // ══════════════════════════════════════════════════
   const handleConfirmBinding = async () => {
     if (!pendingBind) return;
@@ -742,6 +848,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
               ? 'Facebook account bound successfully!'
               : pendingBind.provider === 'phone'
               ? 'Phone number bound successfully!'
+              : pendingBind.provider === 'snapchat'
+              ? 'Snapchat account bound successfully!'
               : 'Twitter account bound successfully!'
           ),
           'success'
@@ -917,6 +1025,33 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 ]}
               >
                 {twitterBoundValue || <T>Bind on Account</T>}
+              </Text>
+              <ChevronRightIcon size={18} color="#C7C7CC" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.rowDivider} />
+
+          {/* 5. Snapchat */}
+          <TouchableOpacity
+            style={styles.rowItem}
+            activeOpacity={0.75}
+            onPress={handleSnapchatClick}
+          >
+            <View style={styles.rowLeft}>
+              <SnapchatCircleIcon size={36} />
+              <Text style={styles.rowLabelText}>
+                <T>Snapchat</T>
+              </Text>
+            </View>
+
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.statusText,
+                  snapchatBoundValue && styles.statusTextBound,
+                ]}
+              >
+                {snapchatBoundValue || <T>Bind on Account</T>}
               </Text>
               <ChevronRightIcon size={18} color="#C7C7CC" />
             </View>
@@ -1632,6 +1767,126 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
             renderLoading={() => (
               <View style={styles.webLoadingContainer}>
                 <ActivityIndicator size="large" color="#1DA1F2" />
+              </View>
+            )}
+          />
+        </View>
+      </Modal>
+
+      {/* ══ 3.2 SNAPCHAT BINDING MODAL ══ */}
+      <Modal
+        visible={snapChooserVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSnapChooserVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.chooserOverlay}
+          activeOpacity={1}
+          onPress={() => setSnapChooserVisible(false)}
+        >
+          <View
+            style={styles.chooserSheet}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.chooserHeaderRow}>
+              <View style={styles.chooserHeaderLeft}>
+                <SnapchatCircleIcon size={28} />
+                <Text style={styles.chooserTitle}>
+                  <T>Bind Snapchat Account</T>
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setSnapChooserVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.chooserCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.chooserSubtitle}>
+              <T>Choose your preferred binding method</T>
+            </Text>
+
+            <View style={styles.inputSectionCard}>
+              {/* Option 1: Fast 1-Click Official Snapchat OAuth */}
+              <TouchableOpacity
+                style={[styles.fbFastBtn, { backgroundColor: '#FFFC00', shadowColor: '#FFFC00' }]}
+                activeOpacity={0.85}
+                onPress={handleStartSnapOAuth}
+              >
+                <SnapchatCircleIcon size={22} />
+                <Text style={[styles.fbFastBtnText, { color: '#000000' }]}>
+                  <T>Continue with Snapchat</T>
+                </Text>
+              </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>
+                  <T>Or bind manually with Snapchat ID</T>
+                </Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Text style={styles.inputSectionLabel}>
+                <T>Snapchat Username</T>
+              </Text>
+              <TextInput
+                style={styles.gmailTextInput}
+                placeholder="snapchat_username"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                value={customSnapInput}
+                onChangeText={setCustomSnapInput}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.submitGmailBtn,
+                  !customSnapInput.trim() && styles.submitGmailBtnDisabled,
+                ]}
+                disabled={!customSnapInput.trim()}
+                activeOpacity={0.8}
+                onPress={handleSnapSubmit}
+              >
+                <Text style={styles.submitGmailBtnText}>
+                  <T>Continue to Bind</T>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ══ 3.3 SNAPCHAT OFFICIAL OAUTH WEBVIEW MODAL ══ */}
+      <Modal
+        visible={snapWebViewVisible}
+        animationType="slide"
+        onRequestClose={() => setSnapWebViewVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Math.max(16, insets.top) }}>
+          <View style={styles.fbWebHeader}>
+            <TouchableOpacity
+              onPress={() => setSnapWebViewVisible(false)}
+              style={styles.fbWebCloseBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.fbWebCloseText}>✕ <T>Cancel</T></Text>
+            </TouchableOpacity>
+            <Text style={styles.fbWebTitle}><T>Snapchat Login</T></Text>
+            <View style={{ width: 60 }} />
+          </View>
+          <WebView
+            source={{ uri: SNAP_AUTH_URL }}
+            onNavigationStateChange={handleSnapNavStateChange}
+            userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+            scalesPageToFit={true}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.webLoadingContainer}>
+                <ActivityIndicator size="large" color="#FFFC00" />
               </View>
             )}
           />

@@ -25,6 +25,8 @@ const {
   verifyFacebookOtp,
   verifyFacebookToken,
   verifyTwitterToken,
+  verifySnapchatToken,
+  snapchatLogin,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -49,6 +51,8 @@ router.post('/facebook-verify-token', verifyFacebookToken);
 router.post('/facebook-login', facebookLogin);
 router.post('/twitter-verify-token', verifyTwitterToken);
 router.post('/twitter-login', twitterLogin);
+router.post('/snapchat-verify-token', verifySnapchatToken);
+router.post('/snapchat-login', snapchatLogin);
 router.post('/bind-account', protect, bindAccount);
 router.post('/unbind-account', protect, unbindAccount);
 router.get('/me', protect, getMe);

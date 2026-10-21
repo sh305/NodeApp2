@@ -827,6 +827,24 @@ exports.bindAccount = async (req, res) => {
         name: name || '',
         boundAt: new Date(),
       };
+    } else if (provider === 'snapchat') {
+      const existing = await User.findOne({ snapchatId: accountId, _id: { $ne: user._id } });
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'This Snapchat account is already bound to another profile',
+        });
+      }
+      user.snapchatId = accountId;
+      user.boundAccounts.snapchat = {
+        id: accountId,
+        displayName: name || '',
+        avatar: avatar || '',
+        boundAt: new Date(),
+      };
+      if (avatar && (!user.avatar || user.avatar.includes('unsplash'))) {
+        user.avatar = avatar;
+      }
     } else if (provider === 'phone') {
       const cleanPhone = accountId.replace(/\D/g, '').slice(-10);
       if (!cleanPhone || cleanPhone.length !== 10) {
@@ -892,6 +910,9 @@ exports.unbindAccount = async (req, res) => {
     } else if (provider === 'twitter') {
       user.twitterId = undefined;
       user.boundAccounts.twitter = undefined;
+    } else if (provider === 'snapchat') {
+      user.snapchatId = undefined;
+      user.boundAccounts.snapchat = undefined;
     } else if (provider === 'phone') {
       user.phone = undefined;
       user.phoneNumber = undefined;
@@ -1019,6 +1040,153 @@ exports.twitterLogin = async (req, res) => {
       user,
     });
   } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify Snapchat OAuth 2.0 Code & Return User Profile
+// @route   POST /api/auth/snapchat-verify-token
+exports.verifySnapchatToken = async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'Snapchat authorization code is required' });
+    }
+
+    const clientId = process.env.SNAPCHAT_CONFIDENTIAL_CLIENT_ID || 'fc77f748-6e4f-4cda-9c0f-3669fbf429da';
+    const clientSecret = process.env.SNAPCHAT_CLIENT_SECRET || 'xN7X2SmcscWEHFZ2DIKFOttqsdfPqQ4LovBl2Ik_9QY';
+    const redirectUri = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    const params = new URLSearchParams();
+    params.append('grant_type', 'authorization_code');
+    params.append('code', code);
+    params.append('client_id', clientId);
+    params.append('client_secret', clientSecret);
+    params.append('redirect_uri', redirectUri);
+
+    const tokenRes = await axios.post('https://accounts.snapchat.com/login/oauth2/access_token', params.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${basicAuth}`,
+      },
+      timeout: 10000,
+    });
+
+    const accessToken = tokenRes.data?.access_token;
+    if (!accessToken) {
+      return res.status(400).json({ success: false, message: 'Failed to obtain Snapchat access token' });
+    }
+
+    // Query Snapchat Kit GraphQL for user info (Bitmoji avatar + Display Name)
+    let snapData = { id: `snap_${Date.now()}`, name: 'Snapchat User', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' };
+
+    try {
+      const profileRes = await axios.post(
+        'https://kit.snapchat.com/v1/me',
+        {
+          query: '{ me { externalId displayName bitmoji { avatar } } }',
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          timeout: 10000,
+        }
+      );
+
+      const me = profileRes.data?.data?.me;
+      if (me && (me.externalId || me.displayName)) {
+        snapData.id = me.externalId || snapData.id;
+        snapData.name = me.displayName || 'Snapchat User';
+        if (me.bitmoji?.avatar) {
+          snapData.avatar = me.bitmoji.avatar;
+        }
+      }
+    } catch (graphErr) {
+      console.warn('Snapchat GraphQL user query note:', graphErr.response?.data || graphErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      profile: snapData,
+    });
+  } catch (error) {
+    console.error('verifySnapchatToken error:', error.response?.data || error.message);
+    return res.status(400).json({
+      success: false,
+      message:
+        error.response?.data?.error_description ||
+        error.response?.data?.message ||
+        'Failed to authenticate with Snapchat',
+    });
+  }
+};
+
+// @desc    Snapchat OAuth Direct Sign-In
+// @route   POST /api/auth/snapchat-login
+exports.snapchatLogin = async (req, res) => {
+  try {
+    const { snapchatId, name, avatar } = req.body;
+    if (!snapchatId) {
+      return res.status(400).json({ success: false, message: 'Snapchat ID is required' });
+    }
+
+    let user = await User.findOne({
+      $or: [{ snapchatId }, { 'boundAccounts.snapchat.id': snapchatId }],
+    });
+
+    if (!user) {
+      const generatedName = name || `Snap_${Math.floor(1000 + Math.random() * 9000)}`;
+      user = await User.create({
+        name: generatedName,
+        snapchatId,
+        avatar: avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        boundAccounts: {
+          snapchat: {
+            id: snapchatId,
+            displayName: generatedName,
+            avatar: avatar || '',
+            boundAt: new Date(),
+          },
+        },
+      });
+    } else {
+      if (!user.boundAccounts) user.boundAccounts = {};
+      user.snapchatId = snapchatId;
+      user.boundAccounts.snapchat = {
+        id: snapchatId,
+        displayName: name || user.name,
+        avatar: avatar || user.avatar,
+        boundAt: new Date(),
+      };
+      if (avatar && (!user.avatar || user.avatar.includes('unsplash'))) {
+        user.avatar = avatar;
+      }
+      user.markModified('boundAccounts');
+      await user.save();
+    }
+
+    const banCheck = user.checkActiveBan();
+    if (banCheck.banned) {
+      return res.status(403).json({
+        success: false,
+        banned: true,
+        message: banCheck.message,
+      });
+    }
+
+    const token = generateToken(user._id);
+    return res.status(200).json({
+      success: true,
+      message: 'Logged in with Snapchat successfully!',
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error('snapchatLogin error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

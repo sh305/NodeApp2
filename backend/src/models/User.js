@@ -40,10 +40,16 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
+    snapchatId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     boundAccounts: {
       google: { id: String, email: String, name: String, boundAt: Date },
       facebook: { id: String, name: String, email: String, boundAt: Date },
       twitter: { id: String, username: String, name: String, boundAt: Date },
+      snapchat: { id: String, displayName: String, avatar: String, boundAt: Date },
       phone: { number: String, boundAt: Date },
     },
     avatar: {
