@@ -506,7 +506,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
 
   const handleFbNavStateChange = async (navState) => {
     const url = navState.url;
-    if (!url) return;
+    if (!url || !url.includes('funapp-2e00d.firebaseapp.com')) return;
 
     if (url.includes('access_token=') || url.includes('code=')) {
       let token = null;
@@ -685,7 +685,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
 
   const handleTwNavStateChange = async (navState) => {
     const url = navState.url;
-    if (!url) return;
+    if (!url || !url.includes('funapp-2e00d.firebaseapp.com')) return;
 
     if (url.includes('code=')) {
       let code = null;
@@ -766,7 +766,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
 
   const handleSnapNavStateChange = async (navState) => {
     const url = navState.url;
-    if (!url) return;
+    if (!url || !url.includes('funapp-2e00d.firebaseapp.com')) return;
 
     if (url.includes('code=')) {
       let code = null;
@@ -1655,7 +1655,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
             onNavigationStateChange={handleFbNavStateChange}
             onShouldStartLoadWithRequest={(request) => {
               const url = request.url;
-              if (url && (url.includes('access_token=') || url.includes('code=') || url.includes('error='))) {
+              if (url && url.includes('funapp-2e00d.firebaseapp.com') && (url.includes('access_token=') || url.includes('code=') || url.includes('error='))) {
                 handleFbNavStateChange({ url });
                 return false;
               }
@@ -1786,7 +1786,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
             onNavigationStateChange={handleTwNavStateChange}
             onShouldStartLoadWithRequest={(request) => {
               const url = request.url;
-              if (url && (url.includes('code=') || url.includes('error='))) {
+              if (url && url.includes('funapp-2e00d.firebaseapp.com') && (url.includes('code=') || url.includes('error='))) {
                 handleTwNavStateChange({ url });
                 return false;
               }
@@ -1918,7 +1918,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
             onNavigationStateChange={handleSnapNavStateChange}
             onShouldStartLoadWithRequest={(request) => {
               const url = request.url;
-              if (url && (url.includes('code=') || url.includes('error='))) {
+              if (url && url.includes('funapp-2e00d.firebaseapp.com') && (url.includes('code=') || url.includes('error='))) {
                 handleSnapNavStateChange({ url });
                 return false;
               }
