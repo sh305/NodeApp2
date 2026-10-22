@@ -72,6 +72,15 @@ app.get('/', (req, res) => {
   res.send('YoYo Real-Time Voice Social API Service');
 });
 
+// Privacy Policy page for Google Play Store & Snapchat Review
+const { getPrivacyPolicyHtml } = require('./views/legalPages');
+app.get('/privacy', (req, res) => {
+  res.send(getPrivacyPolicyHtml());
+});
+app.get('/privacy-policy', (req, res) => {
+  res.send(getPrivacyPolicyHtml());
+});
+
 // 404 Handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'API Route Not Found' });
