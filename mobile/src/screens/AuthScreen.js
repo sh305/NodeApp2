@@ -131,6 +131,12 @@ try {
   console.warn('GoogleSignin.configure error:', e);
 }
 
+import * as WebBrowser from 'expo-web-browser';
+
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch (e) {}
+
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
@@ -825,8 +831,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  const handleDirectFacebookLogin = () => {
-    setFbWebViewVisible(true);
+  const handleDirectFacebookLogin = async () => {
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(FB_AUTH_URL, FB_REDIRECT_URI);
+      if (result.type === 'success' && result.url) {
+        handleFbNavStateChange({ url: result.url });
+      }
+    } catch (err) {
+      console.warn('Facebook WebBrowser fallback:', err);
+      setFbWebViewVisible(true);
+    }
   };
 
   const handleFbNavStateChange = async (navState) => {
@@ -882,8 +896,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  const handleDirectTwitterLogin = () => {
-    setTwWebViewVisible(true);
+  const handleDirectTwitterLogin = async () => {
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(TW_AUTH_URL, TW_REDIRECT_URI);
+      if (result.type === 'success' && result.url) {
+        handleTwNavStateChange({ url: result.url });
+      }
+    } catch (err) {
+      console.warn('Twitter WebBrowser fallback:', err);
+      setTwWebViewVisible(true);
+    }
   };
 
   const handleTwNavStateChange = async (navState) => {
@@ -941,8 +963,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  const handleDirectSnapchatLogin = () => {
-    setSnapWebViewVisible(true);
+  const handleDirectSnapchatLogin = async () => {
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(SNAP_AUTH_URL, SNAP_REDIRECT_URI);
+      if (result.type === 'success' && result.url) {
+        handleSnapNavStateChange({ url: result.url });
+      }
+    } catch (err) {
+      console.warn('Snapchat WebBrowser fallback:', err);
+      setSnapWebViewVisible(true);
+    }
   };
 
   const handleSnapNavStateChange = async (navState) => {

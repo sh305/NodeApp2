@@ -20,6 +20,11 @@ import api from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from '../components/TranslatedText';
 import { useToast } from '../components/Toast';
+import * as WebBrowser from 'expo-web-browser';
+
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch (e) {}
 
 const FB_APP_ID = '4171729949789896';
 const FB_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
@@ -583,9 +588,17 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   // ══════════════════════════════════════════════════
   // 3. FACEBOOK BINDING (OFFICIAL 1-CLICK & MESSENGER FLOW)
   // ══════════════════════════════════════════════════
-  const handleStartFbOAuth = () => {
+  const handleStartFbOAuth = async () => {
     setFbChooserVisible(false);
-    setFbWebViewVisible(true);
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(FB_AUTH_URL, FB_REDIRECT_URI);
+      if (result.type === 'success' && result.url) {
+        handleFbNavStateChange({ url: result.url });
+      }
+    } catch (err) {
+      console.warn('FB WebBrowser fallback:', err);
+      setFbWebViewVisible(true);
+    }
   };
 
   const handleFbNavStateChange = async (navState) => {
@@ -762,9 +775,17 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     setTwChooserVisible(true);
   };
 
-  const handleStartTwOAuth = () => {
+  const handleStartTwOAuth = async () => {
     setTwChooserVisible(false);
-    setTwWebViewVisible(true);
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(TW_AUTH_URL, TW_REDIRECT_URI);
+      if (result.type === 'success' && result.url) {
+        handleTwNavStateChange({ url: result.url });
+      }
+    } catch (err) {
+      console.warn('Twitter WebBrowser fallback:', err);
+      setTwWebViewVisible(true);
+    }
   };
 
   const handleTwNavStateChange = async (navState) => {
@@ -850,9 +871,17 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     setSnapChooserVisible(true);
   };
 
-  const handleStartSnapOAuth = () => {
+  const handleStartSnapOAuth = async () => {
     setSnapChooserVisible(false);
-    setSnapWebViewVisible(true);
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(SNAP_AUTH_URL, SNAP_REDIRECT_URI);
+      if (result.type === 'success' && result.url) {
+        handleSnapNavStateChange({ url: result.url });
+      }
+    } catch (err) {
+      console.warn('Snapchat WebBrowser fallback:', err);
+      setSnapWebViewVisible(true);
+    }
   };
 
   const handleSnapNavStateChange = async (navState) => {
