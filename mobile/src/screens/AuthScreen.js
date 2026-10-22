@@ -33,8 +33,18 @@ const SNAP_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler'
 const SNAP_SCOPES = encodeURIComponent('https://auth.snapchat.com/oauth2/api/user.display_name https://auth.snapchat.com/oauth2/api/user.bitmoji.avatar');
 const SNAP_AUTH_URL = `https://accounts.snapchat.com/accounts/oauth2/auth?client_id=${SNAP_CLIENT_ID}&redirect_uri=${encodeURIComponent(SNAP_REDIRECT_URI)}&response_type=code&scope=${SNAP_SCOPES}&state=funmaza_snap_state`;
 
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
+const GOOGLE_WEB_CLIENT_ID = '343159049565-l36al4hqftj2dk9u4vtpfppna6lla577.apps.googleusercontent.com';
 
+try {
+  GoogleSignin.configure({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    offlineAccess: true,
+  });
+} catch (e) {
+  console.warn('GoogleSignin.configure error:', e);
+}
 
 import LanguageSelectorButton from '../components/LanguageSelectorButton';
 import { useLanguage } from '../context/LanguageContext';
@@ -681,27 +691,50 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  // Direct Social Logins (Google, Facebook, Twitter) - Bound Account Direct 1-Tap Login
+  // Native Google 1-Tap Sign-In (Official Android Account Chooser)
   const handleDirectGoogleLogin = async () => {
-    setLoading(true);
     try {
-      const stored = await AsyncStorage.getItem('@user_info');
-      const parsed = stored ? JSON.parse(stored) : null;
-      const googleId = parsed?.googleId || parsed?.boundAccounts?.google?.id || '108336193049371194923';
-      const email = parsed?.email || parsed?.boundAccounts?.google?.email || 'user@gmail.com';
+      setLoading(true);
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+      const userInfo = response?.data || response;
+      const userObj = userInfo?.user || userInfo;
+      const email = userObj?.email;
+      const name = userObj?.name || userObj?.givenName || 'Google User';
+      const googleId = userObj?.id || userInfo?.idToken || userObj?.email;
+      const avatar = userObj?.photo || undefined;
+
+      if (!googleId || !email) {
+        showToast(t('Google sign in did not return an account'), 'error');
+        return;
+      }
+
       const res = await api.post('/auth/google-login', {
         googleId,
         email,
-        name: parsed?.name || 'Google User',
+        name,
+        avatar,
       });
+
       if (res.data?.success) {
         showToast(t('Logged in with Google successfully! 🎉'), 'success');
         await AsyncStorage.setItem('@auth_token', res.data.token);
         await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
         if (onLoginSuccess) onLoginSuccess(res.data.user);
+      } else {
+        showToast(t(res.data?.message || 'Google login failed'), 'error');
       }
     } catch (err) {
-      showToast(t(err.response?.data?.message || 'Google login failed'), 'error');
+      if (err.code === statusCodes?.SIGN_IN_CANCELLED) {
+        // User cancelled the login prompt - silent exit
+      } else if (err.code === statusCodes?.IN_PROGRESS) {
+        // Sign in in progress
+      } else if (err.code === statusCodes?.PLAY_SERVICES_NOT_AVAILABLE) {
+        showToast(t('Google Play Services not available or outdated'), 'error');
+      } else {
+        console.error('Google Sign In Error:', err);
+        showToast(t(err.response?.data?.message || err.message || 'Google login failed'), 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -1069,12 +1102,12 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         {/* MAIN BUTTONS or ACTIVE AUTH MODAL FORM */}
         {!activeModal ? (
           <View style={styles.actionButtonsContainer}>
-            {/* 1. Google / Gmail Sign In Premium Pill */}
+            {/* 1. Google Sign In Premium Pill (Native 1-Tap) */}
             <InteractivePillButton
               variant="google"
-              onPress={() => handleOpenModal('email')}
+              onPress={handleDirectGoogleLogin}
               icon={<GmailOfficialIcon size={38} />}
-              title={t('Sign in with Google / Gmail')}
+              title={t('Sign in with Google')}
             />
 
             {/* 2. Mobile Phone Sign In Premium Pill */}
@@ -1084,6 +1117,18 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               icon={<PhoneHandsetIcon size={28} color="#0284C7" />}
               title={t('Sign in with Phone Number')}
             />
+
+            {/* Email OTP alternative option */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => handleOpenModal('email')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ marginTop: 6, marginBottom: 2 }}
+            >
+              <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 13, textDecorationLine: 'underline' }}>
+                <T>Or sign in with Email OTP</T>
+              </Text>
+            </TouchableOpacity>
 
             {/* 3. Direct Social 1-Tap Login (Facebook, Google, Twitter) */}
             <View style={styles.socialDirectWrap}>
@@ -1940,6 +1985,18 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <WebView
               source={{ uri: FB_AUTH_URL }}
               onNavigationStateChange={handleFbNavStateChange}
+              onShouldStartLoadWithRequest={(request) => {
+                const url = request.url;
+                if (url && (url.includes('access_token=') || url.includes('code=') || url.includes('error='))) {
+                  handleFbNavStateChange({ url });
+                  return false;
+                }
+                return true;
+              }}
+              setSupportMultipleWindows={false}
+              javaScriptCanOpenWindowsAutomatically={true}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
               userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
               scalesPageToFit={true}
               startInLoadingState
@@ -1973,6 +2030,18 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <WebView
               source={{ uri: TW_AUTH_URL }}
               onNavigationStateChange={handleTwNavStateChange}
+              onShouldStartLoadWithRequest={(request) => {
+                const url = request.url;
+                if (url && (url.includes('code=') || url.includes('error='))) {
+                  handleTwNavStateChange({ url });
+                  return false;
+                }
+                return true;
+              }}
+              setSupportMultipleWindows={false}
+              javaScriptCanOpenWindowsAutomatically={true}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
               userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
               scalesPageToFit={true}
               startInLoadingState
@@ -2006,6 +2075,18 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <WebView
               source={{ uri: SNAP_AUTH_URL }}
               onNavigationStateChange={handleSnapNavStateChange}
+              onShouldStartLoadWithRequest={(request) => {
+                const url = request.url;
+                if (url && (url.includes('code=') || url.includes('error='))) {
+                  handleSnapNavStateChange({ url });
+                  return false;
+                }
+                return true;
+              }}
+              setSupportMultipleWindows={false}
+              javaScriptCanOpenWindowsAutomatically={true}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
               userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
               scalesPageToFit={true}
               startInLoadingState

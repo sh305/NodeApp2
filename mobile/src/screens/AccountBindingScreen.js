@@ -1653,6 +1653,18 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
           <WebView
             source={{ uri: FB_AUTH_URL }}
             onNavigationStateChange={handleFbNavStateChange}
+            onShouldStartLoadWithRequest={(request) => {
+              const url = request.url;
+              if (url && (url.includes('access_token=') || url.includes('code=') || url.includes('error='))) {
+                handleFbNavStateChange({ url });
+                return false;
+              }
+              return true;
+            }}
+            setSupportMultipleWindows={false}
+            javaScriptCanOpenWindowsAutomatically={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
             userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1"
             startInLoadingState
             renderLoading={() => (
@@ -1772,6 +1784,18 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
           <WebView
             source={{ uri: TW_AUTH_URL }}
             onNavigationStateChange={handleTwNavStateChange}
+            onShouldStartLoadWithRequest={(request) => {
+              const url = request.url;
+              if (url && (url.includes('code=') || url.includes('error='))) {
+                handleTwNavStateChange({ url });
+                return false;
+              }
+              return true;
+            }}
+            setSupportMultipleWindows={false}
+            javaScriptCanOpenWindowsAutomatically={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
             userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             scalesPageToFit={true}
             startInLoadingState
@@ -1892,6 +1916,18 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
           <WebView
             source={{ uri: SNAP_AUTH_URL }}
             onNavigationStateChange={handleSnapNavStateChange}
+            onShouldStartLoadWithRequest={(request) => {
+              const url = request.url;
+              if (url && (url.includes('code=') || url.includes('error='))) {
+                handleSnapNavStateChange({ url });
+                return false;
+              }
+              return true;
+            }}
+            setSupportMultipleWindows={false}
+            javaScriptCanOpenWindowsAutomatically={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
             userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             scalesPageToFit={true}
             startInLoadingState

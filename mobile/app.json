@@ -29,6 +29,7 @@
     },
     "owner": "shivamrai123s-team",
     "plugins": [
+      "@react-native-google-signin/google-signin",
       "expo-sharing",
       "expo-asset",
       "expo-splash-screen"

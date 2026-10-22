@@ -1004,6 +1004,8 @@ export const LanguageProvider = ({ children }) => {
       'Finger Gun',
       'Surrender',
       'Bang Bang',
+      'Sign in with Google',
+      'Or sign in with Email OTP',
       'Sign in with Google / Gmail',
       'Instant 6-Digit Email OTP',
       'Sign in with Phone Number',
