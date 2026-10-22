@@ -46,6 +46,14 @@ ramCache.set(
   'hi:::You already have an active room. Entering your room...',
   'आपके पास पहले से एक एक्टिव रूम है। आपके रूम में जा रहे हैं...'
 );
+ramCache.set(
+  'hi:::Please use the main "Sign in with Google" button for Google login',
+  'Google से लॉगिन करने के लिए मुख्य स्क्रीन पर मौजूद "Sign in with Google" बटन का उपयोग करें'
+);
+ramCache.set(
+  'hi:::Please use the Google option in Account Binding',
+  'Google अकाउंट जोड़ने के लिए बाइंडिंग विकल्पों में से Google का चयन करें'
+);
 
 const LanguageContext = createContext();
 
@@ -75,6 +83,8 @@ export const LanguageProvider = ({ children }) => {
   // Dynamic set of all phrases used in the app (auto-accumulated at runtime)
   const knownPhrases = useRef(
     new Set([
+      'Please use the main "Sign in with Google" button for Google login',
+      'Please use the Google option in Account Binding',
       'Verification Center',
       'Verification Information',
       'Real Person Verification',

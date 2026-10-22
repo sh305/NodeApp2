@@ -12,6 +12,7 @@ import {
   Easing,
   Keyboard,
   Modal,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
@@ -803,7 +804,14 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   const handleTwNavStateChange = async (navState) => {
     const url = navState.url;
-    if (!url || !url.includes('funapp-2e00d.firebaseapp.com')) return;
+    if (!url) return;
+
+    if (url === 'about:blank' || url.startsWith('about:')) {
+      setTwWebViewVisible(false);
+      return;
+    }
+
+    if (!url.includes('funapp-2e00d.firebaseapp.com')) return;
 
     if (url.includes('code=')) {
       let code = null;
@@ -855,7 +863,14 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   const handleSnapNavStateChange = async (navState) => {
     const url = navState.url;
-    if (!url || !url.includes('funapp-2e00d.firebaseapp.com')) return;
+    if (!url) return;
+
+    if (url === 'about:blank' || url.startsWith('about:')) {
+      setSnapWebViewVisible(false);
+      return;
+    }
+
+    if (!url.includes('funapp-2e00d.firebaseapp.com')) return;
 
     if (url.includes('code=')) {
       let code = null;
@@ -2032,7 +2047,17 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               onNavigationStateChange={handleTwNavStateChange}
               onShouldStartLoadWithRequest={(request) => {
                 const url = request.url;
-                if (url && url.includes('funapp-2e00d.firebaseapp.com') && (url.includes('code=') || url.includes('error='))) {
+                if (!url) return true;
+                if (url.startsWith('twitter://') || url.startsWith('intent://')) {
+                  Linking.openURL(url).catch(() => {});
+                  return false;
+                }
+                if (url.includes('accounts.google.com') || url.includes('appleid.apple.com')) {
+                  setTwWebViewVisible(false);
+                  showToast(t('Please use the main "Sign in with Google" button for Google login'), 'info');
+                  return false;
+                }
+                if (url.includes('funapp-2e00d.firebaseapp.com') && (url.includes('code=') || url.includes('error='))) {
                   handleTwNavStateChange({ url });
                   return false;
                 }
@@ -2077,7 +2102,17 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               onNavigationStateChange={handleSnapNavStateChange}
               onShouldStartLoadWithRequest={(request) => {
                 const url = request.url;
-                if (url && url.includes('funapp-2e00d.firebaseapp.com') && (url.includes('code=') || url.includes('error='))) {
+                if (!url) return true;
+                if (url.startsWith('snapchat://') || url.startsWith('intent://')) {
+                  Linking.openURL(url).catch(() => {});
+                  return false;
+                }
+                if (url.includes('accounts.google.com') || url.includes('appleid.apple.com')) {
+                  setSnapWebViewVisible(false);
+                  showToast(t('Please use the main "Sign in with Google" button for Google login'), 'info');
+                  return false;
+                }
+                if (url.includes('funapp-2e00d.firebaseapp.com') && (url.includes('code=') || url.includes('error='))) {
                   handleSnapNavStateChange({ url });
                   return false;
                 }
