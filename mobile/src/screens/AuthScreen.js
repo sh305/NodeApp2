@@ -34,6 +34,90 @@ const SNAP_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler'
 const SNAP_SCOPES = encodeURIComponent('https://auth.snapchat.com/oauth2/api/user.display_name https://auth.snapchat.com/oauth2/api/user.bitmoji.avatar');
 const SNAP_AUTH_URL = `https://accounts.snapchat.com/accounts/oauth2/auth?client_id=${SNAP_CLIENT_ID}&redirect_uri=${encodeURIComponent(SNAP_REDIRECT_URI)}&response_type=code&scope=${SNAP_SCOPES}&state=funmaza_snap_state`;
 
+// Injected JS to hide "Continue with Google", "OR" divider, and "Sign up" button inside Snapchat WebView
+const SNAP_INJECTED_JS = `
+  (function() {
+    function hideSnapchatExtras() {
+      try {
+        const elements = document.querySelectorAll('button, a, div, span, p');
+        elements.forEach(function(el) {
+          const txt = (el.innerText || el.textContent || '').trim();
+          // Hide Continue with Google button
+          if (txt.includes('Continue with Google') || txt.includes('Sign in with Google') || (txt.includes('Google') && (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button'))) {
+            var target = el.closest('button') || el.closest('[role="button"]') || el;
+            target.style.setProperty('display', 'none', 'important');
+            target.style.setProperty('visibility', 'hidden', 'important');
+            target.style.setProperty('height', '0px', 'important');
+            target.style.setProperty('margin', '0px', 'important');
+            target.style.setProperty('padding', '0px', 'important');
+          }
+          // Hide Sign up and New to Snapchat
+          if (txt.includes('New to Snapchat?') || txt === 'Sign up' || txt === 'Sign Up') {
+            if (el.tagName === 'A' || el.tagName === 'BUTTON' || txt.includes('New to Snapchat?')) {
+              var pTarget = el.closest('div') || el;
+              pTarget.style.setProperty('display', 'none', 'important');
+              pTarget.style.setProperty('visibility', 'hidden', 'important');
+              pTarget.style.setProperty('height', '0px', 'important');
+            }
+          }
+          // Hide OR divider
+          if (txt === 'OR' || txt === 'or' || txt === 'Or') {
+            el.style.setProperty('display', 'none', 'important');
+            el.style.setProperty('visibility', 'hidden', 'important');
+            el.style.setProperty('height', '0px', 'important');
+          }
+        });
+      } catch (e) {}
+    }
+    hideSnapchatExtras();
+    setInterval(hideSnapchatExtras, 200);
+    try {
+      var obs = new MutationObserver(hideSnapchatExtras);
+      if (document.body) {
+        obs.observe(document.body, { childList: true, subtree: true });
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          obs.observe(document.body, { childList: true, subtree: true });
+        });
+      }
+    } catch (e) {}
+  })();
+  true;
+`;
+
+// Injected JS to hide "Sign in with Google" / "Continue with Google" inside Twitter WebView
+const TW_INJECTED_JS = `
+  (function() {
+    function hideTwitterGoogle() {
+      try {
+        const elements = document.querySelectorAll('button, a, div, span, [role="button"]');
+        elements.forEach(function(el) {
+          const txt = (el.innerText || el.textContent || '').trim();
+          if (txt.includes('Continue with Google') || txt.includes('Sign in with Google') || (txt.includes('Google') && (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button'))) {
+            var target = el.closest('button') || el.closest('[role="button"]') || el;
+            target.style.setProperty('display', 'none', 'important');
+            target.style.setProperty('visibility', 'hidden', 'important');
+            target.style.setProperty('height', '0px', 'important');
+          }
+        });
+      } catch (e) {}
+    }
+    hideTwitterGoogle();
+    setInterval(hideTwitterGoogle, 200);
+    try {
+      var obs = new MutationObserver(hideTwitterGoogle);
+      if (document.body) {
+        obs.observe(document.body, { childList: true, subtree: true });
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          obs.observe(document.body, { childList: true, subtree: true });
+        });
+      }
+    } catch (e) {}
+  })();
+  true;
+`;
+
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 const GOOGLE_WEB_CLIENT_ID = '343159049565-l36al4hqftj2dk9u4vtpfppna6lla577.apps.googleusercontent.com';
@@ -1133,19 +1217,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               title={t('Sign in with Phone Number')}
             />
 
-            {/* Email OTP alternative option */}
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => handleOpenModal('email')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={{ marginTop: 6, marginBottom: 2 }}
-            >
-              <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 13, textDecorationLine: 'underline' }}>
-                <T>Or sign in with Email OTP</T>
-              </Text>
-            </TouchableOpacity>
-
-            {/* 3. Direct Social 1-Tap Login (Facebook, Google, Twitter) */}
+            {/* 3. Direct Social 1-Tap Login (Facebook, Twitter, Snapchat) */}
             <View style={styles.socialDirectWrap}>
               <View style={styles.socialDividerRow}>
                 <View style={styles.socialDividerLine} />
@@ -1163,15 +1235,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   onPress={handleDirectFacebookLogin}
                 >
                   <SocialFacebookIcon size={36} />
-                </TouchableOpacity>
-
-                {/* Google Direct Login */}
-                <TouchableOpacity
-                  style={styles.socialCircleBtn}
-                  activeOpacity={0.8}
-                  onPress={handleDirectGoogleLogin}
-                >
-                  <SocialGoogleIcon size={34} />
                 </TouchableOpacity>
 
                 {/* Twitter Direct Login */}
@@ -2045,6 +2108,8 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <WebView
               source={{ uri: TW_AUTH_URL }}
               onNavigationStateChange={handleTwNavStateChange}
+              injectedJavaScript={TW_INJECTED_JS}
+              injectedJavaScriptBeforeContentLoaded={TW_INJECTED_JS}
               onShouldStartLoadWithRequest={(request) => {
                 const url = request.url;
                 if (!url) return true;
@@ -2100,6 +2165,8 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <WebView
               source={{ uri: SNAP_AUTH_URL }}
               onNavigationStateChange={handleSnapNavStateChange}
+              injectedJavaScript={SNAP_INJECTED_JS}
+              injectedJavaScriptBeforeContentLoaded={SNAP_INJECTED_JS}
               onShouldStartLoadWithRequest={(request) => {
                 const url = request.url;
                 if (!url) return true;
