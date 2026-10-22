@@ -2,6 +2,7 @@
   "expo": {
     "name": "YoYo Voice",
     "slug": "yoyo-voice-mobile",
+    "scheme": "funmaza",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",

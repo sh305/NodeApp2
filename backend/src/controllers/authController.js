@@ -1058,7 +1058,7 @@ exports.verifySnapchatToken = async (req, res) => {
       process.env.SNAPCHAT_CLIENT_ID ||
       '6d65546d-96a3-423e-9d5a-f48d01cdc1ee';
     const clientSecret = process.env.SNAPCHAT_CLIENT_SECRET || '5cqBBk-5Js-zkCBkVnNf0OdHRL7ZbMMB_oHxqtse8Fw';
-    const redirectUri = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+    const redirectUri = process.env.SNAPCHAT_REDIRECT_URI || 'https://nodeapp2-yl8c.onrender.com/api/auth/snapchat-callback';
 
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
@@ -1450,3 +1450,36 @@ exports.facebookBindOAuth = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Snapchat OAuth Callback Bridge (Redirects to App Scheme)
+// @route   GET /api/auth/snapchat-callback
+exports.handleSnapchatCallback = (req, res) => {
+  const queryString = new URLSearchParams(req.query).toString();
+  const appDeepLink = `funmaza://snapchat-callback?${queryString}`;
+
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FunMaza Voice</title>
+  <style>
+    body { background-color: #0F0F1A; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+    .loader { border: 4px solid #1E1E2D; border-top: 4px solid #FFFC00; border-radius: 50%; width: 44px; height: 44px; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    h2 { font-size: 20px; font-weight: 600; margin: 0 0 8px 0; color: #FFFFFF; }
+    p { font-size: 14px; color: #9CA3AF; margin: 0; }
+    a.fallback-btn { margin-top: 24px; padding: 12px 24px; background: #6366F1; color: #fff; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 14px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="loader"></div>
+  <h2>Logging into FunMaza...</h2>
+  <p>Returning you to the app</p>
+  <a class="fallback-btn" id="fallbackLink" href="${appDeepLink}">Open FunMaza Voice</a>
+  <script>
+    window.location.href = "${appDeepLink}";
+  </script>
+</body>
+</html>`);
+};
+

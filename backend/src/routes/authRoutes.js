@@ -27,6 +27,7 @@ const {
   verifyTwitterToken,
   verifySnapchatToken,
   snapchatLogin,
+  handleSnapchatCallback,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -53,6 +54,7 @@ router.post('/twitter-verify-token', verifyTwitterToken);
 router.post('/twitter-login', twitterLogin);
 router.post('/snapchat-verify-token', verifySnapchatToken);
 router.post('/snapchat-login', snapchatLogin);
+router.get('/snapchat-callback', handleSnapchatCallback);
 router.post('/bind-account', protect, bindAccount);
 router.post('/unbind-account', protect, unbindAccount);
 router.get('/me', protect, getMe);

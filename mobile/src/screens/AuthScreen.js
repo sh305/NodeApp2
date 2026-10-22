@@ -30,7 +30,7 @@ const TW_CODE_VERIFIER = 'challenge12345678901234567890123456789012345';
 const TW_AUTH_URL = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${TW_CLIENT_ID}&redirect_uri=${encodeURIComponent(TW_REDIRECT_URI)}&scope=users.read%20tweet.read&state=state&code_challenge=${TW_CODE_VERIFIER}&code_challenge_method=plain`;
 
 const SNAP_CLIENT_ID = '6d65546d-96a3-423e-9d5a-f48d01cdc1ee';
-const SNAP_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+const SNAP_REDIRECT_URI = 'https://nodeapp2-yl8c.onrender.com/api/auth/snapchat-callback';
 const SNAP_SCOPES = encodeURIComponent('https://auth.snapchat.com/oauth2/api/user.display_name https://auth.snapchat.com/oauth2/api/user.bitmoji.avatar');
 const SNAP_AUTH_URL = `https://accounts.snapchat.com/accounts/oauth2/auth?client_id=${SNAP_CLIENT_ID}&redirect_uri=${encodeURIComponent(SNAP_REDIRECT_URI)}&response_type=code&scope=${SNAP_SCOPES}&state=funmaza_snap_state`;
 
@@ -965,7 +965,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   const handleDirectSnapchatLogin = async () => {
     try {
-      const result = await WebBrowser.openAuthSessionAsync(SNAP_AUTH_URL, SNAP_REDIRECT_URI);
+      const result = await WebBrowser.openAuthSessionAsync(SNAP_AUTH_URL, 'funmaza://snapchat-callback');
       if (result.type === 'success' && result.url) {
         handleSnapNavStateChange({ url: result.url });
       }
@@ -984,7 +984,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       return;
     }
 
-    if (!url.includes('funapp-2e00d.firebaseapp.com')) return;
+    if (!url.includes('code=') && !url.includes('error=')) return;
 
     if (url.includes('code=')) {
       let code = null;
@@ -2209,7 +2209,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   showToast(t('Please use the main "Sign in with Google" button for Google login'), 'info');
                   return false;
                 }
-                if (url.includes('funapp-2e00d.firebaseapp.com') && (url.includes('code=') || url.includes('error='))) {
+                if ((url.includes('snapchat-callback') || url.includes('funapp-2e00d.firebaseapp.com')) && (url.includes('code=') || url.includes('error='))) {
                   handleSnapNavStateChange({ url });
                   return false;
                 }
