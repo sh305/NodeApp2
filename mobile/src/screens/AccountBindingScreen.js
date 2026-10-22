@@ -30,7 +30,7 @@ const TW_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 const TW_CODE_VERIFIER = 'challenge12345678901234567890123456789012345';
 const TW_AUTH_URL = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${TW_CLIENT_ID}&redirect_uri=${encodeURIComponent(TW_REDIRECT_URI)}&scope=users.read%20tweet.read&state=state&code_challenge=${TW_CODE_VERIFIER}&code_challenge_method=plain`;
 
-const SNAP_CLIENT_ID = 'fc77f748-6e4f-4cda-9c0f-3669fbf429da';
+const SNAP_CLIENT_ID = '6d65546d-96a3-423e-9d5a-f48d01cdc1ee';
 const SNAP_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 const SNAP_SCOPES = encodeURIComponent('https://auth.snapchat.com/oauth2/api/user.display_name https://auth.snapchat.com/oauth2/api/user.bitmoji.avatar');
 const SNAP_AUTH_URL = `https://accounts.snapchat.com/accounts/oauth2/auth?client_id=${SNAP_CLIENT_ID}&redirect_uri=${encodeURIComponent(SNAP_REDIRECT_URI)}&response_type=code&scope=${SNAP_SCOPES}&state=funmaza_snap_state`;
@@ -793,13 +793,22 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
           showToast(t(res.data?.message || 'Failed to authenticate with Snapchat'), 'error');
         }
       } catch (err) {
-        showToast(t(err.response?.data?.message || 'Failed to verify Snapchat account'), 'error');
+        const errorDetail = err.response?.data?.message || err.message || 'Failed to verify Snapchat account';
+        console.error('Snapchat verify error:', errorDetail, err);
+        showToast(t(errorDetail), 'error');
       } finally {
         setSnapVerifying(false);
       }
     } else if (url.includes('error=')) {
       setSnapWebViewVisible(false);
-      showToast(t('Snapchat authentication cancelled or failed'), 'error');
+      const descMatch = url.match(/[?&]error_description=([^&#]+)/);
+      const errMatch = url.match(/[?&]error=([^&#]+)/);
+      const snapErr = descMatch
+        ? decodeURIComponent(descMatch[1].replace(/\+/g, ' '))
+        : errMatch
+        ? decodeURIComponent(errMatch[1])
+        : 'Snapchat authentication cancelled or failed';
+      showToast(t(snapErr), 'error');
     }
   };
 

@@ -1053,8 +1053,11 @@ exports.verifySnapchatToken = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Snapchat authorization code is required' });
     }
 
-    const clientId = process.env.SNAPCHAT_CONFIDENTIAL_CLIENT_ID || 'fc77f748-6e4f-4cda-9c0f-3669fbf429da';
-    const clientSecret = process.env.SNAPCHAT_CLIENT_SECRET || 'xN7X2SmcscWEHFZ2DIKFOttqsdfPqQ4LovBl2Ik_9QY';
+    const clientId =
+      process.env.SNAPCHAT_CONFIDENTIAL_CLIENT_ID ||
+      process.env.SNAPCHAT_CLIENT_ID ||
+      '6d65546d-96a3-423e-9d5a-f48d01cdc1ee';
+    const clientSecret = process.env.SNAPCHAT_CLIENT_SECRET || '5cqBBk-5Js-zkCBkVnNf0OdHRL7ZbMMB_oHxqtse8Fw';
     const redirectUri = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
 
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
@@ -1066,13 +1069,24 @@ exports.verifySnapchatToken = async (req, res) => {
     params.append('client_secret', clientSecret);
     params.append('redirect_uri', redirectUri);
 
-    const tokenRes = await axios.post('https://accounts.snapchat.com/login/oauth2/access_token', params.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${basicAuth}`,
-      },
-      timeout: 10000,
-    });
+    let tokenRes;
+    try {
+      tokenRes = await axios.post('https://accounts.snapchat.com/login/oauth2/access_token', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        timeout: 10000,
+      });
+    } catch (e1) {
+      console.warn('Snapchat token request without basic auth failed, trying with Basic Auth header:', e1.response?.data || e1.message);
+      tokenRes = await axios.post('https://accounts.snapchat.com/login/oauth2/access_token', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `Basic ${basicAuth}`,
+        },
+        timeout: 10000,
+      });
+    }
 
     const accessToken = tokenRes.data?.access_token;
     if (!accessToken) {
@@ -1114,13 +1128,11 @@ exports.verifySnapchatToken = async (req, res) => {
       profile: snapData,
     });
   } catch (error) {
+    const errorDetail = error.response?.data?.error_description || error.response?.data?.message || error.message;
     console.error('verifySnapchatToken error:', error.response?.data || error.message);
     return res.status(400).json({
       success: false,
-      message:
-        error.response?.data?.error_description ||
-        error.response?.data?.message ||
-        'Failed to authenticate with Snapchat',
+      message: errorDetail || 'Failed to authenticate with Snapchat',
     });
   }
 };
