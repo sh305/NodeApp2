@@ -24,10 +24,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "7788dc64-c454-43d9-bdc2-5e70210356cd"
+        "projectId": "a7037266-074e-4051-bd12-57699aafa37c"
       }
     },
-    "owner": "shivamrai123",
+    "owner": "shivamrai123s-team",
     "plugins": [
       "expo-sharing",
       "expo-asset",
