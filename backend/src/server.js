@@ -98,6 +98,10 @@ app.use((err, req, res, next) => {
 // Initialize real-time room socket handlers
 initRoomSockets(io);
 
+// Initialize Telegram Bot Service
+const { initTelegramBot } = require('./services/telegramBotService');
+initTelegramBot(io);
+
 const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB Atlas and start server

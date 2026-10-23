@@ -62,6 +62,19 @@ ramCache.set(
   'hi:::LIVE VOICE & GAMES PARTY',
   'लाइव वॉइस और गेम्स पार्टी'
 );
+ramCache.set('hi:::Telegram', 'टेलीग्राम');
+ramCache.set('hi:::Bind Telegram Account', 'टेलीग्राम अकाउंट बाइंड करें');
+ramCache.set('hi:::Open Telegram Bot (@FunMazaApp_bot)', 'टेलीग्राम बॉट खोलें (@FunMazaApp_bot)');
+ramCache.set('hi:::Opening Telegram... Tap START in the bot to link!', 'टेलीग्राम खुल रहा है... लिंक करने के लिए बॉट में START दबाएं!');
+ramCache.set('hi:::I tapped START - Check Status', 'मैंने START दबा दिया - स्टेटस चेक करें');
+ramCache.set('hi:::Binding not detected yet. Please tap START in the Telegram bot first.', 'अभी बाइंडिंग नहीं मिली। कृपया पहले टेलीग्राम बॉट में START दबाएं।');
+ramCache.set('hi:::Or bind manually with Telegram Username', 'या टेलीग्राम यूज़रनेम से मैन्युअली बाइंड करें');
+ramCache.set('hi:::Telegram Username or Phone Number', 'टेलीग्राम यूज़रनेम या मोबाइल नंबर');
+ramCache.set('hi:::Please enter your Telegram Username or Mobile Number', 'कृपया अपना टेलीग्राम यूज़रनेम या मोबाइल नंबर दर्ज करें');
+ramCache.set('hi:::Are you sure do you want to bind your account to this Telegram?', 'क्या आप वाकई अपने अकाउंट को इस टेलीग्राम से जोड़ना चाहते हैं?');
+ramCache.set('hi:::Telegram Account Bound Successfully! 🎉', 'टेलीग्राम अकाउंट सफलतापूर्वक जुड़ गया! 🎉');
+ramCache.set('hi:::Telegram account bound successfully!', 'टेलीग्राम अकाउंट सफलतापूर्वक जुड़ गया!');
+
 
 const LanguageContext = createContext();
 
@@ -221,6 +234,19 @@ export const LanguageProvider = ({ children }) => {
       'Are you sure do you want to bind your account to this Snapchat account?',
       'Logged in with Snapchat successfully!',
       'Snapchat authentication cancelled or failed',
+      'Telegram',
+      'Bind Telegram Account',
+      'Open Telegram Bot (@FunMazaApp_bot)',
+      'Opening Telegram... Tap START in the bot to link!',
+      'I tapped START - Check Status',
+      'Binding not detected yet. Please tap START in the Telegram bot first.',
+      'Or bind manually with Telegram Username',
+      'Telegram Username or Phone Number',
+      '@telegram_username',
+      'Please enter your Telegram Username or Mobile Number',
+      'Are you sure do you want to bind your account to this Telegram?',
+      'Telegram Account Bound Successfully! 🎉',
+      'Telegram account bound successfully!',
       'Are you sure do you want to bind your account to this phone number?',
       'Phone number bound successfully!',
       'Please enter a valid 10-digit mobile number',

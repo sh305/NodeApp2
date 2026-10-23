@@ -873,6 +873,33 @@ exports.bindAccount = async (req, res) => {
         number: cleanPhone,
         boundAt: new Date(),
       };
+    } else if (provider === 'telegram') {
+      const cleanTelegramId = String(accountId).trim();
+      const existing = await User.findOne({
+        $or: [
+          { telegramId: cleanTelegramId },
+          { 'boundAccounts.telegram.id': cleanTelegramId },
+        ],
+        _id: { $ne: user._id },
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'This Telegram account is already bound to another profile',
+        });
+      }
+
+      user.telegramId = cleanTelegramId;
+      user.boundAccounts.telegram = {
+        id: cleanTelegramId,
+        username: username ? (username.startsWith('@') ? username : `@${username}`) : '',
+        firstName: name || '',
+        boundAt: new Date(),
+      };
+      if (avatar && (!user.avatar || user.avatar.includes('unsplash'))) {
+        user.avatar = avatar;
+      }
     }
 
     user.markModified('boundAccounts');
@@ -917,6 +944,9 @@ exports.unbindAccount = async (req, res) => {
       user.phone = undefined;
       user.phoneNumber = undefined;
       user.boundAccounts.phone = undefined;
+    } else if (provider === 'telegram') {
+      user.telegramId = undefined;
+      user.boundAccounts.telegram = undefined;
     }
 
     user.markModified('boundAccounts');
@@ -1482,4 +1512,25 @@ exports.handleSnapchatCallback = (req, res) => {
 </body>
 </html>`);
 };
+
+// @desc    Get Telegram Bot Info & Link for FunMaza
+// @route   GET /api/auth/telegram-bot-info
+exports.getTelegramBotInfo = async (req, res) => {
+  try {
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'FunMazaApp_bot';
+    const userId = req.user?._id;
+    const botLink = userId
+      ? `https://t.me/${botUsername}?start=bind_${userId}`
+      : `https://t.me/${botUsername}`;
+
+    return res.status(200).json({
+      success: true,
+      botUsername,
+      botLink,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 

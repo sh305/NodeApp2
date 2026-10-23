@@ -45,11 +45,17 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
+    telegramId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     boundAccounts: {
       google: { id: String, email: String, name: String, boundAt: Date },
       facebook: { id: String, name: String, email: String, boundAt: Date },
       twitter: { id: String, username: String, name: String, boundAt: Date },
       snapchat: { id: String, displayName: String, avatar: String, boundAt: Date },
+      telegram: { id: String, username: String, firstName: String, lastName: String, photoUrl: String, boundAt: Date },
       phone: { number: String, boundAt: Date },
     },
     avatar: {

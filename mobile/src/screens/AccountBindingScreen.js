@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
   Linking,
+  AppState,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
@@ -255,6 +256,17 @@ const SnapchatCircleIcon = ({ size = 36, style }) => (
   />
 );
 
+// 7. Telegram Circle Icon (Official Telegram Sky Blue)
+const TelegramCircleIcon = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#24A1DE" />
+    <Path
+      d="M26.5 10.5L9.5 17.2c-1.15.46-1.14 1.1-.21 1.39l4.36 1.36 10.1-6.38c.48-.29.91-.13.55.19l-8.18 7.39-.32 4.79c.47 0 .68-.21.94-.47l2.26-2.2 4.7 3.47c.87.48 1.49.23 1.71-.8l3.09-14.56c.32-1.27-.49-1.85-1.5-.94z"
+      fill="#FFFFFF"
+    />
+  </Svg>
+);
+
 export default function AccountBindingScreen({ navigation, currentUser }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -303,6 +315,12 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   const [snapWebViewVisible, setSnapWebViewVisible] = useState(false);
   const [snapVerifying, setSnapVerifying] = useState(false);
 
+  // ── 3.2 Telegram Binding State ──
+  const [telegramChooserVisible, setTelegramChooserVisible] = useState(false);
+  const [customTelegramInput, setCustomTelegramInput] = useState('');
+  const [telegramVerifying, setTelegramVerifying] = useState(false);
+  const [botInfo, setBotInfo] = useState({ botUsername: 'FunMazaApp_bot', botLink: 'https://t.me/FunMazaApp_bot' });
+
   // ── 4. Final Confirmation Prompt Modal ──
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [pendingBind, setPendingBind] = useState(null); // { provider, accountId, name, email, avatar, username }
@@ -318,7 +336,16 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
 
   useEffect(() => {
     fetchLatestProfile();
+
+    // Auto-refresh profile when returning from Telegram app
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        fetchLatestProfile();
+      }
+    });
+
     return () => {
+      subscription.remove();
       if (phoneTimerRef.current) clearInterval(phoneTimerRef.current);
       if (googleTimerRef.current) clearInterval(googleTimerRef.current);
       if (fbTimerRef.current) clearInterval(fbTimerRef.current);
@@ -357,6 +384,12 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     profile?.snapchatId ||
     profile?.boundAccounts?.snapchat?.displayName ||
     profile?.boundAccounts?.snapchat?.id;
+
+  const telegramBoundValue =
+    profile?.telegramId ||
+    profile?.boundAccounts?.telegram?.username ||
+    profile?.boundAccounts?.telegram?.firstName ||
+    profile?.boundAccounts?.telegram?.id;
 
   const phoneBoundValue =
     profile?.phone ||
@@ -938,6 +971,90 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   };
 
   // ══════════════════════════════════════════════════
+  // 6. TELEGRAM BINDING HANDLERS
+  // ══════════════════════════════════════════════════
+  const handleTelegramClick = () => {
+    if (telegramBoundValue) {
+      setPendingUnbind({
+        provider: 'telegram',
+        label: t('Telegram'),
+        value: telegramBoundValue,
+      });
+      setUnbindModalVisible(true);
+      return;
+    }
+    setCustomTelegramInput('');
+    setTelegramChooserVisible(true);
+    fetchTelegramBotInfo();
+  };
+
+  const fetchTelegramBotInfo = async () => {
+    try {
+      const res = await api.get('/auth/telegram-bot-info');
+      if (res.data?.success) {
+        setBotInfo({
+          botUsername: res.data.botUsername || 'FunMazaApp_bot',
+          botLink: res.data.botLink || `https://t.me/${res.data.botUsername || 'FunMazaApp_bot'}`,
+        });
+      }
+    } catch (_) {}
+  };
+
+  const handleOpenTelegramBot = async () => {
+    try {
+      const link = botInfo.botLink || `https://t.me/FunMazaApp_bot?start=bind_${profile?._id || ''}`;
+      await Linking.openURL(link);
+      showToast(t('Opening Telegram... Tap START in the bot to link!'), 'info');
+    } catch (err) {
+      const fallbackUrl = `https://t.me/FunMazaApp_bot?start=bind_${profile?._id || ''}`;
+      Linking.openURL(fallbackUrl).catch(() => {
+        showToast(t('Could not open Telegram'), 'error');
+      });
+    }
+  };
+
+  const handleCheckTelegramBinding = async () => {
+    setTelegramVerifying(true);
+    try {
+      const res = await api.get('/auth/me');
+      if (res.data?.success && res.data.user) {
+        const u = res.data.user;
+        const isBound = u.telegramId || u.boundAccounts?.telegram?.id;
+        if (isBound) {
+          setProfile(u);
+          await AsyncStorage.setItem('@user_info', JSON.stringify(u));
+          setTelegramChooserVisible(false);
+          showToast(t('Telegram Account Bound Successfully! 🎉'), 'success');
+        } else {
+          showToast(t('Binding not detected yet. Please tap START in the Telegram bot first.'), 'info');
+        }
+      }
+    } catch (e) {
+      showToast(t('Failed to check Telegram binding status'), 'error');
+    } finally {
+      setTelegramVerifying(false);
+    }
+  };
+
+  const handleTelegramSubmit = () => {
+    const raw = customTelegramInput.trim();
+    if (!raw) {
+      showToast(t('Please enter your Telegram Username or Mobile Number'), 'error');
+      return;
+    }
+    const cleanUsername = raw.startsWith('@') ? raw : `@${raw}`;
+    setTelegramChooserVisible(false);
+    setPendingBind({
+      provider: 'telegram',
+      accountId: cleanUsername,
+      name: cleanUsername,
+      username: cleanUsername,
+      promptText: t('Are you sure do you want to bind your account to this Telegram?'),
+    });
+    setConfirmModalVisible(true);
+  };
+
+  // ══════════════════════════════════════════════════
   // 7. FINAL BINDING CONFIRMATION ("Yes, Bind")
   // ══════════════════════════════════════════════════
   const handleConfirmBinding = async () => {
@@ -968,6 +1085,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
               ? 'Phone number bound successfully!'
               : pendingBind.provider === 'snapchat'
               ? 'Snapchat account bound successfully!'
+              : pendingBind.provider === 'telegram'
+              ? 'Telegram account bound successfully!'
               : 'Twitter account bound successfully!'
           ),
           'success'
@@ -1170,6 +1289,33 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 ]}
               >
                 {snapchatBoundValue || <T>Bind on Account</T>}
+              </Text>
+              <ChevronRightIcon size={18} color="#C7C7CC" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.rowDivider} />
+
+          {/* 6. Telegram */}
+          <TouchableOpacity
+            style={styles.rowItem}
+            activeOpacity={0.75}
+            onPress={handleTelegramClick}
+          >
+            <View style={styles.rowLeft}>
+              <TelegramCircleIcon size={36} />
+              <Text style={styles.rowLabelText}>
+                <T>Telegram</T>
+              </Text>
+            </View>
+
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.statusText,
+                  telegramBoundValue && styles.statusTextBound,
+                ]}
+              >
+                {telegramBoundValue || <T>Bind on Account</T>}
               </Text>
               <ChevronRightIcon size={18} color="#C7C7CC" />
             </View>
@@ -2049,6 +2195,112 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
         </View>
       </Modal>
 
+      {/* ══ 3.4 TELEGRAM BINDING MODAL ══ */}
+      <Modal
+        visible={telegramChooserVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTelegramChooserVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.chooserOverlay}
+          activeOpacity={1}
+          onPress={() => setTelegramChooserVisible(false)}
+        >
+          <View
+            style={styles.chooserSheet}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.chooserHeaderRow}>
+              <View style={styles.chooserHeaderLeft}>
+                <TelegramCircleIcon size={28} />
+                <Text style={styles.chooserTitle}>
+                  <T>Bind Telegram Account</T>
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setTelegramChooserVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.chooserCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.chooserSubtitle}>
+              <T>Choose your preferred binding method</T>
+            </Text>
+
+            <View style={styles.inputSectionCard}>
+              {/* Option 1: Fast 1-Click Official Telegram Bot */}
+              <TouchableOpacity
+                style={[styles.fbFastBtn, { backgroundColor: '#24A1DE', shadowColor: '#24A1DE' }]}
+                activeOpacity={0.85}
+                onPress={handleOpenTelegramBot}
+              >
+                <TelegramCircleIcon size={22} />
+                <Text style={[styles.fbFastBtnText, { color: '#FFFFFF' }]}>
+                  <T>Open Telegram Bot (@FunMazaApp_bot)</T>
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.checkStatusBtn,
+                  telegramVerifying && styles.submitGmailBtnDisabled,
+                ]}
+                disabled={telegramVerifying}
+                activeOpacity={0.8}
+                onPress={handleCheckTelegramBinding}
+              >
+                {telegramVerifying ? (
+                  <ActivityIndicator size="small" color="#24A1DE" />
+                ) : (
+                  <Text style={styles.checkStatusBtnText}>
+                    🔄 <T>I tapped START - Check Status</T>
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>
+                  <T>Or bind manually with Telegram Username</T>
+                </Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Text style={styles.inputSectionLabel}>
+                <T>Telegram Username or Phone Number</T>
+              </Text>
+              <TextInput
+                style={styles.gmailTextInput}
+                placeholder={t('@telegram_username')}
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                value={customTelegramInput}
+                onChangeText={setCustomTelegramInput}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.submitGmailBtn,
+                  !customTelegramInput.trim() && styles.submitGmailBtnDisabled,
+                  { backgroundColor: '#24A1DE' },
+                ]}
+                disabled={!customTelegramInput.trim()}
+                activeOpacity={0.8}
+                onPress={handleTelegramSubmit}
+              >
+                <Text style={styles.submitGmailBtnText}>
+                  <T>Continue to Bind</T>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ══ 4. CONFIRMATION MODAL ("Are you sure do you want to bind...") ══ */}
       <Modal
         visible={confirmModalVisible}
@@ -2073,6 +2325,10 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 <FacebookCircleIcon size={46} />
               ) : pendingBind?.provider === 'phone' ? (
                 <PhoneCircleIcon size={46} />
+              ) : pendingBind?.provider === 'snapchat' ? (
+                <SnapchatCircleIcon size={46} />
+              ) : pendingBind?.provider === 'telegram' ? (
+                <TelegramCircleIcon size={46} />
               ) : (
                 <TwitterCircleIcon size={46} />
               )}
@@ -2164,6 +2420,10 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 <FacebookCircleIcon size={46} />
               ) : pendingUnbind?.provider === 'twitter' ? (
                 <TwitterCircleIcon size={46} />
+              ) : pendingUnbind?.provider === 'snapchat' ? (
+                <SnapchatCircleIcon size={46} />
+              ) : pendingUnbind?.provider === 'telegram' ? (
+                <TelegramCircleIcon size={46} />
               ) : (
                 <PhoneCircleIcon size={46} />
               )}
@@ -2900,5 +3160,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F0F1A',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  checkStatusBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#24A1DE',
+    backgroundColor: '#F0F9FF',
+  },
+  checkStatusBtnText: {
+    color: '#0284C7',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

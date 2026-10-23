@@ -28,6 +28,7 @@ const {
   verifySnapchatToken,
   snapchatLogin,
   handleSnapchatCallback,
+  getTelegramBotInfo,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -57,6 +58,7 @@ router.post('/snapchat-login', snapchatLogin);
 router.get('/snapchat-callback', handleSnapchatCallback);
 router.post('/bind-account', protect, bindAccount);
 router.post('/unbind-account', protect, unbindAccount);
+router.get('/telegram-bot-info', protect, getTelegramBotInfo);
 router.get('/me', protect, getMe);
 
 module.exports = router;
