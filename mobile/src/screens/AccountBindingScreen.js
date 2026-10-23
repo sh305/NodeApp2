@@ -244,17 +244,6 @@ const TwitterCircleIcon = ({ size = 36 }) => (
   </Svg>
 );
 
-// 5. VK Circle Icon (Matching screenshot)
-const VkCircleIcon = ({ size = 36 }) => (
-  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
-    <Circle cx="18" cy="18" r="18" fill="#B0B5BA" />
-    <Path
-      d="M26 13h-2.2c-.8 0-1.1.4-1.5 1.3-1.6 3-3.1 5.3-4.2 5.3-.2 0-.4-.2-.4-.8V14c0-.7-.2-1-1-1h-2.4c-.4 0-.7.2-.7.5 0 .6.9.7 1 2.4v3.3c0 .7-.1.9-.4.9-.7 0-2.3-2.5-3.5-5.3-.2-.5-.6-.8-1.4-.8H8c-.8 0-1 .4-1 .8 0 .8 1.1 4.4 5.1 9.8C14.7 27 18 27 18.7 27h1.4c.5 0 .8-.3.8-1v-2c.7.2 1.6 1.1 2.2 2 .5.7 1 .9 1.8.9h2.2c.8 0 1.2-.4 1-1.2-.4-1.3-2.2-3.2-3.1-4.2-.4-.4-.5-.7 0-1.3 1.2-1.6 2.8-4.2 3-6.2.1-.5-.2-1-1-1z"
-      fill="#FFFFFF"
-    />
-  </Svg>
-);
-
 const snapchatAsset = require('../../assets/icons/snapchat.png');
 
 // 6. Snapchat Circle Icon
@@ -948,11 +937,6 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     setConfirmModalVisible(true);
   };
 
-  // 6. VK Click
-  const handleVkClick = () => {
-    showToast(t('VK account binding coming soon'), 'info');
-  };
-
   // ══════════════════════════════════════════════════
   // 7. FINAL BINDING CONFIRMATION ("Yes, Bind")
   // ══════════════════════════════════════════════════
@@ -1186,28 +1170,6 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 ]}
               >
                 {snapchatBoundValue || <T>Bind on Account</T>}
-              </Text>
-              <ChevronRightIcon size={18} color="#C7C7CC" />
-            </View>
-          </TouchableOpacity>
-          <View style={styles.rowDivider} />
-
-          {/* 5. VK */}
-          <TouchableOpacity
-            style={styles.rowItem}
-            activeOpacity={0.75}
-            onPress={handleVkClick}
-          >
-            <View style={styles.rowLeft}>
-              <VkCircleIcon size={36} />
-              <Text style={styles.rowLabelText}>
-                <T>VK</T>
-              </Text>
-            </View>
-
-            <View style={styles.rowRight}>
-              <Text style={styles.statusText}>
-                <T>Bind on Account</T>
               </Text>
               <ChevronRightIcon size={18} color="#C7C7CC" />
             </View>
