@@ -6,6 +6,7 @@ const VoiceOtpService = require('../services/voiceOtpService');
 const EmailOtpService = require('../services/emailOtpService');
 const { cacheService } = require('../config/redis');
 const axios = require('axios');
+const { createLoginSession, getLoginSession } = require('../services/telegramBotService');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'yoyo_super_secret_jwt_key_2026_!@#$%^', {
@@ -1529,6 +1530,102 @@ exports.getTelegramBotInfo = async (req, res) => {
       botLink,
     });
   } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Initialize Telegram Login Session
+// @route   POST /api/auth/telegram-login-init
+exports.initTelegramLoginSession = async (req, res) => {
+  try {
+    const session = createLoginSession();
+    return res.status(200).json({
+      success: true,
+      sessionId: session.sessionId,
+      botUsername: session.botUsername,
+      botUrl: session.botUrl,
+    });
+  } catch (error) {
+    console.error('initTelegramLoginSession error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Check Telegram Login Session Status
+// @route   GET /api/auth/telegram-login-status/:sessionId
+exports.checkTelegramLoginSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const session = getLoginSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Login session expired or not found' });
+    }
+    if (session.status === 'success') {
+      return res.status(200).json({
+        success: true,
+        status: 'success',
+        token: session.token,
+        user: session.user,
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      status: 'pending',
+    });
+  } catch (error) {
+    console.error('checkTelegramLoginSession error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Direct Login with bound Telegram account (Username or ID)
+// @route   POST /api/auth/telegram-direct-login
+exports.telegramDirectLogin = async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier || !identifier.trim()) {
+      return res.status(400).json({ success: false, message: 'Please enter your Telegram @username or ID' });
+    }
+    const clean = identifier.trim();
+    const cleanWithAt = clean.startsWith('@') ? clean : `@${clean}`;
+    const cleanWithoutAt = clean.replace('@', '');
+
+    const user = await User.findOne({
+      $or: [
+        { telegramId: clean },
+        { telegramId: cleanWithoutAt },
+        { 'boundAccounts.telegram.id': clean },
+        { 'boundAccounts.telegram.id': cleanWithoutAt },
+        { 'boundAccounts.telegram.username': cleanWithAt },
+        { 'boundAccounts.telegram.username': cleanWithoutAt },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No FunMaza account found bound to this Telegram. Please bind your Telegram account first or use 1-tap Telegram Bot sign-in.',
+      });
+    }
+
+    const banCheck = user.checkActiveBan ? user.checkActiveBan() : { banned: false };
+    if (banCheck.banned) {
+      return res.status(403).json({
+        success: false,
+        banned: true,
+        message: banCheck.message,
+      });
+    }
+
+    const token = generateToken(user._id);
+    return res.status(200).json({
+      success: true,
+      message: 'Logged in with Telegram successfully! 🎉',
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error('telegramDirectLogin error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -1,5 +1,6 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8836145749:AAEq5rKid1mOslFUtdhfhPxZI4KjLZYpzZs';
@@ -10,6 +11,33 @@ let lastUpdateId = 0;
 let isPollingActive = false;
 let pollingTimeoutRef = null;
 let ioInstance = null;
+
+// In-memory active Telegram Login Sessions map
+const telegramLoginSessions = new Map();
+
+function createLoginSession() {
+  const sessionId = crypto.randomBytes(16).toString('hex');
+  telegramLoginSessions.set(sessionId, {
+    status: 'pending',
+    createdAt: Date.now(),
+  });
+  // Auto-expire after 10 minutes
+  setTimeout(() => {
+    if (telegramLoginSessions.has(sessionId)) {
+      telegramLoginSessions.delete(sessionId);
+    }
+  }, 10 * 60 * 1000);
+
+  return {
+    sessionId,
+    botUsername: BOT_USERNAME,
+    botUrl: `https://t.me/${BOT_USERNAME}?start=login_${sessionId}`,
+  };
+}
+
+function getLoginSession(sessionId) {
+  return telegramLoginSessions.get(sessionId);
+}
 
 /**
  * Send a text message to a Telegram chat
@@ -135,6 +163,80 @@ async function handleTelegramMessage(message) {
       return;
     }
 
+    if (param.startsWith('login_')) {
+      const sessionId = param.replace('login_', '').trim();
+      try {
+        let user = await User.findOne({
+          $or: [
+            { telegramId: String(from.id) },
+            { 'boundAccounts.telegram.id': String(from.id) },
+          ],
+        });
+
+        if (!user) {
+          // If no user found, auto-create a user authenticated via Telegram
+          const displayName = from.first_name || from.username || `User_${String(from.id).slice(-4)}`;
+          user = await User.create({
+            name: displayName,
+            telegramId: String(from.id),
+            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+            boundAccounts: {
+              telegram: {
+                id: String(from.id),
+                username: from.username ? `@${from.username.replace('@', '')}` : '',
+                firstName: from.first_name || '',
+                lastName: from.last_name || '',
+                boundAt: new Date(),
+              },
+            },
+          });
+        }
+
+        const banCheck = user.checkActiveBan ? user.checkActiveBan() : { banned: false };
+        if (banCheck.banned) {
+          await sendMessage(chatId, `🚫 <b>Account Suspended:</b> ${banCheck.message}`);
+          return;
+        }
+
+        const token = jwt.sign(
+          { id: user._id },
+          process.env.JWT_SECRET || 'yoyo_super_secret_jwt_key_2026_!@#$%^',
+          { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+        );
+
+        telegramLoginSessions.set(sessionId, {
+          status: 'success',
+          token,
+          user,
+          updatedAt: Date.now(),
+        });
+
+        const welcomeName = from.first_name || from.username || user.name || 'Member';
+        await sendMessage(
+          chatId,
+          `🎉 <b>Login Successful!</b>\n\n` +
+          `Welcome back, <b>${welcomeName}</b>!\n` +
+          `You have successfully authenticated with FunMaza.\n\n` +
+          `👉 <i>Return to the FunMaza app now to continue!</i>`
+        );
+
+        if (ioInstance) {
+          ioInstance.emit(`telegram_login_done:${sessionId}`, {
+            success: true,
+            token,
+            user,
+          });
+        }
+      } catch (err) {
+        console.error('Error handling Telegram login /start:', err);
+        await sendMessage(
+          chatId,
+          `❌ <i>Something went wrong during Telegram authentication. Please try again.</i>`
+        );
+      }
+      return;
+    }
+
     // Default /start greeting
     const welcomeName = from.first_name || 'Friend';
     await sendMessage(
@@ -214,4 +316,6 @@ module.exports = {
   stopTelegramBot,
   sendMessage,
   verifyTelegramWidgetData,
+  createLoginSession,
+  getLoginSession,
 };

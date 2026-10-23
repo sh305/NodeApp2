@@ -211,6 +211,16 @@ const SocialSnapchatIcon = ({ size = 24, style }) => (
   />
 );
 
+const telegramAsset = require('../../assets/icons/telegram.png');
+
+const SocialTelegramIcon = ({ size = 24, style }) => (
+  <Image
+    source={telegramAsset}
+    style={[{ width: size, height: size }, style]}
+    resizeMode="contain"
+  />
+);
+
 const SocialGoogleIcon = ({ size = 24 }) => (
   <Svg width={size} height={size} viewBox="0 0 48 48">
     <Path
@@ -232,7 +242,7 @@ const SocialGoogleIcon = ({ size = 24 }) => (
   </Svg>
 );
 
-const funmazaIconAsset = require('../../assets/icons/funmaza_app_icon.png');
+const funmazaIconAsset = require('../../assets/icons/AppLogo.png');
 
 // Official FunMaza App Emblem Logo Component (3D Party Headset + Golden Crown + Voice Mic + Equalizer)
 const FunMazaLogo = ({ size = 96 }) => (
@@ -545,6 +555,20 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   // Snapchat In-App OAuth WebView Modal
   const [snapWebViewVisible, setSnapWebViewVisible] = useState(false);
 
+  // Telegram Direct Login Modal & Polling State
+  const [telegramModalVisible, setTelegramModalVisible] = useState(false);
+  const [telegramInput, setTelegramInput] = useState('');
+  const [telegramSession, setTelegramSession] = useState(null);
+  const [telegramWaiting, setTelegramWaiting] = useState(false);
+  const [telegramDirectLoading, setTelegramDirectLoading] = useState(false);
+  const telegramPollRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+    };
+  }, []);
+
   // Scroll View Ref for automatic keyboard focus scrolling
   const scrollViewRef = useRef(null);
 
@@ -838,7 +862,12 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         showToast(t('Google Play Services not available or outdated'), 'error');
       } else {
         console.error('Google Sign In Error:', err);
-        showToast(t(err.response?.data?.message || err.message || 'Google login failed'), 'error');
+        const errMsg = err.message || '';
+        if (errMsg.includes('DEVELOPER_ERROR')) {
+          showToast(t('Google Sign-In configuration error: Please register SHA-1 in Google Cloud Console'), 'error');
+        } else {
+          showToast(t(err.response?.data?.message || err.message || 'Google login failed'), 'error');
+        }
       }
     } finally {
       setLoading(false);
@@ -1047,6 +1076,92 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         : 'Snapchat authentication cancelled or failed';
       showToast(t(snapErr), 'error');
     }
+  };
+
+  // ---------------- TELEGRAM DIRECT & BOT LOGIN HANDLERS ----------------
+  const handleDirectTelegramLogin = async () => {
+    setTelegramModalVisible(true);
+    setTelegramInput('');
+    initTelegramSession();
+  };
+
+  const initTelegramSession = async () => {
+    try {
+      setTelegramWaiting(true);
+      const res = await api.post('/auth/telegram-login-init');
+      if (res.data?.success && res.data?.sessionId) {
+        setTelegramSession(res.data);
+        startTelegramPolling(res.data.sessionId);
+      }
+    } catch (err) {
+      console.warn('initTelegramSession error:', err);
+    } finally {
+      setTelegramWaiting(false);
+    }
+  };
+
+  const startTelegramPolling = (sessionId) => {
+    if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+    telegramPollRef.current = setInterval(async () => {
+      try {
+        const res = await api.get(`/auth/telegram-login-status/${sessionId}`);
+        if (res.data?.success && res.data?.status === 'success' && res.data?.token) {
+          clearInterval(telegramPollRef.current);
+          setTelegramModalVisible(false);
+          showToast(t('Logged in with Telegram successfully! 🎉'), 'success');
+          await AsyncStorage.setItem('@auth_token', res.data.token);
+          await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+          if (onLoginSuccess) onLoginSuccess(res.data.user);
+        }
+      } catch (err) {
+        // silent polling catch
+      }
+    }, 2000);
+  };
+
+  const handleOpenTelegramBot = async () => {
+    const url = telegramSession?.botUrl || 'https://t.me/FunMazaApp_bot';
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        await WebBrowser.openBrowserAsync(url);
+      }
+    } catch (err) {
+      await WebBrowser.openBrowserAsync(url);
+    }
+  };
+
+  const handleTelegramBoundLogin = async () => {
+    const clean = telegramInput.trim();
+    if (!clean) {
+      showToast(t('Please enter your bound Telegram @username or ID'), 'error');
+      return;
+    }
+    setTelegramDirectLoading(true);
+    try {
+      const res = await api.post('/auth/telegram-direct-login', { identifier: clean });
+      if (res.data?.success && res.data?.token) {
+        if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+        setTelegramModalVisible(false);
+        showToast(t('Logged in with Telegram successfully! 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', res.data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        if (onLoginSuccess) onLoginSuccess(res.data.user);
+      } else {
+        showToast(t(res.data?.message || 'Telegram login failed'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'No bound account found for this Telegram'), 'error');
+    } finally {
+      setTelegramDirectLoading(false);
+    }
+  };
+
+  const closeTelegramModal = () => {
+    if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+    setTelegramModalVisible(false);
   };
 
   // ---------------- GMAIL / EMAIL AUTH HANDLERS ----------------
@@ -1308,6 +1423,15 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   onPress={handleDirectSnapchatLogin}
                 >
                   <SocialSnapchatIcon size={36} />
+                </TouchableOpacity>
+
+                {/* Telegram Direct Login */}
+                <TouchableOpacity
+                  style={styles.socialCircleBtn}
+                  activeOpacity={0.8}
+                  onPress={handleDirectTelegramLogin}
+                >
+                  <SocialTelegramIcon size={36} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -2255,6 +2379,106 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             />
           </View>
         </Modal>
+
+        {/* ══ TELEGRAM DIRECT & BOT LOGIN MODAL ══ */}
+        <Modal
+          visible={telegramModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={closeTelegramModal}
+        >
+          <View style={styles.telegramModalBackdrop}>
+            <View style={styles.telegramModalCard}>
+              {/* Header */}
+              <View style={styles.telegramModalHeader}>
+                <View style={styles.telegramModalHeaderTitleWrap}>
+                  <SocialTelegramIcon size={26} />
+                  <Text style={styles.telegramModalTitle}>
+                    <T>Login with Telegram</T>
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={closeTelegramModal}
+                  style={styles.telegramModalCloseBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={styles.telegramModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.telegramSubtitle}>
+                <T>Instant 1-Tap sign-in with your Telegram account</T>
+              </Text>
+
+              {/* 1. Instant 1-Tap Button via Bot */}
+              <TouchableOpacity
+                style={styles.telegramBotBtn}
+                activeOpacity={0.8}
+                onPress={handleOpenTelegramBot}
+              >
+                <SocialTelegramIcon size={30} />
+                <View style={styles.telegramBotBtnTextWrap}>
+                  <Text style={styles.telegramBotBtnTitle}>
+                    <T>1-Tap Login via Telegram Bot</T>
+                  </Text>
+                  <Text style={styles.telegramBotBtnSub}>
+                    <T>Tap START in Telegram to log in instantly</T>
+                  </Text>
+                </View>
+                {telegramWaiting && <ActivityIndicator size="small" color="#FFFFFF" />}
+              </TouchableOpacity>
+
+              {/* Polling / Waiting Status Indicator */}
+              <View style={styles.telegramWaitingIndicatorRow}>
+                <View style={styles.telegramPulseDot} />
+                <Text style={styles.telegramWaitingText}>
+                  <T>Listening for Telegram authorization...</T>
+                </Text>
+              </View>
+
+              {/* Divider */}
+              <View style={styles.telegramDividerRow}>
+                <View style={styles.telegramDividerLine} />
+                <Text style={styles.telegramDividerText}>
+                  <T>OR BOUND ACCOUNT</T>
+                </Text>
+                <View style={styles.telegramDividerLine} />
+              </View>
+
+              {/* 2. Direct Bound Account Input */}
+              <Text style={styles.telegramInputLabel}>
+                <T>Bound Telegram @username or ID</T>
+              </Text>
+              <TextInput
+                style={styles.telegramTextInput}
+                placeholder={t('Enter @username or Telegram ID')}
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                value={telegramInput}
+                onChangeText={setTelegramInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.telegramDirectSubmitBtn,
+                  telegramDirectLoading && { opacity: 0.6 },
+                ]}
+                activeOpacity={0.8}
+                onPress={handleTelegramBoundLogin}
+                disabled={telegramDirectLoading}
+              >
+                {telegramDirectLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.telegramDirectSubmitText}>
+                    <T>Login with Bound Account</T>
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
     </ScreenContainer>
   );
 }
@@ -2944,5 +3168,153 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F0F1A',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // Telegram Direct Login Modal Styles
+  telegramModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  telegramModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#1E1E2D',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 158, 217, 0.35)',
+    padding: 22,
+    shadowColor: '#229ED9',
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  telegramModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  telegramModalHeaderTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  telegramModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  telegramModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  telegramModalCloseText: {
+    color: '#9CA3AF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  telegramSubtitle: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    marginBottom: 18,
+  },
+  telegramBotBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#229ED9',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+    shadowColor: '#229ED9',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  telegramBotBtnTextWrap: {
+    flex: 1,
+  },
+  telegramBotBtnTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  telegramBotBtnSub: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  telegramWaitingIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  telegramPulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  telegramWaitingText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  telegramDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    gap: 10,
+  },
+  telegramDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  telegramDividerText: {
+    color: 'rgba(255, 255, 255, 0.45)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  telegramInputLabel: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  telegramTextInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginBottom: 14,
+  },
+  telegramDirectSubmitBtn: {
+    backgroundColor: '#6366F1',
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  telegramDirectSubmitText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

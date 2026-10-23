@@ -29,6 +29,9 @@ const {
   snapchatLogin,
   handleSnapchatCallback,
   getTelegramBotInfo,
+  initTelegramLoginSession,
+  checkTelegramLoginSession,
+  telegramDirectLogin,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -56,6 +59,9 @@ router.post('/twitter-login', twitterLogin);
 router.post('/snapchat-verify-token', verifySnapchatToken);
 router.post('/snapchat-login', snapchatLogin);
 router.get('/snapchat-callback', handleSnapchatCallback);
+router.post('/telegram-login-init', initTelegramLoginSession);
+router.get('/telegram-login-status/:sessionId', checkTelegramLoginSession);
+router.post('/telegram-direct-login', telegramDirectLogin);
 router.post('/bind-account', protect, bindAccount);
 router.post('/unbind-account', protect, unbindAccount);
 router.get('/telegram-bot-info', protect, getTelegramBotInfo);
