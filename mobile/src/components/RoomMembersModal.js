@@ -393,7 +393,7 @@ export default function RoomMembersModal({
           </View>
         </TouchableOpacity>
 
-        {/* Action Buttons: Agree & Reject */}
+        {/* Action Buttons: Agree & Rejects */}
         <View style={styles.applicantActionRow}>
           <TouchableOpacity
             style={styles.agreeBtn}
