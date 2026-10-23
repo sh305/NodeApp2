@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
-import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import api from '../api/client';
 import ScreenContainer from '../components/ScreenContainer';
 
@@ -230,6 +230,23 @@ const SocialGoogleIcon = ({ size = 24 }) => (
       d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
     />
   </Svg>
+);
+
+const funmazaIconAsset = require('../../assets/icons/funmaza_app_icon.png');
+
+// Official FunMaza App Emblem Logo Component (3D Party Headset + Golden Crown + Voice Mic + Equalizer)
+const FunMazaLogo = ({ size = 96 }) => (
+  <View style={styles.funMazaLogoBadge}>
+    <Image
+      source={funmazaIconAsset}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: Math.round(size * 0.24),
+      }}
+      resizeMode="cover"
+    />
+  </View>
 );
 
 // Interactive Animated Pill Button with Rich Hover (Web) & Press (Phone) Spring Physics
@@ -1170,15 +1187,17 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   return (
     <ScreenContainer
-      backgroundColor="#12C85A"
+      backgroundColor="#120E2E"
       contentContainerStyle={styles.scrollContent}
       scrollRef={scrollViewRef}
     >
       {/* Dynamic Animated Movable 3D Gaming & Music Background Icons */}
       <View style={styles.bgDecorations} pointerEvents="none">
         {/* Ambient Glow Orbs */}
-        <View style={[styles.ambientGlowOrb, { top: -40, left: -40, backgroundColor: '#34D399' }]} />
-        <View style={[styles.ambientGlowOrb, { bottom: 50, right: -40, backgroundColor: '#10B981' }]} />
+        <View style={[styles.ambientGlowOrb, { top: -50, left: -40, backgroundColor: '#7C3AED', opacity: 0.38 }]} />
+        <View style={[styles.ambientGlowOrb, { top: '30%', right: -60, backgroundColor: '#EC4899', opacity: 0.32 }]} />
+        <View style={[styles.ambientGlowOrb, { bottom: 80, left: -40, backgroundColor: '#3B82F6', opacity: 0.28 }]} />
+        <View style={[styles.ambientGlowOrb, { bottom: 20, right: -40, backgroundColor: '#F59E0B', opacity: 0.25 }]} />
 
         {/* Movable Icon Group 1 */}
         <Animated.View style={[styles.floatingWrap, { top: '8%', left: '8%', transform: [{ translateY: floatAnim1 }] }]}>
@@ -1211,14 +1230,23 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         </Animated.View>
       </View>
 
-      {/* Top Header & Big "Yo!" Logo matching screenshot */}
+      {/* Top Header & FunMaza Official Logo */}
       <View style={styles.brandHeader}>
-        <View style={styles.yoLogoContainer}>
-          <Text style={styles.yoTextY}>Y</Text>
-          <View style={styles.yoBubbleContainer}>
-            <View style={styles.speechDot} />
+        <FunMazaLogo size={Platform.OS === 'web' ? 104 : 96} />
+
+        <View style={styles.funMazaTextRow}>
+          <Text style={styles.brandTextFun}>Fun</Text>
+          <Text style={styles.brandTextMaza}>Maza</Text>
+          <View style={styles.sparkleBadge}>
+            <Text style={styles.sparkleEmoji}>✨</Text>
           </View>
-          <Text style={styles.yoExclamation}>!</Text>
+        </View>
+
+        <View style={styles.liveBadgeRow}>
+          <View style={styles.livePulseDot} />
+          <Text style={styles.liveBadgeText}>
+            <T>LIVE VOICE & GAMES PARTY</T>
+          </Text>
         </View>
 
         <Text style={styles.hindiTagline}>{t('Voice Chat, Play Games, Make Friends')}</Text>
@@ -1656,7 +1684,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.switchAuthModeText}>
-                    {t('New to YoYo?')} <Text style={styles.switchAuthHighlight}>{t('Register User')}</Text>
+                    {t('New to FunMaza?')} <Text style={styles.switchAuthHighlight}>{t('Register User')}</Text>
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -2033,7 +2061,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.switchAuthModeText}>
-                    {t('New to YoYo?')} <Text style={styles.switchAuthHighlight}>{t('Register User')}</Text>
+                    {t('New to FunMaza?')} <Text style={styles.switchAuthHighlight}>{t('Register User')}</Text>
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -2234,7 +2262,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#12C85A', // Rich vibrant emerald gamer background
+    backgroundColor: '#120E2E', // Luxurious Royal Midnight Party theme
     position: 'relative',
   },
   scrollContent: {
@@ -2263,8 +2291,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   floatingIcon: {
-    opacity: 0.32,
-    textShadowColor: 'rgba(0, 50, 20, 0.3)',
+    opacity: 0.35,
+    textShadowColor: 'rgba(124, 58, 237, 0.45)',
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 8,
   },
@@ -2348,67 +2376,93 @@ const styles = StyleSheet.create({
   // Brand Header
   brandHeader: {
     alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 24,
+    marginTop: 14,
+    marginBottom: 20,
   },
-  yoLogoContainer: {
+  funMazaLogoBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+    shadowColor: '#38BDF8',
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+  funMazaTextRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
-  },
-  yoTextY: {
-    fontSize: 78,
-    fontWeight: '900',
-    color: '#F4EB3B', // Vibrant cartoon yellow
-    textShadowColor: 'rgba(0, 0, 0, 0.22)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 6,
-    fontFamily: Platform.OS === 'web' ? 'Impact, Arial Black, sans-serif' : undefined,
-  },
-  yoBubbleContainer: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: '#F4EB3B',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    marginTop: 4,
   },
-  speechDot: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1E232A',
-    borderBottomRightRadius: 4,
-  },
-  yoExclamation: {
-    fontSize: 78,
+  brandTextFun: {
+    fontSize: 46,
     fontWeight: '900',
-    color: '#F4EB3B',
-    textShadowColor: 'rgba(0, 0, 0, 0.22)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 6,
+    color: '#FBBF24', // Sunny 24K Gold
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(245, 158, 11, 0.65)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 12,
     fontFamily: Platform.OS === 'web' ? 'Impact, Arial Black, sans-serif' : undefined,
+  },
+  brandTextMaza: {
+    fontSize: 46,
+    fontWeight: '900',
+    color: '#F43F5E', // Electric Coral Pink
+    letterSpacing: 0.5,
+    marginLeft: 2,
+    textShadowColor: 'rgba(244, 63, 94, 0.65)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 12,
+    fontFamily: Platform.OS === 'web' ? 'Impact, Arial Black, sans-serif' : undefined,
+  },
+  sparkleBadge: {
+    marginLeft: 4,
+    transform: [{ rotate: '12deg' }],
+  },
+  sparkleEmoji: {
+    fontSize: 22,
+  },
+  liveBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderRadius: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginTop: 6,
+    gap: 6,
+  },
+  livePulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  liveBadgeText: {
+    color: '#E2E8F0',
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 1.1,
   },
   hindiTagline: {
     color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: '900',
+    fontSize: 18.5,
+    fontWeight: '800',
     textAlign: 'center',
     letterSpacing: 0.3,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    marginTop: 10,
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 5,
+    textShadowRadius: 6,
   },
   englishTagline: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 12.5,
-    fontWeight: '700',
-    marginTop: 4,
+    color: 'rgba(226, 232, 240, 0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 3,
     textAlign: 'center',
   },
 
@@ -2833,7 +2887,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   langPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: 20,

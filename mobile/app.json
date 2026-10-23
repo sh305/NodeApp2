@@ -1,17 +1,19 @@
 {
   "expo": {
-    "name": "YoYo Voice",
-    "slug": "yoyo-voice-mobile",
+    "name": "FunMaza",
+    "slug": "funmaza-mobile",
     "scheme": "funmaza",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F0F1A"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#60A5FA"
       },
       "package": "com.funmaza.app",
       "softwareKeyboardLayoutMode": "resize",

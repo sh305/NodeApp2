@@ -54,6 +54,14 @@ ramCache.set(
   'hi:::Please use the Google option in Account Binding',
   'Google अकाउंट जोड़ने के लिए बाइंडिंग विकल्पों में से Google का चयन करें'
 );
+ramCache.set(
+  'hi:::New to FunMaza?',
+  'FunMaza पर नए हैं?'
+);
+ramCache.set(
+  'hi:::LIVE VOICE & GAMES PARTY',
+  'लाइव वॉइस और गेम्स पार्टी'
+);
 
 const LanguageContext = createContext();
 
@@ -1073,6 +1081,8 @@ export const LanguageProvider = ({ children }) => {
       'Register & Create Account',
       'Already have an account?',
       'New to YoYo?',
+      'New to FunMaza?',
+      'LIVE VOICE & GAMES PARTY',
       'Password Verified Successfully! Welcome 🎉',
       'Registration Successful! Welcome 🎉',
       'Registration failed',
