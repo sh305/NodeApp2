@@ -119,7 +119,7 @@ const TW_INJECTED_JS = `
   true;
 `;
 
-// Injected JS to detect successful Instagram Web Login, block external app launches, and extract verified user
+// Injected JS to detect successful Instagram Web Login, handle 2FA, block external app launches, and extract verified user
 const INSTA_INJECTED_JS = `
   (function() {
     // 1. Block external Instagram app launch / intent links
@@ -130,6 +130,8 @@ const INSTA_INJECTED_JS = `
       document.head && document.head.appendChild(style);
     } catch(e) {}
 
+    var RESERVED = ['accounts', 'challenge', 'two_factor', 'login', 'emailsignup', 'password', 'explore', 'reels', 'direct', 'stories', 'privacy', 'legal', 'about', 'directory', 'developer', 'help', 'support', 'p', 'reel', 'tv', 'api', 'graphql', 'static', 'session', 'oauth', 'consent', 'terms', 'download', 'web', 'home'];
+
     var reported = false;
     function checkLogin() {
       if (reported) return;
@@ -137,37 +139,95 @@ const INSTA_INJECTED_JS = `
         var cookies = document.cookie || '';
         var dsMatch = cookies.match(/ds_user_id=([^;]+)/);
         var userId = dsMatch ? dsMatch[1] : null;
-        var path = window.location.pathname || '';
+        var hasSession = cookies.indexOf('sessionid=') !== -1;
+        var path = (window.location.pathname || '').toLowerCase();
 
-        var isPastLogin = !path.includes('/accounts/login') && !path.includes('/accounts/emailsignup') && !path.includes('/accounts/password');
+        // STRICT: DO NOT fire while on login or 2FA challenge screens!
+        if (path.indexOf('/accounts/login') !== -1 ||
+            path.indexOf('/challenge') !== -1 ||
+            path.indexOf('/two_factor') !== -1 ||
+            path.indexOf('/accounts/emailsignup') !== -1 ||
+            path.indexOf('/accounts/password') !== -1) {
+          return;
+        }
 
-        if (userId && isPastLogin) {
-          reported = true;
-
-          // Attempt to find username from profile links or storage
-          var username = null;
-          var links = document.querySelectorAll('a[href^="/"]');
-          for (var i = 0; i < links.length; i++) {
-            var href = links[i].getAttribute('href') || '';
-            if (href.length > 2 && !href.startsWith('/accounts') && !href.startsWith('/explore') && !href.startsWith('/direct') && !href.startsWith('/reels') && !href.startsWith('/stories') && !href.includes('?') && !href.includes('&')) {
-              var clean = href.replace(/^\\/+|\\/+$/g, '');
-              if (clean && !clean.includes('/')) {
-                username = clean;
+        // Auto-dismiss "Save Your Login Info?" on onetap screen
+        if (path.indexOf('/accounts/onetap') !== -1) {
+          try {
+            var buttons = document.querySelectorAll('button');
+            for (var b = 0; b < buttons.length; b++) {
+              var btnText = (buttons[b].innerText || '').toLowerCase();
+              if (btnText.indexOf('not now') !== -1 || btnText.indexOf('save info') !== -1) {
+                buttons[b].click();
                 break;
               }
             }
+          } catch(e) {}
+        }
+
+        // Only proceed if sessionid cookie exists OR user has navigated beyond login & 2FA challenge
+        if (hasSession || (userId && path !== '/' && RESERVED.indexOf(path.replace(/^\\/+|\\/+$/g, '')) === -1)) {
+          var username = null;
+          var fullName = null;
+          var avatar = null;
+
+          // 1. Try to find real username from links on page
+          var links = document.querySelectorAll('a[href^="/"]');
+          for (var i = 0; i < links.length; i++) {
+            var href = links[i].getAttribute('href') || '';
+            var clean = href.replace(/^\\/+|\\/+$/g, '').split('?')[0].split('/')[0];
+            if (clean && clean.length >= 2 && clean.length <= 30 && RESERVED.indexOf(clean.toLowerCase()) === -1) {
+              username = clean;
+              break;
+            }
           }
 
-          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'INSTA_LOGIN_SUCCESS',
-            userId: userId,
-            username: username || ('insta_' + userId)
-          }));
+          // 2. Try window._sharedData
+          if (!username) {
+            try {
+              if (window._sharedData && window._sharedData.config && window._sharedData.config.viewer) {
+                username = window._sharedData.config.viewer.username;
+                fullName = window._sharedData.config.viewer.full_name;
+                avatar = window._sharedData.config.viewer.profile_pic_url;
+              }
+            } catch(e) {}
+          }
+
+          // 3. Try to fetch current user via internal Instagram API
+          if (!username && userId) {
+            fetch('/api/v1/accounts/current_user/?edit=true', { credentials: 'include' })
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                if (data && data.user && data.user.username) {
+                  reported = true;
+                  window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'INSTA_LOGIN_SUCCESS',
+                    userId: data.user.pk || userId,
+                    username: data.user.username,
+                    fullName: data.user.full_name,
+                    avatar: data.user.profile_pic_url
+                  }));
+                }
+              })
+              .catch(function() {});
+          }
+
+          // If we found a valid username, or if sessionid is verified, send success!
+          if (username || hasSession) {
+            reported = true;
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'INSTA_LOGIN_SUCCESS',
+              userId: userId,
+              username: username || ('insta_' + userId),
+              fullName: fullName,
+              avatar: avatar
+            }));
+          }
         }
       } catch(e) {}
     }
 
-    setInterval(checkLogin, 500);
+    setInterval(checkLogin, 600);
     checkLogin();
   })();
   true;
@@ -1244,26 +1304,31 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         const identifier = data.username || (data.userId ? `insta_${data.userId}` : null);
         if (!identifier) return;
 
-        setInstaWebViewVisible(false);
         setLoading(true);
-        const res = await api.post('/auth/instagram-direct-login', {
-          identifier: identifier,
-          instagramId: data.userId || identifier,
-          authSource: 'instagram_webview',
-        });
-        if (res.data?.success && res.data?.token) {
-          showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
-          await AsyncStorage.setItem('@auth_token', res.data.token);
-          await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
-          if (onLoginSuccess) onLoginSuccess(res.data.user);
-        } else {
-          showToast(t(res.data?.message || 'Instagram login failed'), 'error');
+        try {
+          const res = await api.post('/auth/instagram-direct-login', {
+            identifier: identifier,
+            instagramId: data.userId || identifier,
+            name: data.fullName,
+            avatar: data.avatar,
+            authSource: 'instagram_webview',
+          });
+          if (res.data?.success && res.data?.token) {
+            setInstaWebViewVisible(false);
+            showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
+            await AsyncStorage.setItem('@auth_token', res.data.token);
+            await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+            if (onLoginSuccess) onLoginSuccess(res.data.user);
+          } else {
+            showToast(t(res.data?.message || 'Instagram login failed'), 'error');
+          }
+        } catch (err) {
+          showToast(t(err.response?.data?.message || 'Instagram login failed'), 'error');
+        } finally {
+          setLoading(false);
         }
       }
     } catch (_) {}
-    finally {
-      setLoading(false);
-    }
   };
 
   const handleInstaNavStateChange = async (navState) => {
@@ -1277,32 +1342,69 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
     const isPastLogin =
       !url.includes('/accounts/login') &&
+      !url.includes('/challenge') &&
+      !url.includes('/two_factor') &&
       !url.includes('/accounts/emailsignup') &&
       !url.includes('/accounts/password');
 
     if (isPastLogin && url.includes('instagram.com/')) {
       const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
-      if (match && match[1] && match[1] !== 'accounts' && match[1] !== 'explore' && match[1] !== 'reels' && match[1] !== 'direct') {
-        const username = match[1];
-        setInstaWebViewVisible(false);
-        setLoading(true);
-        try {
-          const res = await api.post('/auth/instagram-direct-login', {
-            identifier: username,
-            authSource: 'instagram_webview',
-          });
-          if (res.data?.success && res.data?.token) {
-            showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
-            await AsyncStorage.setItem('@auth_token', res.data.token);
-            await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
-            if (onLoginSuccess) onLoginSuccess(res.data.user);
-          } else {
-            showToast(t(res.data?.message || 'Instagram login failed'), 'error');
+      if (match && match[1]) {
+        const candidate = match[1].toLowerCase();
+        const reserved = [
+          'accounts',
+          'challenge',
+          'two_factor',
+          'login',
+          'emailsignup',
+          'password',
+          'explore',
+          'reels',
+          'direct',
+          'stories',
+          'privacy',
+          'legal',
+          'about',
+          'directory',
+          'developer',
+          'help',
+          'support',
+          'p',
+          'reel',
+          'tv',
+          'api',
+          'graphql',
+          'static',
+          'session',
+          'oauth',
+          'consent',
+          'terms',
+          'download',
+          'web',
+          'home'
+        ];
+        if (!reserved.includes(candidate)) {
+          const username = match[1];
+          setLoading(true);
+          try {
+            const res = await api.post('/auth/instagram-direct-login', {
+              identifier: username,
+              authSource: 'instagram_webview',
+            });
+            if (res.data?.success && res.data?.token) {
+              setInstaWebViewVisible(false);
+              showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
+              await AsyncStorage.setItem('@auth_token', res.data.token);
+              await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+              if (onLoginSuccess) onLoginSuccess(res.data.user);
+            } else {
+              showToast(t(res.data?.message || 'Instagram login failed'), 'error');
+            }
+          } catch (err) {
+            showToast(t(err.response?.data?.message || 'Instagram login failed'), 'error');
+          } finally {
+            setLoading(false);
           }
-        } catch (err) {
-          showToast(t(err.response?.data?.message || 'Instagram login failed'), 'error');
-        } finally {
-          setLoading(false);
         }
       }
     }
@@ -2581,6 +2683,14 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 </View>
               )}
             />
+            {loading && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15, 15, 26, 0.9)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }]}>
+                <ActivityIndicator size="large" color="#E1306C" />
+                <Text style={{ color: '#FFFFFF', marginTop: 14, fontSize: 15, fontWeight: '600' }}>
+                  <T>Logging into FunMaza...</T>
+                </Text>
+              </View>
+            )}
           </View>
         </Modal>
 

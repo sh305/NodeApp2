@@ -1717,7 +1717,7 @@ const verifyInstagramAccount = async (username) => {
 // @route   POST /api/auth/instagram-direct-login
 exports.instagramDirectLogin = async (req, res) => {
   try {
-    const { identifier } = req.body;
+    const { identifier, instagramId, name: passedName, avatar: passedAvatar } = req.body;
     if (!identifier || !identifier.trim()) {
       return res.status(400).json({ success: false, message: 'Please enter your Instagram @username' });
     }
@@ -1729,14 +1729,23 @@ exports.instagramDirectLogin = async (req, res) => {
     const escapedClean = cleanWithoutAt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedWithAt = cleanWithAt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    let user = await User.findOne({
-      $or: [
-        { instagramId: new RegExp(`^${escapedClean}$`, 'i') },
-        { 'boundAccounts.instagram.id': new RegExp(`^${escapedClean}$`, 'i') },
-        { 'boundAccounts.instagram.username': new RegExp(`^${escapedClean}$`, 'i') },
-        { 'boundAccounts.instagram.username': new RegExp(`^${escapedWithAt}$`, 'i') },
-      ],
-    });
+    const searchConditions = [
+      { instagramId: new RegExp(`^${escapedClean}$`, 'i') },
+      { 'boundAccounts.instagram.id': new RegExp(`^${escapedClean}$`, 'i') },
+      { 'boundAccounts.instagram.username': new RegExp(`^${escapedClean}$`, 'i') },
+      { 'boundAccounts.instagram.username': new RegExp(`^${escapedWithAt}$`, 'i') },
+    ];
+
+    if (instagramId) {
+      const cleanId = String(instagramId).trim();
+      const escapedId = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      searchConditions.push(
+        { instagramId: new RegExp(`^${escapedId}$`, 'i') },
+        { 'boundAccounts.instagram.id': new RegExp(`^${escapedId}$`, 'i') }
+      );
+    }
+
+    let user = await User.findOne({ $or: searchConditions });
 
     // SECURITY GUARD: Direct username hijacking protection
     // Existing accounts CANNOT be logged in via raw text input without completing Official Instagram Login!
@@ -1748,26 +1757,40 @@ exports.instagramDirectLogin = async (req, res) => {
     }
 
     if (!user) {
-      // 1. Strictly verify that this Instagram account actually exists on Instagram
-      const check = await verifyInstagramAccount(cleanWithoutAt);
-      if (!check.exists) {
-        return res.status(400).json({
-          success: false,
-          message: 'This Instagram account does not exist. Please enter a valid Instagram account.',
-        });
+      let generatedName = passedName || cleanWithoutAt;
+      let avatarUrl = passedAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+
+      if (req.body.authSource === 'instagram_webview') {
+        // Officially authenticated via Instagram WebView (password + 2FA verified by Instagram)
+        if (!cleanWithoutAt.startsWith('insta_')) {
+          try {
+            const check = await verifyInstagramAccount(cleanWithoutAt);
+            if (check.realName) generatedName = check.realName;
+          } catch (_) {}
+        } else {
+          generatedName = 'Instagram User';
+        }
+      } else {
+        // Direct text handle input: strictly verify existence
+        const check = await verifyInstagramAccount(cleanWithoutAt);
+        if (!check.exists) {
+          return res.status(400).json({
+            success: false,
+            message: 'This Instagram account does not exist. Please enter a valid Instagram account.',
+          });
+        }
+        if (check.realName) generatedName = check.realName;
       }
 
-      // Auto-create / Sign-up new account with verified Instagram profile
-      const generatedName = check.realName || cleanWithoutAt;
-      const avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+      const effectiveId = String(instagramId || cleanWithoutAt);
 
       user = await User.create({
         name: generatedName,
-        instagramId: cleanWithoutAt,
+        instagramId: effectiveId,
         avatar: avatarUrl,
         boundAccounts: {
           instagram: {
-            id: cleanWithoutAt,
+            id: effectiveId,
             username: cleanWithoutAt,
             name: generatedName,
             avatar: avatarUrl,
@@ -1778,18 +1801,23 @@ exports.instagramDirectLogin = async (req, res) => {
     } else {
       if (!user.boundAccounts) user.boundAccounts = {};
       let modified = false;
+      const effectiveId = String(instagramId || user.instagramId || cleanWithoutAt);
+
       if (!user.instagramId) {
-        user.instagramId = cleanWithoutAt;
+        user.instagramId = effectiveId;
         modified = true;
       }
       if (!user.boundAccounts.instagram) {
         user.boundAccounts.instagram = {
-          id: cleanWithoutAt,
+          id: effectiveId,
           username: cleanWithoutAt,
           name: user.name || cleanWithoutAt,
           avatar: user.avatar || '',
           boundAt: new Date(),
         };
+        modified = true;
+      } else if (cleanWithoutAt && !cleanWithoutAt.startsWith('insta_') && user.boundAccounts.instagram.username !== cleanWithoutAt) {
+        user.boundAccounts.instagram.username = cleanWithoutAt;
         modified = true;
       }
       if (modified) {

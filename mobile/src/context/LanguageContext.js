@@ -138,6 +138,8 @@ export const LanguageProvider = ({ children }) => {
       'Go Back',
       'Starting camera...',
       'Camera is not active. Please enable camera.',
+      'Logging into FunMaza...',
+      'Instagram Login',
       'Re-verify Real Person',
       'Could not capture image from camera. Please try again.',
       'Detection timeout, please try again',
