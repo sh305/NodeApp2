@@ -636,10 +636,15 @@ exports.verifyFacebookToken = async (req, res) => {
 
     // Exchange OAuth code for accessToken if code was returned
     if (!accessToken && code) {
-      // FunMaza Official Meta App Credentials
-      const fbAppId = '4171729949789896';
-      const fbAppSecret = '3a1542d32cad765d08107386a726659a';
-      const redirectUri = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+      // Meta Facebook App Credentials from environment variables
+      const fbAppId = process.env.FACEBOOK_APP_ID;
+      const fbAppSecret = process.env.FACEBOOK_APP_SECRET;
+      const redirectUri = process.env.FACEBOOK_REDIRECT_URI || 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+
+      if (!fbAppId || !fbAppSecret) {
+        console.error('❌ [Facebook Auth] Missing FACEBOOK_APP_ID or FACEBOOK_APP_SECRET in environment variables');
+        return res.status(500).json({ success: false, message: 'Facebook credentials not configured in environment' });
+      }
 
       const tokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
         params: {
@@ -1005,10 +1010,15 @@ exports.verifyTwitterToken = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Twitter authorization code is required' });
     }
 
-    const clientId = process.env.TWITTER_CLIENT_ID || 'N3JzYXhzQ3BNSGVaQWMydnFTU2E6MTpjaQ';
-    const clientSecret = process.env.TWITTER_CLIENT_SECRET || '-idgC5LKFG3pTjYlVYxKaX4N3oNbm2qKZ15HDqCAT4Ggf4Xiuf';
-    const redirectUri = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+    const redirectUri = process.env.TWITTER_REDIRECT_URI || 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
     const verifier = codeVerifier || 'challenge12345678901234567890123456789012345';
+
+    if (!clientId || !clientSecret) {
+      console.error('❌ [Twitter Auth] Missing TWITTER_CLIENT_ID or TWITTER_CLIENT_SECRET in environment variables');
+      return res.status(500).json({ success: false, message: 'Twitter credentials not configured in environment' });
+    }
 
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
@@ -1119,10 +1129,14 @@ exports.verifySnapchatToken = async (req, res) => {
 
     const clientId =
       process.env.SNAPCHAT_CONFIDENTIAL_CLIENT_ID ||
-      process.env.SNAPCHAT_CLIENT_ID ||
-      '6d65546d-96a3-423e-9d5a-f48d01cdc1ee';
-    const clientSecret = process.env.SNAPCHAT_CLIENT_SECRET || '5cqBBk-5Js-zkCBkVnNf0OdHRL7ZbMMB_oHxqtse8Fw';
+      process.env.SNAPCHAT_CLIENT_ID;
+    const clientSecret = process.env.SNAPCHAT_CLIENT_SECRET;
     const redirectUri = process.env.SNAPCHAT_REDIRECT_URI || 'https://nodeapp2-yl8c.onrender.com/api/auth/snapchat-callback';
+
+    if (!clientId || !clientSecret) {
+      console.error('❌ [Snapchat Auth] Missing SNAPCHAT_CLIENT_ID or SNAPCHAT_CLIENT_SECRET in environment variables');
+      return res.status(500).json({ success: false, message: 'Snapchat credentials not configured in environment' });
+    }
 
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
