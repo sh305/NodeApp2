@@ -595,11 +595,8 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [telegramDirectLoading, setTelegramDirectLoading] = useState(false);
   const telegramPollRef = useRef(null);
 
-  // Instagram Direct & WebView Login State
-  const [instagramModalVisible, setInstagramModalVisible] = useState(false);
+  // Instagram Official WebView Login State
   const [instaWebViewVisible, setInstaWebViewVisible] = useState(false);
-  const [instagramInput, setInstagramInput] = useState('');
-  const [instagramDirectLoading, setInstagramDirectLoading] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -1202,27 +1199,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     setTelegramModalVisible(false);
   };
 
-  // ---------------- INSTAGRAM DIRECT & WEBVIEW LOGIN HANDLERS ----------------
+  // ---------------- INSTAGRAM OFFICIAL WEBVIEW LOGIN HANDLERS ----------------
   const handleDirectInstagramLogin = () => {
     setInstaWebViewVisible(true);
-  };
-
-  const closeInstagramModal = () => {
-    setInstagramModalVisible(false);
-  };
-
-  const handleOpenInstagramApp = async () => {
-    const url = 'https://instagram.com';
-    try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        await WebBrowser.openBrowserAsync(url);
-      }
-    } catch (err) {
-      await WebBrowser.openBrowserAsync(url);
-    }
   };
 
   const handleInstaMessage = async (event) => {
@@ -1231,7 +1210,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       if (data && data.type === 'INSTA_LOGIN_SUCCESS' && data.username) {
         setInstaWebViewVisible(false);
         setLoading(true);
-        const res = await api.post('/auth/instagram-direct-login', { identifier: data.username });
+        const res = await api.post('/auth/instagram-direct-login', {
+          identifier: data.username,
+          instagramId: data.instagramId || data.username,
+          authSource: 'instagram_webview',
+        });
         if (res.data?.success && res.data?.token) {
           showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
           await AsyncStorage.setItem('@auth_token', res.data.token);
@@ -1257,7 +1240,10 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         setInstaWebViewVisible(false);
         setLoading(true);
         try {
-          const res = await api.post('/auth/instagram-direct-login', { identifier: username });
+          const res = await api.post('/auth/instagram-direct-login', {
+            identifier: username,
+            authSource: 'instagram_webview',
+          });
           if (res.data?.success && res.data?.token) {
             showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
             await AsyncStorage.setItem('@auth_token', res.data.token);
@@ -1272,31 +1258,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           setLoading(false);
         }
       }
-    }
-  };
-
-  const handleInstagramBoundLogin = async () => {
-    const clean = instagramInput.trim();
-    if (!clean) {
-      showToast(t('Please enter your bound Instagram @username'), 'error');
-      return;
-    }
-    setInstagramDirectLoading(true);
-    try {
-      const res = await api.post('/auth/instagram-direct-login', { identifier: clean });
-      if (res.data?.success && res.data?.token) {
-        setInstagramModalVisible(false);
-        showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
-        await AsyncStorage.setItem('@auth_token', res.data.token);
-        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
-        if (onLoginSuccess) onLoginSuccess(res.data.user);
-      } else {
-        showToast(t(res.data?.message || 'Instagram login failed'), 'error');
-      }
-    } catch (err) {
-      showToast(t(err.response?.data?.message || 'No bound account found for this Instagram'), 'error');
-    } finally {
-      setInstagramDirectLoading(false);
     }
   };
 
@@ -2544,16 +2505,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 <SocialInstagramIcon size={22} />
                 <Text style={styles.fbWebTitle}><T>Instagram Login</T></Text>
               </View>
-              <TouchableOpacity
-                onPress={() => {
-                  setInstaWebViewVisible(false);
-                  setInstagramModalVisible(true);
-                }}
-                style={styles.fbWebCloseBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={[styles.fbWebCloseText, { color: '#E1306C' }]}>@handle</Text>
-              </TouchableOpacity>
+              <View style={{ width: 60 }} />
             </View>
             <WebView
               source={{ uri: 'https://www.instagram.com/accounts/login/' }}
@@ -2672,89 +2624,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           </View>
         </Modal>
 
-        {/* ══ INSTAGRAM DIRECT LOGIN MODAL ══ */}
-        <Modal
-          visible={instagramModalVisible}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={closeInstagramModal}
-        >
-          <View style={styles.instagramModalBackdrop}>
-            <View style={styles.instagramModalCard}>
-              {/* Header */}
-              <View style={styles.instagramModalHeader}>
-                <View style={styles.instagramModalHeaderTitleWrap}>
-                  <SocialInstagramIcon size={26} />
-                  <Text style={styles.instagramModalTitle}>
-                    <T>Login / Sign Up with Instagram</T>
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={closeInstagramModal}
-                  style={styles.instagramModalCloseBtn}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Text style={styles.instagramModalCloseText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.instagramSubtitle}>
-                <T>Instant sign-in or create a new account with your Instagram</T>
-              </Text>
-
-              {/* Instagram Info Helper */}
-              <View style={styles.instagramInfoBadge}>
-                <SocialInstagramIcon size={20} />
-                <Text style={styles.instagramInfoText}>
-                  <T>Enter your Instagram @username. Existing bound users log in directly, and new users are registered instantly!</T>
-                </Text>
-              </View>
-
-              {/* Input */}
-              <Text style={styles.instagramInputLabel}>
-                <T>Instagram @username</T>
-              </Text>
-              <TextInput
-                style={styles.instagramTextInput}
-                placeholder={t('Enter @username (e.g. @cool_user)')}
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                value={instagramInput}
-                onChangeText={setInstagramInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <TouchableOpacity
-                style={[
-                  styles.instagramDirectSubmitBtn,
-                  instagramDirectLoading && { opacity: 0.6 },
-                ]}
-                activeOpacity={0.8}
-                onPress={handleInstagramBoundLogin}
-                disabled={instagramDirectLoading}
-              >
-                {instagramDirectLoading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.instagramDirectSubmitText}>
-                    <T>Continue with Instagram</T>
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              {/* Open Instagram Link */}
-              <TouchableOpacity
-                style={styles.instagramOpenLinkBtn}
-                activeOpacity={0.7}
-                onPress={handleOpenInstagramApp}
-              >
-                <Text style={styles.instagramOpenLinkText}>
-                  <T>Need to check your Instagram handle? Open Instagram</T> →
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
     </ScreenContainer>
   );
 }

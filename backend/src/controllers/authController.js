@@ -1724,6 +1724,15 @@ exports.instagramDirectLogin = async (req, res) => {
       ],
     });
 
+    // SECURITY GUARD: Direct username hijacking protection
+    // Existing accounts CANNOT be logged in via raw text input without completing Official Instagram Login!
+    if (user && req.body.authSource !== 'instagram_webview') {
+      return res.status(403).json({
+        success: false,
+        message: 'For security, please log in through the Official Instagram Login screen with your Instagram password.',
+      });
+    }
+
     if (!user) {
       // 1. Strictly verify that this Instagram account actually exists on Instagram
       const check = await verifyInstagramAccount(cleanWithoutAt);
