@@ -46,6 +46,7 @@ import SearchScreen from './src/screens/SearchScreen';
 import UserRelationsScreen from './src/screens/UserRelationsScreen';
 import WalletScreen from './src/screens/WalletScreen';
 import ConfirmMoneyScreen from './src/screens/ConfirmMoneyScreen';
+import ModerationCenterScreen from './src/screens/ModerationCenterScreen';
 import UserProblemScreen from './src/screens/UserProblemScreen';
 import StoreScreen from './src/screens/StoreScreen';
 import LevelScreen from './src/screens/LevelScreen';
@@ -200,6 +201,14 @@ export default function App() {
                   <Stack.Screen name="ConfirmMoney">
                     {(props) => (
                       <ConfirmMoneyScreen
+                        {...props}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="ModerationCenter">
+                    {(props) => (
+                      <ModerationCenterScreen
                         {...props}
                         currentUser={currentUser}
                       />

@@ -214,6 +214,25 @@ const MenuIcon = ({ type, color = '#2C3E50', size = 22 }) => {
           <Circle cx="12" cy="15.5" r="1" fill={color} />
         </Svg>
       );
+    case 'moderation':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"
+            stroke="#6366F1"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M9 12L11 14L15 10"
+            stroke="#6366F1"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
     default:
       return null;
   }
@@ -236,7 +255,14 @@ export default function MeProfileView({
 
   const [profile, setProfile] = useState(myProfile || currentUser);
   const [problemCount, setProblemCount] = useState(0);
+  const [pendingReportsCount, setPendingReportsCount] = useState(0);
   const [equippedFrame, setEquippedFrame] = useState(null);
+
+  const isOwner =
+    profile?.role === 'owner' ||
+    currentUser?.role === 'owner' ||
+    profile?.email?.toLowerCase().trim() === 'shivamraie09@gmail.com' ||
+    currentUser?.email?.toLowerCase().trim() === 'shivamraie09@gmail.com';
 
   const fetchProfile = async () => {
     try {
@@ -259,6 +285,18 @@ export default function MeProfileView({
       const res = await api.get('/recharge/admin/problems-count');
       if (res.data?.success) {
         setProblemCount(res.data.count || 0);
+      }
+    } catch (e) {
+      // quiet fallback
+    }
+  };
+
+  const fetchModerationStats = async () => {
+    if (!isOwner) return;
+    try {
+      const res = await api.get('/reports/admin/all');
+      if (res.data?.success) {
+        setPendingReportsCount(res.data.pendingCount || 0);
       }
     } catch (e) {
       // quiet fallback
@@ -319,17 +357,16 @@ export default function MeProfileView({
 
   // Re-fetch profile when returning from UserRelations or other sub-screens
   useEffect(() => {
-    if (!navigation?.addListener) return;
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchProfile();
-      if (onRefreshProfile) onRefreshProfile();
-    });
-    return unsubscribe;
-  }, [navigation, onRefreshProfile]);
+    fetchProfile();
+    fetchProblemCount();
+    fetchModerationStats();
+  }, [currentUser?._id, currentUser?.id]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchProfile();
+    await fetchProblemCount();
+    await fetchModerationStats();
     if (onRefreshProfile) {
       await onRefreshProfile();
     }
@@ -363,6 +400,14 @@ export default function MeProfileView({
         navigation.navigate('ConfirmMoney');
       } else {
         showToast(t('Confirm Money'), 'info');
+      }
+      return;
+    }
+    if (menuKey === 'moderation') {
+      if (navigation?.navigate) {
+        navigation.navigate('ModerationCenter');
+      } else {
+        showToast(t('Moderation Center'), 'info');
       }
       return;
     }
@@ -683,6 +728,16 @@ export default function MeProfileView({
           { key: 'coupon', title: 'Coupon', icon: 'coupon' },
           { key: 'help', title: 'Help', icon: 'help' },
           { key: 'setting', title: 'Setting', icon: 'setting' },
+          ...(isOwner
+            ? [
+                {
+                  key: 'moderation',
+                  title: 'Moderation Center',
+                  icon: 'moderation',
+                  badge: pendingReportsCount,
+                },
+              ]
+            : []),
           { key: 'confirmMoney', title: 'Confirm Money', icon: 'confirmMoney' },
           { key: 'userProblem', title: 'User Problems', icon: 'userProblem', badge: problemCount },
         ].map((item, index, arr) => (

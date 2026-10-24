@@ -33,22 +33,48 @@ const reportSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    proofUrl: {
+      type: String,
+      required: [true, 'Proof photo or video is required to submit a report'],
+    },
+    proofType: {
+      type: String,
+      enum: ['image', 'video'],
+      default: 'image',
+    },
     requestedBanDuration: {
       type: String,
       enum: ['3days', '7days', 'permanent'],
-      required: true,
+      default: '3days',
     },
     status: {
       type: String,
-      enum: ['pending', 'applied', 'rejected'],
-      default: 'applied', // Can be auto-applied or reviewed
+      enum: ['pending', 'warned', 'banned', 'dismissed_fake'],
+      default: 'pending',
     },
-    actionTakenAt: {
+    isFake: {
+      type: Boolean,
+      default: false,
+    },
+    adminNote: {
+      type: String,
+      default: '',
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewedAt: {
       type: Date,
-      default: Date.now,
+      default: null,
     },
   },
   { timestamps: true }
 );
+
+// Index to quickly enforce 24-hour rate limit between same reporter and reportedUser
+reportSchema.index({ reporter: 1, reportedUser: 1, createdAt: -1 });
+reportSchema.index({ reportedUser: 1, status: 1 });
 
 module.exports = mongoose.model('Report', reportSchema);

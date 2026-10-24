@@ -1857,14 +1857,14 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
       <ReportModal
         visible={reportModalVisible}
         onClose={() => setReportModalVisible(false)}
-        onSubmitReport={async ({ requestedBanDuration, reason, description }) => {
+        onSubmitReport={async ({ reason, description, proofUrl, proofType }) => {
           await api.post('/reports', {
             reportedUserId: userId,
-            requestedBanDuration,
             reason,
             description,
+            proofUrl,
+            proofType,
           });
-          showToast(t('Report submitted successfully'), 'success');
         }}
         targetUserName={profile.name}
       />

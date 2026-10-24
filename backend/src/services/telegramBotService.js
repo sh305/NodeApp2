@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8836145749:AAEq5rKid1mOslFUtdhfhPxZI4KjLZYpzZs';
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'FunMazaApp_bot';
 const TELEGRAM_API = BOT_TOKEN ? `https://api.telegram.org/bot${BOT_TOKEN}` : null;
 

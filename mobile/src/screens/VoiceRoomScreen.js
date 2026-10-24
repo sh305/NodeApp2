@@ -1594,14 +1594,15 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
     }
   };
 
-  const handleSubmitReport = async ({ requestedBanDuration, reason, description }) => {
+  const handleSubmitReport = async ({ reason, description, proofUrl, proofType }) => {
     if (!selectedSeatUser) return;
     await api.post('/reports', {
       reportedUserId: selectedSeatUser._id,
       roomId,
-      requestedBanDuration,
       reason,
       description,
+      proofUrl,
+      proofType,
     });
     setSelectedSeatUser(null);
   };

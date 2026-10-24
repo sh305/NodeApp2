@@ -15,8 +15,7 @@ if (accountSid && authToken) {
   }
 }
 
-const twoFactorApiKey =
-  process.env.TWOFACTOR_API_KEY || '20d6d690-b96f-11f1-af74-0200cd936042';
+const twoFactorApiKey = process.env.TWOFACTOR_API_KEY;
 
 /**
  * 2Factor.in Real Voice Call & SMS OTP Service

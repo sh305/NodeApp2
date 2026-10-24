@@ -143,6 +143,12 @@ const userSchema = new mongoose.Schema(
       name: { type: String, default: 'Level 1 Frame' },
       frameUrl: { type: String, default: '/icons/User Level Frame/level_01.svg' },
     },
+    // User Role System (User, Admin, Owner)
+    role: {
+      type: String,
+      enum: ['user', 'admin', 'owner'],
+      default: 'user',
+    },
     // User Ban System (Reporting Penalty)
     isBanned: {
       type: Boolean,
@@ -164,6 +170,28 @@ const userSchema = new mongoose.Schema(
     banReason: {
       type: String,
       default: '',
+    },
+    // Official Warning & Strike System
+    warningCount: {
+      type: Number,
+      default: 0,
+    },
+    warnings: [
+      {
+        message: { type: String, default: '' },
+        reason: { type: String, default: '' },
+        issuedAt: { type: Date, default: Date.now },
+        issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      },
+    ],
+    // Reporter Penalty System (Blocked if submitting repeated false reports)
+    reportingBlockedUntil: {
+      type: Date,
+      default: null,
+    },
+    falseReportStrikes: {
+      type: Number,
+      default: 0,
     },
     // Block System (User A blocks User B)
     blockedUsers: [
@@ -324,7 +352,7 @@ userSchema.methods.checkActiveBan = function () {
     return {
       banned: true,
       type: 'permanent',
-      message: 'Aapka account permanent ban kar diya gaya hai. Aap dubara login nahi kar sakte.',
+      message: 'Your account has been permanently suspended due to community guideline violations.',
     };
   }
 
@@ -334,7 +362,7 @@ userSchema.methods.checkActiveBan = function () {
       banned: true,
       type: this.banType,
       expiresAt: this.banExpiresAt,
-      message: `Aapka account ${daysLeft} din ke liye suspend hai report ki wajah se.`,
+      message: `Your account has been suspended for ${daysLeft} more day(s) due to community violations.`,
     };
   }
 
