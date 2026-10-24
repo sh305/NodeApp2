@@ -1663,6 +1663,42 @@ exports.telegramDirectLogin = async (req, res) => {
   }
 };
 
+// Helper: Verify whether Instagram account actually exists on Instagram
+const verifyInstagramAccount = async (username) => {
+  try {
+    const res = await axios.get(`https://www.instagram.com/${encodeURIComponent(username)}/`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      timeout: 8000,
+    });
+    const html = res.data || '';
+    const titleMatch = typeof html === 'string' ? html.match(/<title>(.*?)<\/title>/) : null;
+    const title = titleMatch ? titleMatch[1] : '';
+
+    // Real Instagram profiles have title: "<Name> (@<username>) • Instagram photos and videos"
+    const exists =
+      title.includes('(') &&
+      (title.includes('&#064;') || title.includes('@') || title.includes('Instagram photos and videos'));
+
+    let realName = username;
+    const nameMatch = title.match(/^(.*?)\s*[\(\•]/);
+    if (nameMatch && nameMatch[1]) {
+      realName = nameMatch[1].trim();
+    }
+
+    return { exists, realName, title };
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      return { exists: false };
+    }
+    // Strict format fallback
+    const isValidFormat = /^[a-zA-Z0-9._]{1,30}$/.test(username);
+    return { exists: isValidFormat, realName: username, fallback: true };
+  }
+};
+
 // @desc    Direct Login / Sign-up with Instagram account (Username or ID)
 // @route   POST /api/auth/instagram-direct-login
 exports.instagramDirectLogin = async (req, res) => {
@@ -1689,8 +1725,17 @@ exports.instagramDirectLogin = async (req, res) => {
     });
 
     if (!user) {
-      // Auto-create / Sign-up new account with Instagram username
-      const generatedName = cleanWithoutAt || `Insta_${Math.floor(1000 + Math.random() * 9000)}`;
+      // 1. Strictly verify that this Instagram account actually exists on Instagram
+      const check = await verifyInstagramAccount(cleanWithoutAt);
+      if (!check.exists) {
+        return res.status(400).json({
+          success: false,
+          message: 'This Instagram account does not exist. Please enter a valid Instagram account.',
+        });
+      }
+
+      // Auto-create / Sign-up new account with verified Instagram profile
+      const generatedName = check.realName || cleanWithoutAt;
       const avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
 
       user = await User.create({

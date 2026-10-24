@@ -119,6 +119,28 @@ const TW_INJECTED_JS = `
   true;
 `;
 
+// Injected JS to detect successful Instagram Web Login and extract verified username
+const INSTA_INJECTED_JS = `
+  (function() {
+    function checkLogin() {
+      try {
+        var path = window.location.pathname || '';
+        if (!path.includes('/accounts/login') && !path.includes('/accounts/emailsignup') && path !== '/') {
+          var clean = path.replace(/^\\/+|\\/+$/g, '').split('?')[0];
+          if (clean && !clean.includes('/') && clean !== 'explore' && clean !== 'reels' && clean !== 'direct' && clean !== 'stories') {
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'INSTA_LOGIN_SUCCESS',
+              username: clean
+            }));
+          }
+        }
+      } catch(e) {}
+    }
+    setInterval(checkLogin, 1000);
+  })();
+  true;
+`;
+
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 const GOOGLE_WEB_CLIENT_ID = '343159049565-l36al4hqftj2dk9u4vtpfppna6lla577.apps.googleusercontent.com';
@@ -573,8 +595,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [telegramDirectLoading, setTelegramDirectLoading] = useState(false);
   const telegramPollRef = useRef(null);
 
-  // Instagram Direct Login Modal State
+  // Instagram Direct & WebView Login State
   const [instagramModalVisible, setInstagramModalVisible] = useState(false);
+  const [instaWebViewVisible, setInstaWebViewVisible] = useState(false);
   const [instagramInput, setInstagramInput] = useState('');
   const [instagramDirectLoading, setInstagramDirectLoading] = useState(false);
 
@@ -1179,10 +1202,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     setTelegramModalVisible(false);
   };
 
-  // ---------------- INSTAGRAM DIRECT LOGIN HANDLERS ----------------
+  // ---------------- INSTAGRAM DIRECT & WEBVIEW LOGIN HANDLERS ----------------
   const handleDirectInstagramLogin = () => {
-    setInstagramModalVisible(true);
-    setInstagramInput('');
+    setInstaWebViewVisible(true);
   };
 
   const closeInstagramModal = () => {
@@ -1200,6 +1222,56 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       }
     } catch (err) {
       await WebBrowser.openBrowserAsync(url);
+    }
+  };
+
+  const handleInstaMessage = async (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data && data.type === 'INSTA_LOGIN_SUCCESS' && data.username) {
+        setInstaWebViewVisible(false);
+        setLoading(true);
+        const res = await api.post('/auth/instagram-direct-login', { identifier: data.username });
+        if (res.data?.success && res.data?.token) {
+          showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
+          await AsyncStorage.setItem('@auth_token', res.data.token);
+          await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+          if (onLoginSuccess) onLoginSuccess(res.data.user);
+        } else {
+          showToast(t(res.data?.message || 'Instagram login failed'), 'error');
+        }
+      }
+    } catch (_) {}
+    finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInstaNavStateChange = async (navState) => {
+    const url = navState.url;
+    if (!url) return;
+    if (url.includes('instagram.com/') && !url.includes('/accounts/') && !url.includes('/explore/') && !url.includes('/reels/') && !url.includes('/direct/')) {
+      const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+      if (match && match[1] && match[1] !== 'home') {
+        const username = match[1];
+        setInstaWebViewVisible(false);
+        setLoading(true);
+        try {
+          const res = await api.post('/auth/instagram-direct-login', { identifier: username });
+          if (res.data?.success && res.data?.token) {
+            showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
+            await AsyncStorage.setItem('@auth_token', res.data.token);
+            await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+            if (onLoginSuccess) onLoginSuccess(res.data.user);
+          } else {
+            showToast(t(res.data?.message || 'Instagram login failed'), 'error');
+          }
+        } catch (err) {
+          showToast(t(err.response?.data?.message || 'Instagram login failed'), 'error');
+        } finally {
+          setLoading(false);
+        }
+      }
     }
   };
 
@@ -2447,6 +2519,53 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               renderLoading={() => (
                 <View style={styles.webLoadingContainer}>
                   <ActivityIndicator size="large" color="#FFFC00" />
+                </View>
+              )}
+            />
+          </View>
+        </Modal>
+
+        {/* ══ INSTAGRAM LOGIN WEBVIEW MODAL ══ */}
+        <Modal
+          visible={instaWebViewVisible}
+          animationType="slide"
+          onRequestClose={() => setInstaWebViewVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Platform.OS === 'android' ? 24 : 44 }}>
+            <View style={styles.fbWebHeader}>
+              <TouchableOpacity
+                onPress={() => setInstaWebViewVisible(false)}
+                style={styles.fbWebCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.fbWebCloseText}>✕ <T>Cancel</T></Text>
+              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <SocialInstagramIcon size={22} />
+                <Text style={styles.fbWebTitle}><T>Instagram Login</T></Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setInstaWebViewVisible(false);
+                  setInstagramModalVisible(true);
+                }}
+                style={styles.fbWebCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[styles.fbWebCloseText, { color: '#E1306C' }]}>@handle</Text>
+              </TouchableOpacity>
+            </View>
+            <WebView
+              source={{ uri: 'https://www.instagram.com/accounts/login/' }}
+              onNavigationStateChange={handleInstaNavStateChange}
+              onMessage={handleInstaMessage}
+              injectedJavaScript={INSTA_INJECTED_JS}
+              injectedJavaScriptBeforeContentLoaded={INSTA_INJECTED_JS}
+              userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.webLoadingContainer}>
+                  <ActivityIndicator size="large" color="#E1306C" />
                 </View>
               )}
             />

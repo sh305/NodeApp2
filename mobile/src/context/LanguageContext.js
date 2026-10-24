@@ -263,6 +263,8 @@ export const LanguageProvider = ({ children }) => {
       'Instagram login failed',
       'No bound account found for this Instagram',
       'No FunMaza account found bound to this Instagram. Please bind your Instagram account first from Profile settings.',
+      'This Instagram account does not exist. Please enter a valid Instagram account.',
+      'This Instagram account does not exist. Please enter a valid Instagram username.',
       'Are you sure do you want to bind your account to this phone number?',
       'Phone number bound successfully!',
       'Please enter a valid 10-digit mobile number',
