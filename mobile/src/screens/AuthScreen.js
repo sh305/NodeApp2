@@ -2567,7 +2567,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 <View style={styles.instagramModalHeaderTitleWrap}>
                   <SocialInstagramIcon size={26} />
                   <Text style={styles.instagramModalTitle}>
-                    <T>Login with Instagram</T>
+                    <T>Login / Sign Up with Instagram</T>
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -2580,20 +2580,20 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               </View>
 
               <Text style={styles.instagramSubtitle}>
-                <T>Direct sign-in using your bound Instagram account</T>
+                <T>Instant sign-in or create a new account with your Instagram</T>
               </Text>
 
               {/* Instagram Info Helper */}
               <View style={styles.instagramInfoBadge}>
                 <SocialInstagramIcon size={20} />
                 <Text style={styles.instagramInfoText}>
-                  <T>Enter the Instagram @username you bound in your FunMaza profile settings.</T>
+                  <T>Enter your Instagram @username. Existing bound users log in directly, and new users are registered instantly!</T>
                 </Text>
               </View>
 
               {/* Input */}
               <Text style={styles.instagramInputLabel}>
-                <T>Bound Instagram @username</T>
+                <T>Instagram @username</T>
               </Text>
               <TextInput
                 style={styles.instagramTextInput}
@@ -2618,7 +2618,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.instagramDirectSubmitText}>
-                    <T>Login with Bound Account</T>
+                    <T>Continue with Instagram</T>
                   </Text>
                 )}
               </TouchableOpacity>

@@ -1663,7 +1663,7 @@ exports.telegramDirectLogin = async (req, res) => {
   }
 };
 
-// @desc    Direct Login with bound Instagram account (Username or ID)
+// @desc    Direct Login / Sign-up with Instagram account (Username or ID)
 // @route   POST /api/auth/instagram-direct-login
 exports.instagramDirectLogin = async (req, res) => {
   try {
@@ -1673,13 +1673,13 @@ exports.instagramDirectLogin = async (req, res) => {
     }
     const clean = identifier.trim();
     const cleanWithAt = clean.startsWith('@') ? clean : `@${clean}`;
-    const cleanWithoutAt = clean.replace(/^@/, '');
+    const cleanWithoutAt = clean.replace(/^@+/, '');
 
     // Escape regex special characters just in case
     const escapedClean = cleanWithoutAt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedWithAt = cleanWithAt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    const user = await User.findOne({
+    let user = await User.findOne({
       $or: [
         { instagramId: new RegExp(`^${escapedClean}$`, 'i') },
         { 'boundAccounts.instagram.id': new RegExp(`^${escapedClean}$`, 'i') },
@@ -1689,10 +1689,45 @@ exports.instagramDirectLogin = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No FunMaza account found bound to this Instagram. Please bind your Instagram account first from Profile settings.',
+      // Auto-create / Sign-up new account with Instagram username
+      const generatedName = cleanWithoutAt || `Insta_${Math.floor(1000 + Math.random() * 9000)}`;
+      const avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+
+      user = await User.create({
+        name: generatedName,
+        instagramId: cleanWithoutAt,
+        avatar: avatarUrl,
+        boundAccounts: {
+          instagram: {
+            id: cleanWithoutAt,
+            username: cleanWithoutAt,
+            name: generatedName,
+            avatar: avatarUrl,
+            boundAt: new Date(),
+          },
+        },
       });
+    } else {
+      if (!user.boundAccounts) user.boundAccounts = {};
+      let modified = false;
+      if (!user.instagramId) {
+        user.instagramId = cleanWithoutAt;
+        modified = true;
+      }
+      if (!user.boundAccounts.instagram) {
+        user.boundAccounts.instagram = {
+          id: cleanWithoutAt,
+          username: cleanWithoutAt,
+          name: user.name || cleanWithoutAt,
+          avatar: user.avatar || '',
+          boundAt: new Date(),
+        };
+        modified = true;
+      }
+      if (modified) {
+        user.markModified('boundAccounts');
+        await user.save();
+      }
     }
 
     const banCheck = user.checkActiveBan ? user.checkActiveBan() : { banned: false };
