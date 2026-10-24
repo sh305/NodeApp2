@@ -119,24 +119,56 @@ const TW_INJECTED_JS = `
   true;
 `;
 
-// Injected JS to detect successful Instagram Web Login and extract verified username
+// Injected JS to detect successful Instagram Web Login, block external app launches, and extract verified user
 const INSTA_INJECTED_JS = `
   (function() {
+    // 1. Block external Instagram app launch / intent links
+    try {
+      window.open = function() { return null; };
+      var style = document.createElement('style');
+      style.innerHTML = 'a[href*="instagram://"], a[href*="intent://"], a[href*="play.google.com"] { pointer-events: none !important; display: none !important; }';
+      document.head && document.head.appendChild(style);
+    } catch(e) {}
+
+    var reported = false;
     function checkLogin() {
+      if (reported) return;
       try {
+        var cookies = document.cookie || '';
+        var dsMatch = cookies.match(/ds_user_id=([^;]+)/);
+        var userId = dsMatch ? dsMatch[1] : null;
         var path = window.location.pathname || '';
-        if (!path.includes('/accounts/login') && !path.includes('/accounts/emailsignup') && path !== '/') {
-          var clean = path.replace(/^\\/+|\\/+$/g, '').split('?')[0];
-          if (clean && !clean.includes('/') && clean !== 'explore' && clean !== 'reels' && clean !== 'direct' && clean !== 'stories') {
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'INSTA_LOGIN_SUCCESS',
-              username: clean
-            }));
+
+        var isPastLogin = !path.includes('/accounts/login') && !path.includes('/accounts/emailsignup') && !path.includes('/accounts/password');
+
+        if (userId && isPastLogin) {
+          reported = true;
+
+          // Attempt to find username from profile links or storage
+          var username = null;
+          var links = document.querySelectorAll('a[href^="/"]');
+          for (var i = 0; i < links.length; i++) {
+            var href = links[i].getAttribute('href') || '';
+            if (href.length > 2 && !href.startsWith('/accounts') && !href.startsWith('/explore') && !href.startsWith('/direct') && !href.startsWith('/reels') && !href.startsWith('/stories') && !href.includes('?') && !href.includes('&')) {
+              var clean = href.replace(/^\\/+|\\/+$/g, '');
+              if (clean && !clean.includes('/')) {
+                username = clean;
+                break;
+              }
+            }
           }
+
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'INSTA_LOGIN_SUCCESS',
+            userId: userId,
+            username: username || ('insta_' + userId)
+          }));
         }
       } catch(e) {}
     }
-    setInterval(checkLogin, 1000);
+
+    setInterval(checkLogin, 500);
+    checkLogin();
   })();
   true;
 `;
@@ -597,6 +629,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   // Instagram Official WebView Login State
   const [instaWebViewVisible, setInstaWebViewVisible] = useState(false);
+  const instaWebRef = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -1207,12 +1240,15 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleInstaMessage = async (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data && data.type === 'INSTA_LOGIN_SUCCESS' && data.username) {
+      if (data && data.type === 'INSTA_LOGIN_SUCCESS') {
+        const identifier = data.username || (data.userId ? `insta_${data.userId}` : null);
+        if (!identifier) return;
+
         setInstaWebViewVisible(false);
         setLoading(true);
         const res = await api.post('/auth/instagram-direct-login', {
-          identifier: data.username,
-          instagramId: data.instagramId || data.username,
+          identifier: identifier,
+          instagramId: data.userId || identifier,
           authSource: 'instagram_webview',
         });
         if (res.data?.success && res.data?.token) {
@@ -1233,9 +1269,20 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleInstaNavStateChange = async (navState) => {
     const url = navState.url;
     if (!url) return;
-    if (url.includes('instagram.com/') && !url.includes('/accounts/') && !url.includes('/explore/') && !url.includes('/reels/') && !url.includes('/direct/')) {
+
+    // Block external deep links
+    if (url.startsWith('instagram://') || url.startsWith('intent://') || url.includes('play.google.com')) {
+      return;
+    }
+
+    const isPastLogin =
+      !url.includes('/accounts/login') &&
+      !url.includes('/accounts/emailsignup') &&
+      !url.includes('/accounts/password');
+
+    if (isPastLogin && url.includes('instagram.com/')) {
       const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
-      if (match && match[1] && match[1] !== 'home') {
+      if (match && match[1] && match[1] !== 'accounts' && match[1] !== 'explore' && match[1] !== 'reels' && match[1] !== 'direct') {
         const username = match[1];
         setInstaWebViewVisible(false);
         setLoading(true);
@@ -2508,11 +2555,24 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
               <View style={{ width: 60 }} />
             </View>
             <WebView
+              ref={instaWebRef}
               source={{ uri: 'https://www.instagram.com/accounts/login/' }}
               onNavigationStateChange={handleInstaNavStateChange}
               onMessage={handleInstaMessage}
               injectedJavaScript={INSTA_INJECTED_JS}
               injectedJavaScriptBeforeContentLoaded={INSTA_INJECTED_JS}
+              onShouldStartLoadWithRequest={(request) => {
+                const url = request.url;
+                if (!url) return true;
+                // STRICT: Block opening external Instagram native app, Google Play, or intent links!
+                if (url.startsWith('instagram://') || url.startsWith('intent://') || url.includes('play.google.com')) {
+                  return false;
+                }
+                return true;
+              }}
+              setSupportMultipleWindows={false}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
               userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
               startInLoadingState
               renderLoading={() => (
