@@ -50,6 +50,11 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
+    instagramId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     boundAccounts: {
       google: { id: String, email: String, name: String, boundAt: Date },
       facebook: { id: String, name: String, email: String, boundAt: Date },
@@ -57,6 +62,7 @@ const userSchema = new mongoose.Schema(
       snapchat: { id: String, displayName: String, avatar: String, boundAt: Date },
       telegram: { id: String, username: String, firstName: String, lastName: String, photoUrl: String, boundAt: Date },
       phone: { number: String, boundAt: Date },
+      instagram: { id: String, username: String, name: String, avatar: String, boundAt: Date },
     },
     avatar: {
       type: String,

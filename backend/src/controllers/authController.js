@@ -901,6 +901,36 @@ exports.bindAccount = async (req, res) => {
       if (avatar && (!user.avatar || user.avatar.includes('unsplash'))) {
         user.avatar = avatar;
       }
+    } else if (provider === 'instagram') {
+      const cleanUsername = String(accountId || username).replace(/^@+/, '').trim().toLowerCase();
+      if (!cleanUsername) {
+        return res.status(400).json({ success: false, message: 'Invalid Instagram username' });
+      }
+
+      const existing = await User.findOne({
+        $or: [
+          { instagramId: cleanUsername },
+          { 'boundAccounts.instagram.username': cleanUsername },
+          { 'boundAccounts.instagram.id': cleanUsername },
+        ],
+        _id: { $ne: user._id },
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'This Instagram account is already bound to another profile',
+        });
+      }
+
+      user.instagramId = cleanUsername;
+      user.boundAccounts.instagram = {
+        id: cleanUsername,
+        username: cleanUsername,
+        name: name || `@${cleanUsername}`,
+        avatar: avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        boundAt: new Date(),
+      };
     }
 
     user.markModified('boundAccounts');
@@ -948,6 +978,9 @@ exports.unbindAccount = async (req, res) => {
     } else if (provider === 'telegram') {
       user.telegramId = undefined;
       user.boundAccounts.telegram = undefined;
+    } else if (provider === 'instagram') {
+      user.instagramId = undefined;
+      user.boundAccounts.instagram = undefined;
     }
 
     user.markModified('boundAccounts');

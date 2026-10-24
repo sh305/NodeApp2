@@ -267,6 +267,16 @@ const TelegramCircleIcon = ({ size = 36 }) => (
   </Svg>
 );
 
+// 8. Instagram Circle Icon (Signature Gradient/Color)
+const InstagramCircleIcon = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+    <Circle cx="18" cy="18" r="18" fill="#E1306C" />
+    <Rect x="10" y="10" width="16" height="16" rx="4.5" stroke="#FFFFFF" strokeWidth="1.8" />
+    <Circle cx="18" cy="18" r="4" stroke="#FFFFFF" strokeWidth="1.8" />
+    <Circle cx="22.2" cy="13.8" r="1.1" fill="#FFFFFF" />
+  </Svg>
+);
+
 export default function AccountBindingScreen({ navigation, currentUser }) {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
@@ -391,10 +401,21 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
     profile?.boundAccounts?.telegram?.firstName ||
     profile?.boundAccounts?.telegram?.id;
 
+  const instagramBoundValue =
+    profile?.instagramId ||
+    profile?.boundAccounts?.instagram?.username ||
+    profile?.boundAccounts?.instagram?.id;
+
   const phoneBoundValue =
     profile?.phone ||
     profile?.phoneNumber ||
     profile?.boundAccounts?.phone?.number;
+
+  // Instagram State
+  const [instaChooserVisible, setInstaChooserVisible] = useState(false);
+  const [customInstaInput, setCustomInstaInput] = useState('');
+  const [instaPreviewVisible, setInstaPreviewVisible] = useState(false);
+  const [targetInstaHandle, setTargetInstaHandle] = useState('');
 
   // ══════════════════════════════════════════════════
   // 1. PHONE HANDLER (WHATSAPP OTP VERIFICATION)
@@ -1055,6 +1076,47 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   };
 
   // ══════════════════════════════════════════════════
+  // 6. INSTAGRAM HANDLER (LIVE PROFILE PREVIEW CHECK)
+  // ══════════════════════════════════════════════════
+  const handleInstagramClick = () => {
+    if (instagramBoundValue) {
+      setPendingUnbind({
+        provider: 'instagram',
+        label: t('Instagram'),
+        value: instagramBoundValue.startsWith('@') ? instagramBoundValue : `@${instagramBoundValue}`,
+      });
+      setUnbindModalVisible(true);
+      return;
+    }
+    setCustomInstaInput('');
+    setInstaChooserVisible(true);
+  };
+
+  const handleStartInstaPreview = () => {
+    const clean = customInstaInput.trim().replace(/^@+/, '').replace(/\s+/g, '');
+    if (!clean) {
+      showToast(t('Please enter your Instagram username'), 'error');
+      return;
+    }
+    setTargetInstaHandle(clean);
+    setInstaChooserVisible(false);
+    setInstaPreviewVisible(true);
+  };
+
+  const handleConfirmInstaFromPreview = () => {
+    setInstaPreviewVisible(false);
+    setPendingBind({
+      provider: 'instagram',
+      accountId: targetInstaHandle,
+      username: targetInstaHandle,
+      name: `@${targetInstaHandle}`,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      promptText: t('Are you sure do you want to bind your account to this Instagram profile?'),
+    });
+    setConfirmModalVisible(true);
+  };
+
+  // ══════════════════════════════════════════════════
   // 7. FINAL BINDING CONFIRMATION ("Yes, Bind")
   // ══════════════════════════════════════════════════
   const handleConfirmBinding = async () => {
@@ -1087,6 +1149,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
               ? 'Snapchat account bound successfully!'
               : pendingBind.provider === 'telegram'
               ? 'Telegram account bound successfully!'
+              : pendingBind.provider === 'instagram'
+              ? 'Instagram account bound successfully!'
               : 'Twitter account bound successfully!'
           ),
           'success'
@@ -1316,6 +1380,37 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 ]}
               >
                 {telegramBoundValue || <T>Bind on Account</T>}
+              </Text>
+              <ChevronRightIcon size={18} color="#C7C7CC" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.rowDivider} />
+
+          {/* 7. Instagram (With In-App Live Profile Preview Verification) */}
+          <TouchableOpacity
+            style={styles.rowItem}
+            activeOpacity={0.75}
+            onPress={handleInstagramClick}
+          >
+            <View style={styles.rowLeft}>
+              <InstagramCircleIcon size={36} />
+              <Text style={styles.rowLabelText}>
+                <T>Instagram</T>
+              </Text>
+            </View>
+
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.statusText,
+                  instagramBoundValue && styles.statusTextBound,
+                ]}
+              >
+                {instagramBoundValue ? (
+                  instagramBoundValue.startsWith('@') ? instagramBoundValue : `@${instagramBoundValue}`
+                ) : (
+                  <T>Bind on Account</T>
+                )}
               </Text>
               <ChevronRightIcon size={18} color="#C7C7CC" />
             </View>
@@ -2301,6 +2396,150 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
         </TouchableOpacity>
       </Modal>
 
+      {/* ══ 3.5 INSTAGRAM BINDING CHOOSER MODAL ══ */}
+      <Modal
+        visible={instaChooserVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setInstaChooserVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.chooserOverlay}
+          activeOpacity={1}
+          onPress={() => setInstaChooserVisible(false)}
+        >
+          <View
+            style={styles.chooserSheet}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.chooserHeaderRow}>
+              <View style={styles.chooserHeaderLeft}>
+                <InstagramCircleIcon size={28} />
+                <Text style={styles.chooserTitle}>
+                  <T>Bind Instagram Account</T>
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setInstaChooserVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.chooserCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.chooserSubtitle}>
+              <T>Enter your Instagram username to preview and verify your profile</T>
+            </Text>
+
+            <View style={styles.inputSectionCard}>
+              <Text style={styles.inputSectionLabel}>
+                <T>Instagram @username</T>
+              </Text>
+              <TextInput
+                style={styles.gmailTextInput}
+                placeholder={t('@username')}
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                value={customInstaInput}
+                onChangeText={setCustomInstaInput}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.submitGmailBtn,
+                  !customInstaInput.trim() && styles.submitGmailBtnDisabled,
+                  { backgroundColor: '#E1306C' },
+                ]}
+                disabled={!customInstaInput.trim()}
+                activeOpacity={0.8}
+                onPress={handleStartInstaPreview}
+              >
+                <Text style={styles.submitGmailBtnText}>
+                  🔍 <T>Preview & Verify Profile</T>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ══ 3.6 INSTAGRAM IN-APP LIVE PROFILE PREVIEW MODAL (Method 2) ══ */}
+      <Modal
+        visible={instaPreviewVisible}
+        animationType="slide"
+        onRequestClose={() => setInstaPreviewVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Math.max(16, insets.top) }}>
+          <View style={styles.fbWebHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                setInstaPreviewVisible(false);
+                setInstaChooserVisible(true);
+              }}
+              style={styles.fbWebCloseBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.fbWebCloseText}>✕ <T>Cancel</T></Text>
+            </TouchableOpacity>
+            <Text style={styles.fbWebTitle}>@{targetInstaHandle}</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          {/* Embedded live profile WebView */}
+          <WebView
+            source={{ uri: `https://www.instagram.com/${targetInstaHandle}/` }}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.webLoadingContainer}>
+                <ActivityIndicator size="large" color="#E1306C" />
+              </View>
+            )}
+            style={{ flex: 1 }}
+          />
+
+          {/* Bottom Confirmation Bar */}
+          <View
+            style={{
+              backgroundColor: '#1E1E2D',
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderTopWidth: 1,
+              borderTopColor: '#2A2A3E',
+              gap: 10,
+              paddingBottom: Math.max(16, insets.bottom + 10),
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <InstagramCircleIcon size={24} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+                  <T>Verify Instagram Profile</T>
+                </Text>
+                <Text style={{ color: '#94A3B8', fontSize: 12 }}>
+                  <T>Check your avatar and bio above. Tap confirm to bind.</T>
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#E1306C',
+                paddingVertical: 12,
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              activeOpacity={0.85}
+              onPress={handleConfirmInstaFromPreview}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+                ✓ <T>Yes, Bind This Account</T>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ══ 4. CONFIRMATION MODAL ("Are you sure do you want to bind...") ══ */}
       <Modal
         visible={confirmModalVisible}
@@ -2329,6 +2568,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 <SnapchatCircleIcon size={46} />
               ) : pendingBind?.provider === 'telegram' ? (
                 <TelegramCircleIcon size={46} />
+              ) : pendingBind?.provider === 'instagram' ? (
+                <InstagramCircleIcon size={46} />
               ) : (
                 <TwitterCircleIcon size={46} />
               )}
@@ -2424,6 +2665,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
                 <SnapchatCircleIcon size={46} />
               ) : pendingUnbind?.provider === 'telegram' ? (
                 <TelegramCircleIcon size={46} />
+              ) : pendingUnbind?.provider === 'instagram' ? (
+                <InstagramCircleIcon size={46} />
               ) : (
                 <PhoneCircleIcon size={46} />
               )}
