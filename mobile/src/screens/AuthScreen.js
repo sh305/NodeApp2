@@ -221,6 +221,16 @@ const SocialTelegramIcon = ({ size = 24, style }) => (
   />
 );
 
+const instagramAsset = require('../../assets/icons/instagram.png');
+
+const SocialInstagramIcon = ({ size = 24, style }) => (
+  <Image
+    source={instagramAsset}
+    style={[{ width: size, height: size }, style]}
+    resizeMode="contain"
+  />
+);
+
 const SocialGoogleIcon = ({ size = 24 }) => (
   <Svg width={size} height={size} viewBox="0 0 48 48">
     <Path
@@ -562,6 +572,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [telegramWaiting, setTelegramWaiting] = useState(false);
   const [telegramDirectLoading, setTelegramDirectLoading] = useState(false);
   const telegramPollRef = useRef(null);
+
+  // Instagram Direct Login Modal State
+  const [instagramModalVisible, setInstagramModalVisible] = useState(false);
+  const [instagramInput, setInstagramInput] = useState('');
+  const [instagramDirectLoading, setInstagramDirectLoading] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -1164,6 +1179,55 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     setTelegramModalVisible(false);
   };
 
+  // ---------------- INSTAGRAM DIRECT LOGIN HANDLERS ----------------
+  const handleDirectInstagramLogin = () => {
+    setInstagramModalVisible(true);
+    setInstagramInput('');
+  };
+
+  const closeInstagramModal = () => {
+    setInstagramModalVisible(false);
+  };
+
+  const handleOpenInstagramApp = async () => {
+    const url = 'https://instagram.com';
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        await WebBrowser.openBrowserAsync(url);
+      }
+    } catch (err) {
+      await WebBrowser.openBrowserAsync(url);
+    }
+  };
+
+  const handleInstagramBoundLogin = async () => {
+    const clean = instagramInput.trim();
+    if (!clean) {
+      showToast(t('Please enter your bound Instagram @username'), 'error');
+      return;
+    }
+    setInstagramDirectLoading(true);
+    try {
+      const res = await api.post('/auth/instagram-direct-login', { identifier: clean });
+      if (res.data?.success && res.data?.token) {
+        setInstagramModalVisible(false);
+        showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', res.data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        if (onLoginSuccess) onLoginSuccess(res.data.user);
+      } else {
+        showToast(t(res.data?.message || 'Instagram login failed'), 'error');
+      }
+    } catch (err) {
+      showToast(t(err.response?.data?.message || 'No bound account found for this Instagram'), 'error');
+    } finally {
+      setInstagramDirectLoading(false);
+    }
+  };
+
   // ---------------- GMAIL / EMAIL AUTH HANDLERS ----------------
 
   // 1. Send OTP to Gmail
@@ -1432,6 +1496,15 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   onPress={handleDirectTelegramLogin}
                 >
                   <SocialTelegramIcon size={36} />
+                </TouchableOpacity>
+
+                {/* Instagram Direct Login */}
+                <TouchableOpacity
+                  style={styles.socialCircleBtn}
+                  activeOpacity={0.8}
+                  onPress={handleDirectInstagramLogin}
+                >
+                  <SocialInstagramIcon size={36} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -2479,6 +2552,90 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             </View>
           </View>
         </Modal>
+
+        {/* ══ INSTAGRAM DIRECT LOGIN MODAL ══ */}
+        <Modal
+          visible={instagramModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={closeInstagramModal}
+        >
+          <View style={styles.instagramModalBackdrop}>
+            <View style={styles.instagramModalCard}>
+              {/* Header */}
+              <View style={styles.instagramModalHeader}>
+                <View style={styles.instagramModalHeaderTitleWrap}>
+                  <SocialInstagramIcon size={26} />
+                  <Text style={styles.instagramModalTitle}>
+                    <T>Login with Instagram</T>
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={closeInstagramModal}
+                  style={styles.instagramModalCloseBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={styles.instagramModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.instagramSubtitle}>
+                <T>Direct sign-in using your bound Instagram account</T>
+              </Text>
+
+              {/* Instagram Info Helper */}
+              <View style={styles.instagramInfoBadge}>
+                <SocialInstagramIcon size={20} />
+                <Text style={styles.instagramInfoText}>
+                  <T>Enter the Instagram @username you bound in your FunMaza profile settings.</T>
+                </Text>
+              </View>
+
+              {/* Input */}
+              <Text style={styles.instagramInputLabel}>
+                <T>Bound Instagram @username</T>
+              </Text>
+              <TextInput
+                style={styles.instagramTextInput}
+                placeholder={t('Enter @username (e.g. @cool_user)')}
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                value={instagramInput}
+                onChangeText={setInstagramInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.instagramDirectSubmitBtn,
+                  instagramDirectLoading && { opacity: 0.6 },
+                ]}
+                activeOpacity={0.8}
+                onPress={handleInstagramBoundLogin}
+                disabled={instagramDirectLoading}
+              >
+                {instagramDirectLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.instagramDirectSubmitText}>
+                    <T>Login with Bound Account</T>
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Open Instagram Link */}
+              <TouchableOpacity
+                style={styles.instagramOpenLinkBtn}
+                activeOpacity={0.7}
+                onPress={handleOpenInstagramApp}
+              >
+                <Text style={styles.instagramOpenLinkText}>
+                  <T>Need to check your Instagram handle? Open Instagram</T> →
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
     </ScreenContainer>
   );
 }
@@ -2726,7 +2883,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 22,
+    gap: 14,
     marginTop: 4,
   },
   socialCircleBtn: {
@@ -3316,5 +3473,123 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+
+  // Instagram Direct Login Modal Styles
+  instagramModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  instagramModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#1E1E2D',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(225, 48, 108, 0.45)',
+    padding: 22,
+    shadowColor: '#E1306C',
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  instagramModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  instagramModalHeaderTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  instagramModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  instagramModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  instagramModalCloseText: {
+    color: '#9CA3AF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  instagramSubtitle: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    marginBottom: 16,
+  },
+  instagramInfoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(225, 48, 108, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 48, 108, 0.25)',
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+    marginBottom: 16,
+  },
+  instagramInfoText: {
+    flex: 1,
+    color: '#F9A8D4',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+  instagramInputLabel: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  instagramTextInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  instagramDirectSubmitBtn: {
+    backgroundColor: '#E1306C',
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#E1306C',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  instagramDirectSubmitText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  instagramOpenLinkBtn: {
+    marginTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+  },
+  instagramOpenLinkText: {
+    color: '#A78BFA',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

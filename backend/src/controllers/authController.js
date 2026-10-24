@@ -1663,4 +1663,58 @@ exports.telegramDirectLogin = async (req, res) => {
   }
 };
 
+// @desc    Direct Login with bound Instagram account (Username or ID)
+// @route   POST /api/auth/instagram-direct-login
+exports.instagramDirectLogin = async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier || !identifier.trim()) {
+      return res.status(400).json({ success: false, message: 'Please enter your Instagram @username' });
+    }
+    const clean = identifier.trim();
+    const cleanWithAt = clean.startsWith('@') ? clean : `@${clean}`;
+    const cleanWithoutAt = clean.replace(/^@/, '');
+
+    // Escape regex special characters just in case
+    const escapedClean = cleanWithoutAt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedWithAt = cleanWithAt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const user = await User.findOne({
+      $or: [
+        { instagramId: new RegExp(`^${escapedClean}$`, 'i') },
+        { 'boundAccounts.instagram.id': new RegExp(`^${escapedClean}$`, 'i') },
+        { 'boundAccounts.instagram.username': new RegExp(`^${escapedClean}$`, 'i') },
+        { 'boundAccounts.instagram.username': new RegExp(`^${escapedWithAt}$`, 'i') },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No FunMaza account found bound to this Instagram. Please bind your Instagram account first from Profile settings.',
+      });
+    }
+
+    const banCheck = user.checkActiveBan ? user.checkActiveBan() : { banned: false };
+    if (banCheck.banned) {
+      return res.status(403).json({
+        success: false,
+        banned: true,
+        message: banCheck.message,
+      });
+    }
+
+    const token = generateToken(user._id);
+    return res.status(200).json({
+      success: true,
+      message: 'Logged in with Instagram successfully! 🎉',
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error('instagramDirectLogin error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
