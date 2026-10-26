@@ -175,6 +175,164 @@ const INSTA_INJECTED_JS = `
       } catch(e) {}
     }
 
+    function findAvatarInPage() {
+      // 1. Check all scripts for profile_pic_url_hd or profile_pic_url
+      try {
+        var scripts = document.querySelectorAll('script');
+        for (var i = 0; i < scripts.length; i++) {
+          var txt = scripts[i].textContent || '';
+          if (txt.indexOf('profile_pic_url') !== -1) {
+            var mHd = txt.match(/"profile_pic_url_hd"\s*:\s*"([^"]+)"/);
+            if (mHd && mHd[1]) {
+              var uHd = mHd[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+              if (uHd.indexOf('http') === 0) return uHd;
+            }
+            var mNorm = txt.match(/"profile_pic_url"\s*:\s*"([^"]+)"/);
+            if (mNorm && mNorm[1]) {
+              var uNorm = mNorm[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+              if (uNorm.indexOf('http') === 0 && uNorm.indexOf('rsrc.php') === -1) return uNorm;
+            }
+          }
+        }
+      } catch(e) {}
+
+      // 2. Check localStorage
+      try {
+        for (var l = 0; l < localStorage.length; l++) {
+          var val = localStorage.getItem(localStorage.key(l));
+          if (val && typeof val === 'string' && val.indexOf('profile_pic_url') !== -1) {
+            var mHd2 = val.match(/"profile_pic_url_hd"\s*:\s*"([^"]+)"/);
+            if (mHd2 && mHd2[1]) return mHd2[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+            var mNorm2 = val.match(/"profile_pic_url"\s*:\s*"([^"]+)"/);
+            if (mNorm2 && mNorm2[1]) return mNorm2[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+          }
+        }
+      } catch(e) {}
+
+      // 3. Check window._sharedData
+      try {
+        if (window._sharedData && window._sharedData.config && window._sharedData.config.viewer) {
+          var v = window._sharedData.config.viewer;
+          if (v.profile_pic_url_hd || v.profile_pic_url) {
+            return v.profile_pic_url_hd || v.profile_pic_url;
+          }
+        }
+      } catch(e) {}
+
+      // 4. Check DOM img tags
+      try {
+        var imgs = document.querySelectorAll('img');
+        for (var j = 0; j < imgs.length; j++) {
+          var s = imgs[j].currentSrc || imgs[j].src || '';
+          if (!s || s.indexOf('data:') === 0 || s.indexOf('rsrc.php') !== -1 || s.indexOf('.svg') !== -1) continue;
+          var alt = (imgs[j].alt || '').toLowerCase();
+          if (s.indexOf('cdninstagram.com') !== -1 || s.indexOf('fbcdn.net') !== -1) {
+            if (alt.indexOf('profile') !== -1 || s.indexOf('150x150') !== -1 || s.indexOf('320x320') !== -1 || s.indexOf('s150x150') !== -1 || s.indexOf('s320x320') !== -1) {
+              return s;
+            }
+          }
+        }
+        var navImg = document.querySelector('nav img, footer img, [role="navigation"] img, [role="tablist"] img');
+        if (navImg && (navImg.currentSrc || navImg.src)) {
+          var ns = navImg.currentSrc || navImg.src;
+          if (ns.indexOf('rsrc.php') === -1 && ns.indexOf('.svg') === -1) return ns;
+        }
+      } catch(e) {}
+
+      return null;
+    }
+
+    function fetchProfilePicAndFinish(username, userId, fullName, initialAvatar) {
+      if (reported) return;
+      notifyVerifying();
+
+      var targetUser = username || (capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : '');
+
+      function finalizeWithAvatar(foundPic, resolvedName) {
+        if (reported) return;
+        var cleanPic = foundPic && typeof foundPic === 'string' ? foundPic.replace(/\\u0026/g, '&').replace(/&amp;/g, '&') : null;
+        sendSuccess(targetUser || username, resolvedName || fullName, cleanPic, userId);
+      }
+
+      // If initialAvatar is already a clean CDN picture:
+      if (initialAvatar && (initialAvatar.indexOf('cdninstagram.com') !== -1 || initialAvatar.indexOf('fbcdn.net') !== -1) && initialAvatar.indexOf('rsrc.php') === -1) {
+        finalizeWithAvatar(initialAvatar, fullName);
+        return;
+      }
+
+      // 1. Try finding avatar immediately in scripts / localStorage / DOM
+      var instantAvatar = findAvatarInPage();
+      if (instantAvatar) {
+        finalizeWithAvatar(instantAvatar, fullName);
+        return;
+      }
+
+      var csrfMatch = (document.cookie || '').match(/csrftoken=([^;]+)/);
+      var csrf = csrfMatch ? csrfMatch[1] : '';
+
+      // 2. Query /api/v1/accounts/current_user/?edit=true
+      fetch('/api/v1/accounts/current_user/?edit=true', {
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-IG-App-ID': '936619743392459',
+          'X-CSRFToken': csrf
+        }
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data && data.user) {
+          var realUser = data.user.username || targetUser;
+          if (realUser) targetUser = realUser;
+          var realPic = data.user.profile_pic_url_hd || data.user.profile_pic_url;
+          var realName = data.user.full_name || fullName;
+          if (realPic) {
+            finalizeWithAvatar(realPic, realName);
+            return;
+          }
+        }
+        tryWebProfileInfo();
+      })
+      .catch(function() {
+        tryWebProfileInfo();
+      });
+
+      function tryWebProfileInfo() {
+        if (!targetUser) {
+          finalizeWithAvatar(findAvatarInPage(), fullName);
+          return;
+        }
+        fetch('/api/v1/users/web_profile_info/?username=' + encodeURIComponent(targetUser), {
+          credentials: 'include',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-IG-App-ID': '936619743392459',
+            'X-CSRFToken': csrf
+          }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          var u = data && data.data && data.data.user;
+          if (u) {
+            var realPic = u.profile_pic_url_hd || u.profile_pic_url;
+            var realName = u.full_name || fullName;
+            if (realPic) {
+              finalizeWithAvatar(realPic, realName);
+              return;
+            }
+          }
+          finalizeWithAvatar(findAvatarInPage(), fullName);
+        })
+        .catch(function() {
+          finalizeWithAvatar(findAvatarInPage(), fullName);
+        });
+      }
+
+      setTimeout(function() {
+        finalizeWithAvatar(findAvatarInPage(), fullName);
+      }, 2000);
+    }
+
     // Intercept XHR for login completion
     try {
       var origOpen = XMLHttpRequest.prototype.open;
@@ -190,10 +348,8 @@ const INSTA_INJECTED_JS = `
               var data = JSON.parse(this.responseText);
               if (data && (data.authenticated === true || data.user === true || data.userId)) {
                 notifyVerifying();
-                if (data.userId) {
-                  var cleanCap = capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : null;
-                  sendSuccess(cleanCap, null, null, data.userId);
-                }
+                var cleanCap = capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : null;
+                fetchProfilePicAndFinish(cleanCap, data.userId || null, null);
               }
             }
           } catch(e) {}
@@ -214,10 +370,8 @@ const INSTA_INJECTED_JS = `
               res.clone().json().then(function(data) {
                 if (data && (data.authenticated === true || data.user === true || data.userId)) {
                   notifyVerifying();
-                  if (data.userId) {
-                    var cleanCap = capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : null;
-                    sendSuccess(cleanCap, null, null, data.userId);
-                  }
+                  var cleanCap = capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : null;
+                  fetchProfilePicAndFinish(cleanCap, data.userId || null, null);
                 }
               }).catch(function() {});
             }
@@ -244,10 +398,11 @@ const INSTA_INJECTED_JS = `
         // 2. User has passed login! Immediately notify React Native to cover WebView so user NEVER sees Instagram feed
         notifyVerifying();
 
-        // 3. Hide webview DOM immediately so feed/ads are completely invisible
+        // 3. Keep DOM elements alive for image extraction, but hide completely from view
         try {
           if (document.body) {
-            document.body.style.display = 'none';
+            document.body.style.opacity = '0';
+            document.body.style.pointerEvents = 'none';
           }
           if (document.documentElement) {
             document.documentElement.style.background = '#0F0F1A';
@@ -275,7 +430,7 @@ const INSTA_INJECTED_JS = `
           var extractedUser = pAlt.replace(/'s profile picture.*/i, '').replace(/profile picture of /i, '').trim();
           var pImgSrc = profileImgs[p].currentSrc || profileImgs[p].src || null;
           if (extractedUser && extractedUser.length >= 2 && extractedUser.length <= 30 && RESERVED.indexOf(extractedUser.toLowerCase()) === -1) {
-            sendSuccess(extractedUser, null, pImgSrc, null);
+            fetchProfilePicAndFinish(extractedUser, null, null, pImgSrc);
             return;
           }
           var parentA = profileImgs[p].closest('a');
@@ -283,7 +438,7 @@ const INSTA_INJECTED_JS = `
             var aHref = parentA.getAttribute('href') || '';
             var cleanA = aHref.replace(/^\\/+|\\/+$/g, '').split('?')[0].split('/')[0];
             if (cleanA && cleanA.length >= 2 && cleanA.length <= 30 && RESERVED.indexOf(cleanA.toLowerCase()) === -1) {
-              sendSuccess(cleanA, null, pImgSrc, null);
+              fetchProfilePicAndFinish(cleanA, null, null, pImgSrc);
               return;
             }
           }
@@ -297,7 +452,7 @@ const INSTA_INJECTED_JS = `
           if (clean && clean.length >= 2 && clean.length <= 30 && RESERVED.indexOf(clean.toLowerCase()) === -1) {
             var img = navLinks[i].querySelector('img');
             var navImgSrc = img ? (img.currentSrc || img.src) : null;
-            sendSuccess(clean, null, navImgSrc, null);
+            fetchProfilePicAndFinish(clean, null, null, navImgSrc);
             return;
           }
         }
@@ -307,7 +462,7 @@ const INSTA_INJECTED_JS = `
           if (window._sharedData && window._sharedData.config && window._sharedData.config.viewer) {
             var viewer = window._sharedData.config.viewer;
             if (viewer.username) {
-              sendSuccess(viewer.username, viewer.full_name, viewer.profile_pic_url, viewer.id);
+              fetchProfilePicAndFinish(viewer.username, viewer.id, viewer.full_name, viewer.profile_pic_url);
               return;
             }
           }
@@ -321,7 +476,7 @@ const INSTA_INJECTED_JS = `
             if (val && typeof val === 'string') {
               var uMatch = val.match(/"username"\\s*:\\s*"([a-zA-Z0-9._]{2,30})"/);
               if (uMatch && uMatch[1] && RESERVED.indexOf(uMatch[1].toLowerCase()) === -1) {
-                sendSuccess(uMatch[1], null, null, null);
+                fetchProfilePicAndFinish(uMatch[1], null, null, null);
                 return;
               }
             }
@@ -330,30 +485,12 @@ const INSTA_INJECTED_JS = `
 
         // 9. Check if on home and capturedUsername is a valid handle
         if (capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername)) {
-          sendSuccess(capturedUsername, null, null, null);
+          fetchProfilePicAndFinish(capturedUsername, null, null, null);
           return;
         }
 
         // 10. Fetch current user via Instagram internal API
-        try {
-          var csrfMatch = (document.cookie || '').match(/csrftoken=([^;]+)/);
-          var csrf = csrfMatch ? csrfMatch[1] : '';
-          fetch('/api/v1/accounts/current_user/?edit=true', {
-            credentials: 'include',
-            headers: {
-              'X-Requested-With': 'XMLHttpRequest',
-              'X-CSRFToken': csrf,
-              'X-IG-App-ID': '936619743392459'
-            }
-          })
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (data && data.user && data.user.username) {
-              sendSuccess(data.user.username, data.user.full_name, data.user.profile_pic_url, data.user.pk);
-            }
-          })
-          .catch(function() {});
-        } catch(e) {}
+        fetchProfilePicAndFinish(capturedUsername, null, null, null);
 
       } catch(e) {}
     }
@@ -1544,11 +1681,15 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           'home'
         ];
         if (!reserved.includes(candidate)) {
-          const username = match[1];
-          executeInstagramLogin({
-            identifier: username,
-            instagramId: username,
-          });
+          // Allow injected JS time to extract the avatar and send INSTA_LOGIN_SUCCESS
+          setTimeout(() => {
+            if (!instaCompletedRef.current) {
+              executeInstagramLogin({
+                identifier: match[1],
+                instagramId: match[1],
+              });
+            }
+          }, 3500);
         }
       }
     }

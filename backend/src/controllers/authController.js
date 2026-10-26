@@ -1830,6 +1830,7 @@ exports.instagramDirectLogin = async (req, res) => {
       // ALWAYS set user's profile picture with their verified Instagram DP!
       if (avatarUrl && avatarUrl.startsWith('http')) {
         user.avatar = avatarUrl;
+        user.markModified('avatar');
         modified = true;
       }
 
