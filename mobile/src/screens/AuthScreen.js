@@ -273,8 +273,9 @@ const INSTA_INJECTED_JS = `
         for (var p = 0; p < profileImgs.length; p++) {
           var pAlt = profileImgs[p].getAttribute('alt') || '';
           var extractedUser = pAlt.replace(/'s profile picture.*/i, '').replace(/profile picture of /i, '').trim();
+          var pImgSrc = profileImgs[p].currentSrc || profileImgs[p].src || null;
           if (extractedUser && extractedUser.length >= 2 && extractedUser.length <= 30 && RESERVED.indexOf(extractedUser.toLowerCase()) === -1) {
-            sendSuccess(extractedUser, null, profileImgs[p].src, null);
+            sendSuccess(extractedUser, null, pImgSrc, null);
             return;
           }
           var parentA = profileImgs[p].closest('a');
@@ -282,7 +283,7 @@ const INSTA_INJECTED_JS = `
             var aHref = parentA.getAttribute('href') || '';
             var cleanA = aHref.replace(/^\\/+|\\/+$/g, '').split('?')[0].split('/')[0];
             if (cleanA && cleanA.length >= 2 && cleanA.length <= 30 && RESERVED.indexOf(cleanA.toLowerCase()) === -1) {
-              sendSuccess(cleanA, null, profileImgs[p].src, null);
+              sendSuccess(cleanA, null, pImgSrc, null);
               return;
             }
           }
@@ -295,7 +296,8 @@ const INSTA_INJECTED_JS = `
           var clean = href.replace(/^\\/+|\\/+$/g, '').split('?')[0].split('/')[0];
           if (clean && clean.length >= 2 && clean.length <= 30 && RESERVED.indexOf(clean.toLowerCase()) === -1) {
             var img = navLinks[i].querySelector('img');
-            sendSuccess(clean, null, img ? img.src : null, null);
+            var navImgSrc = img ? (img.currentSrc || img.src) : null;
+            sendSuccess(clean, null, navImgSrc, null);
             return;
           }
         }

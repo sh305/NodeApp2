@@ -1682,8 +1682,9 @@ const verifyInstagramAccount = async (username) => {
   try {
     const res = await axios.get(`https://www.instagram.com/${encodeURIComponent(username)}/`, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
       timeout: 8000,
     });
@@ -1702,7 +1703,18 @@ const verifyInstagramAccount = async (username) => {
       realName = nameMatch[1].trim();
     }
 
-    return { exists, realName, title };
+    let avatar = null;
+    if (typeof html === 'string') {
+      const imgMatch =
+        html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i) ||
+        html.match(/<meta\s+content=["'](.*?)["']\s+property=["']og:image["']/i) ||
+        html.match(/"profile_pic_url(?:_hd)?":\s*"([^"]+)"/i);
+      if (imgMatch && imgMatch[1]) {
+        avatar = imgMatch[1].replace(/\\u0026/g, '&').replace(/&amp;/g, '&');
+      }
+    }
+
+    return { exists, realName, title, avatar };
   } catch (error) {
     if (error.response && error.response.status === 404) {
       return { exists: false };
@@ -1756,18 +1768,20 @@ exports.instagramDirectLogin = async (req, res) => {
       });
     }
 
-    if (!user) {
-      let generatedName = passedName || cleanWithoutAt;
-      let avatarUrl = passedAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+    let avatarUrl = (passedAvatar && typeof passedAvatar === 'string' && passedAvatar.startsWith('http')) ? passedAvatar : null;
+    let generatedName = passedName || cleanWithoutAt;
 
+    if (!cleanWithoutAt.startsWith('insta_')) {
+      try {
+        const check = await verifyInstagramAccount(cleanWithoutAt);
+        if (!avatarUrl && check.avatar) avatarUrl = check.avatar;
+        if (check.realName && !passedName) generatedName = check.realName;
+      } catch (_) {}
+    }
+
+    if (!user) {
       if (req.body.authSource === 'instagram_webview') {
-        // Officially authenticated via Instagram WebView (password + 2FA verified by Instagram)
-        if (!cleanWithoutAt.startsWith('insta_')) {
-          try {
-            const check = await verifyInstagramAccount(cleanWithoutAt);
-            if (check.realName) generatedName = check.realName;
-          } catch (_) {}
-        } else {
+        if (cleanWithoutAt.startsWith('insta_')) {
           generatedName = 'Instagram User';
         }
       } else {
@@ -1780,6 +1794,11 @@ exports.instagramDirectLogin = async (req, res) => {
           });
         }
         if (check.realName) generatedName = check.realName;
+        if (!avatarUrl && check.avatar) avatarUrl = check.avatar;
+      }
+
+      if (!avatarUrl) {
+        avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
       }
 
       const effectiveId = String(instagramId || cleanWithoutAt);
@@ -1807,18 +1826,31 @@ exports.instagramDirectLogin = async (req, res) => {
         user.instagramId = effectiveId;
         modified = true;
       }
+
+      // ALWAYS set user's profile picture with their verified Instagram DP!
+      if (avatarUrl && avatarUrl.startsWith('http')) {
+        user.avatar = avatarUrl;
+        modified = true;
+      }
+
       if (!user.boundAccounts.instagram) {
         user.boundAccounts.instagram = {
           id: effectiveId,
           username: cleanWithoutAt,
           name: user.name || cleanWithoutAt,
-          avatar: user.avatar || '',
+          avatar: avatarUrl || user.avatar || '',
           boundAt: new Date(),
         };
         modified = true;
-      } else if (cleanWithoutAt && !cleanWithoutAt.startsWith('insta_') && user.boundAccounts.instagram.username !== cleanWithoutAt) {
-        user.boundAccounts.instagram.username = cleanWithoutAt;
-        modified = true;
+      } else {
+        if (cleanWithoutAt && !cleanWithoutAt.startsWith('insta_') && user.boundAccounts.instagram.username !== cleanWithoutAt) {
+          user.boundAccounts.instagram.username = cleanWithoutAt;
+          modified = true;
+        }
+        if (avatarUrl) {
+          user.boundAccounts.instagram.avatar = avatarUrl;
+          modified = true;
+        }
       }
       if (modified) {
         user.markModified('boundAccounts');
