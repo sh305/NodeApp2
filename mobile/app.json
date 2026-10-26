@@ -25,7 +25,7 @@
         "android.permission.BLUETOOTH"
       ]
     },
-    "owner": "shivamrai123",
+    "owner": "princerai",
     "plugins": [
       "@react-native-google-signin/google-signin",
       "expo-sharing",
@@ -35,7 +35,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "89b4fffe-1043-452d-a47c-e4927195c15a"
+        "projectId": "3764a5d4-6348-4255-9a5b-b83e3d503435"
       }
     }
   }
