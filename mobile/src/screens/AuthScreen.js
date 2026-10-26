@@ -132,17 +132,107 @@ const INSTA_INJECTED_JS = `
 
     var RESERVED = ['accounts', 'challenge', 'two_factor', 'login', 'emailsignup', 'password', 'explore', 'reels', 'direct', 'stories', 'privacy', 'legal', 'about', 'directory', 'developer', 'help', 'support', 'p', 'reel', 'tv', 'api', 'graphql', 'static', 'session', 'oauth', 'consent', 'terms', 'download', 'web', 'home'];
 
+    var capturedUsername = '';
     var reported = false;
+
+    // Listen for username input typing
+    document.addEventListener('input', function(e) {
+      try {
+        if (e.target && (e.target.name === 'username' || e.target.getAttribute('autocomplete') === 'username')) {
+          var val = (e.target.value || '').trim();
+          if (val) capturedUsername = val;
+        }
+      } catch(e) {}
+    }, true);
+
+    document.addEventListener('submit', function(e) {
+      try {
+        var u = document.querySelector('input[name="username"], input[autocomplete="username"]');
+        if (u && u.value) capturedUsername = u.value.trim();
+      } catch(e) {}
+    }, true);
+
+    function sendSuccess(username, fullName, avatar, userId) {
+      if (reported) return;
+      if (!username && !userId) return;
+      reported = true;
+      try {
+        window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'INSTA_LOGIN_SUCCESS',
+          username: username,
+          fullName: fullName || null,
+          avatar: avatar || null,
+          userId: userId || null
+        }));
+      } catch(e) {}
+    }
+
+    function notifyVerifying() {
+      try {
+        window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'INSTA_AUTH_VERIFYING'
+        }));
+      } catch(e) {}
+    }
+
+    // Intercept XHR for login completion
+    try {
+      var origOpen = XMLHttpRequest.prototype.open;
+      var origSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this._reqUrl = url || '';
+        return origOpen.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function() {
+        this.addEventListener('load', function() {
+          try {
+            if (this._reqUrl && (this._reqUrl.indexOf('login/ajax') !== -1 || this._reqUrl.indexOf('/login') !== -1)) {
+              var data = JSON.parse(this.responseText);
+              if (data && (data.authenticated === true || data.user === true || data.userId)) {
+                notifyVerifying();
+                if (data.userId) {
+                  var cleanCap = capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : null;
+                  sendSuccess(cleanCap, null, null, data.userId);
+                }
+              }
+            }
+          } catch(e) {}
+        });
+        return origSend.apply(this, arguments);
+      };
+    } catch(e) {}
+
+    // Intercept fetch
+    try {
+      var origFetch = window.fetch;
+      window.fetch = function() {
+        var args = arguments;
+        return origFetch.apply(this, args).then(function(res) {
+          try {
+            var url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+            if (url && (url.indexOf('login/ajax') !== -1 || url.indexOf('/login') !== -1)) {
+              res.clone().json().then(function(data) {
+                if (data && (data.authenticated === true || data.user === true || data.userId)) {
+                  notifyVerifying();
+                  if (data.userId) {
+                    var cleanCap = capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : null;
+                    sendSuccess(cleanCap, null, null, data.userId);
+                  }
+                }
+              }).catch(function() {});
+            }
+          } catch(e) {}
+          return res;
+        });
+      };
+    } catch(e) {}
+
     function checkLogin() {
       if (reported) return;
       try {
-        var cookies = document.cookie || '';
-        var dsMatch = cookies.match(/ds_user_id=([^;]+)/);
-        var userId = dsMatch ? dsMatch[1] : null;
-        var hasSession = cookies.indexOf('sessionid=') !== -1;
         var path = (window.location.pathname || '').toLowerCase();
 
-        // STRICT: DO NOT fire while on login or 2FA challenge screens!
+        // 1. If currently on login or 2FA challenge screen, do NOT extract or hide
         if (path.indexOf('/accounts/login') !== -1 ||
             path.indexOf('/challenge') !== -1 ||
             path.indexOf('/two_factor') !== -1 ||
@@ -151,7 +241,20 @@ const INSTA_INJECTED_JS = `
           return;
         }
 
-        // Auto-dismiss "Save Your Login Info?" on onetap screen
+        // 2. User has passed login! Immediately notify React Native to cover WebView so user NEVER sees Instagram feed
+        notifyVerifying();
+
+        // 3. Hide webview DOM immediately so feed/ads are completely invisible
+        try {
+          if (document.body) {
+            document.body.style.display = 'none';
+          }
+          if (document.documentElement) {
+            document.documentElement.style.background = '#0F0F1A';
+          }
+        } catch(e) {}
+
+        // 4. Auto-dismiss "Save Your Login Info?" on onetap screen
         if (path.indexOf('/accounts/onetap') !== -1) {
           try {
             var buttons = document.querySelectorAll('button');
@@ -165,69 +268,95 @@ const INSTA_INJECTED_JS = `
           } catch(e) {}
         }
 
-        // Only proceed if sessionid cookie exists OR user has navigated beyond login & 2FA challenge
-        if (hasSession || (userId && path !== '/' && RESERVED.indexOf(path.replace(/^\\/+|\\/+$/g, '')) === -1)) {
-          var username = null;
-          var fullName = null;
-          var avatar = null;
-
-          // 1. Try to find real username from links on page
-          var links = document.querySelectorAll('a[href^="/"]');
-          for (var i = 0; i < links.length; i++) {
-            var href = links[i].getAttribute('href') || '';
-            var clean = href.replace(/^\\/+|\\/+$/g, '').split('?')[0].split('/')[0];
-            if (clean && clean.length >= 2 && clean.length <= 30 && RESERVED.indexOf(clean.toLowerCase()) === -1) {
-              username = clean;
-              break;
+        // 5. Look for username from Profile Picture / Nav bar links
+        var profileImgs = document.querySelectorAll('img[alt*="profile picture"], img[alt*="Profile picture"]');
+        for (var p = 0; p < profileImgs.length; p++) {
+          var pAlt = profileImgs[p].getAttribute('alt') || '';
+          var extractedUser = pAlt.replace(/'s profile picture.*/i, '').replace(/profile picture of /i, '').trim();
+          if (extractedUser && extractedUser.length >= 2 && extractedUser.length <= 30 && RESERVED.indexOf(extractedUser.toLowerCase()) === -1) {
+            sendSuccess(extractedUser, null, profileImgs[p].src, null);
+            return;
+          }
+          var parentA = profileImgs[p].closest('a');
+          if (parentA) {
+            var aHref = parentA.getAttribute('href') || '';
+            var cleanA = aHref.replace(/^\\/+|\\/+$/g, '').split('?')[0].split('/')[0];
+            if (cleanA && cleanA.length >= 2 && cleanA.length <= 30 && RESERVED.indexOf(cleanA.toLowerCase()) === -1) {
+              sendSuccess(cleanA, null, profileImgs[p].src, null);
+              return;
             }
           }
+        }
 
-          // 2. Try window._sharedData
-          if (!username) {
-            try {
-              if (window._sharedData && window._sharedData.config && window._sharedData.config.viewer) {
-                username = window._sharedData.config.viewer.username;
-                fullName = window._sharedData.config.viewer.full_name;
-                avatar = window._sharedData.config.viewer.profile_pic_url;
-              }
-            } catch(e) {}
-          }
-
-          // 3. Try to fetch current user via internal Instagram API
-          if (!username && userId) {
-            fetch('/api/v1/accounts/current_user/?edit=true', { credentials: 'include' })
-              .then(function(res) { return res.json(); })
-              .then(function(data) {
-                if (data && data.user && data.user.username) {
-                  reported = true;
-                  window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'INSTA_LOGIN_SUCCESS',
-                    userId: data.user.pk || userId,
-                    username: data.user.username,
-                    fullName: data.user.full_name,
-                    avatar: data.user.profile_pic_url
-                  }));
-                }
-              })
-              .catch(function() {});
-          }
-
-          // If we found a valid username, or if sessionid is verified, send success!
-          if (username || hasSession) {
-            reported = true;
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'INSTA_LOGIN_SUCCESS',
-              userId: userId,
-              username: username || ('insta_' + userId),
-              fullName: fullName,
-              avatar: avatar
-            }));
+        // 6. Navigation bar / tab bar links
+        var navLinks = document.querySelectorAll('nav a[href^="/"], [role="navigation"] a[href^="/"], [role="tablist"] a[href^="/"], footer a[href^="/"]');
+        for (var i = 0; i < navLinks.length; i++) {
+          var href = navLinks[i].getAttribute('href') || '';
+          var clean = href.replace(/^\\/+|\\/+$/g, '').split('?')[0].split('/')[0];
+          if (clean && clean.length >= 2 && clean.length <= 30 && RESERVED.indexOf(clean.toLowerCase()) === -1) {
+            var img = navLinks[i].querySelector('img');
+            sendSuccess(clean, null, img ? img.src : null, null);
+            return;
           }
         }
+
+        // 7. Check window._sharedData
+        try {
+          if (window._sharedData && window._sharedData.config && window._sharedData.config.viewer) {
+            var viewer = window._sharedData.config.viewer;
+            if (viewer.username) {
+              sendSuccess(viewer.username, viewer.full_name, viewer.profile_pic_url, viewer.id);
+              return;
+            }
+          }
+        } catch(e) {}
+
+        // 8. Check localStorage for viewer info
+        try {
+          for (var l = 0; l < localStorage.length; l++) {
+            var key = localStorage.key(l);
+            var val = localStorage.getItem(key);
+            if (val && typeof val === 'string') {
+              var uMatch = val.match(/"username"\\s*:\\s*"([a-zA-Z0-9._]{2,30})"/);
+              if (uMatch && uMatch[1] && RESERVED.indexOf(uMatch[1].toLowerCase()) === -1) {
+                sendSuccess(uMatch[1], null, null, null);
+                return;
+              }
+            }
+          }
+        } catch(e) {}
+
+        // 9. Check if on home and capturedUsername is a valid handle
+        if (capturedUsername && !capturedUsername.includes('@') && !/^\\+?[0-9]{8,15}$/.test(capturedUsername)) {
+          sendSuccess(capturedUsername, null, null, null);
+          return;
+        }
+
+        // 10. Fetch current user via Instagram internal API
+        try {
+          var csrfMatch = (document.cookie || '').match(/csrftoken=([^;]+)/);
+          var csrf = csrfMatch ? csrfMatch[1] : '';
+          fetch('/api/v1/accounts/current_user/?edit=true', {
+            credentials: 'include',
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRFToken': csrf,
+              'X-IG-App-ID': '936619743392459'
+            }
+          })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (data && data.user && data.user.username) {
+              sendSuccess(data.user.username, data.user.full_name, data.user.profile_pic_url, data.user.pk);
+            }
+          })
+          .catch(function() {});
+        } catch(e) {}
+
       } catch(e) {}
     }
 
-    setInterval(checkLogin, 600);
+    setInterval(checkLogin, 250);
     checkLogin();
   })();
   true;
@@ -689,7 +818,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   // Instagram Official WebView Login State
   const [instaWebViewVisible, setInstaWebViewVisible] = useState(false);
+  const [instaVerifying, setInstaVerifying] = useState(false);
   const instaWebRef = useRef(null);
+  const instaCompletedRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -1294,38 +1425,60 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   // ---------------- INSTAGRAM OFFICIAL WEBVIEW LOGIN HANDLERS ----------------
   const handleDirectInstagramLogin = () => {
+    instaCompletedRef.current = false;
+    setInstaVerifying(false);
     setInstaWebViewVisible(true);
+  };
+
+  const executeInstagramLogin = async ({ identifier, instagramId, name, avatar }) => {
+    if (instaCompletedRef.current) return;
+    instaCompletedRef.current = true;
+    setInstaVerifying(true);
+    setLoading(true);
+
+    try {
+      const res = await api.post('/auth/instagram-direct-login', {
+        identifier: identifier,
+        instagramId: instagramId || identifier,
+        name: name,
+        avatar: avatar,
+        authSource: 'instagram_webview',
+      });
+      if (res.data?.success && res.data?.token) {
+        setInstaWebViewVisible(false);
+        setInstaVerifying(false);
+        showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', res.data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+        if (onLoginSuccess) onLoginSuccess(res.data.user);
+      } else {
+        instaCompletedRef.current = false;
+        setInstaVerifying(false);
+        showToast(t(res.data?.message || 'Instagram login failed'), 'error');
+      }
+    } catch (err) {
+      instaCompletedRef.current = false;
+      setInstaVerifying(false);
+      showToast(t(err.response?.data?.message || 'Instagram login failed'), 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInstaMessage = async (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data && data.type === 'INSTA_LOGIN_SUCCESS') {
+      if (data && data.type === 'INSTA_AUTH_VERIFYING') {
+        setInstaVerifying(true);
+      } else if (data && data.type === 'INSTA_LOGIN_SUCCESS') {
         const identifier = data.username || (data.userId ? `insta_${data.userId}` : null);
-        if (!identifier) return;
-
-        setLoading(true);
-        try {
-          const res = await api.post('/auth/instagram-direct-login', {
+        if (identifier) {
+          executeInstagramLogin({
             identifier: identifier,
             instagramId: data.userId || identifier,
             name: data.fullName,
             avatar: data.avatar,
-            authSource: 'instagram_webview',
           });
-          if (res.data?.success && res.data?.token) {
-            setInstaWebViewVisible(false);
-            showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
-            await AsyncStorage.setItem('@auth_token', res.data.token);
-            await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
-            if (onLoginSuccess) onLoginSuccess(res.data.user);
-          } else {
-            showToast(t(res.data?.message || 'Instagram login failed'), 'error');
-          }
-        } catch (err) {
-          showToast(t(err.response?.data?.message || 'Instagram login failed'), 'error');
-        } finally {
-          setLoading(false);
         }
       }
     } catch (_) {}
@@ -1346,6 +1499,11 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       !url.includes('/two_factor') &&
       !url.includes('/accounts/emailsignup') &&
       !url.includes('/accounts/password');
+
+    // As soon as user is past the login/2FA screen, immediately show native overlay so user NEVER sees Instagram feed
+    if (isPastLogin && url.includes('instagram.com')) {
+      setInstaVerifying(true);
+    }
 
     if (isPastLogin && url.includes('instagram.com/')) {
       const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
@@ -1385,26 +1543,10 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         ];
         if (!reserved.includes(candidate)) {
           const username = match[1];
-          setLoading(true);
-          try {
-            const res = await api.post('/auth/instagram-direct-login', {
-              identifier: username,
-              authSource: 'instagram_webview',
-            });
-            if (res.data?.success && res.data?.token) {
-              setInstaWebViewVisible(false);
-              showToast(t('Logged in with Instagram successfully! 🎉'), 'success');
-              await AsyncStorage.setItem('@auth_token', res.data.token);
-              await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
-              if (onLoginSuccess) onLoginSuccess(res.data.user);
-            } else {
-              showToast(t(res.data?.message || 'Instagram login failed'), 'error');
-            }
-          } catch (err) {
-            showToast(t(err.response?.data?.message || 'Instagram login failed'), 'error');
-          } finally {
-            setLoading(false);
-          }
+          executeInstagramLogin({
+            identifier: username,
+            instagramId: username,
+          });
         }
       }
     }
@@ -2639,12 +2781,18 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         <Modal
           visible={instaWebViewVisible}
           animationType="slide"
-          onRequestClose={() => setInstaWebViewVisible(false)}
+          onRequestClose={() => {
+            setInstaWebViewVisible(false);
+            setInstaVerifying(false);
+          }}
         >
           <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Platform.OS === 'android' ? 24 : 44 }}>
             <View style={styles.fbWebHeader}>
               <TouchableOpacity
-                onPress={() => setInstaWebViewVisible(false)}
+                onPress={() => {
+                  setInstaWebViewVisible(false);
+                  setInstaVerifying(false);
+                }}
                 style={styles.fbWebCloseBtn}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
@@ -2683,11 +2831,14 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 </View>
               )}
             />
-            {loading && (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15, 15, 26, 0.9)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }]}>
+            {(instaVerifying || loading) && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0F0F1A', justifyContent: 'center', alignItems: 'center', zIndex: 999 }]}>
                 <ActivityIndicator size="large" color="#E1306C" />
-                <Text style={{ color: '#FFFFFF', marginTop: 14, fontSize: 15, fontWeight: '600' }}>
+                <Text style={{ color: '#FFFFFF', marginTop: 16, fontSize: 16, fontWeight: '700' }}>
                   <T>Logging into FunMaza...</T>
+                </Text>
+                <Text style={{ color: '#94A3B8', marginTop: 6, fontSize: 13 }}>
+                  <T>Verifying your Instagram account...</T>
                 </Text>
               </View>
             )}

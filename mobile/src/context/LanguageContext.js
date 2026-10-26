@@ -262,6 +262,7 @@ export const LanguageProvider = ({ children }) => {
       'Need to check your Instagram handle? Open Instagram',
       'Please enter your bound Instagram @username',
       'Logged in with Instagram successfully! 🎉',
+      'Verifying your Instagram account...',
       'Instagram login failed',
       'No bound account found for this Instagram',
       'No FunMaza account found bound to this Instagram. Please bind your Instagram account first from Profile settings.',
