@@ -58,6 +58,7 @@ ramCache.set(
   'hi:::New to FunMaza?',
   'FunMaza पर नए हैं?'
 );
+ramCache.set('hi:::Instagram login took too long. Please try again.', 'इंस्टाग्राम लॉगिन में अधिक समय लगा। कृपया पुनः प्रयास करें।');
 ramCache.set(
   'hi:::LIVE VOICE & GAMES PARTY',
   'लाइव वॉइस और गेम्स पार्टी'
