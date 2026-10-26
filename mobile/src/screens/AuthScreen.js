@@ -138,14 +138,20 @@ const INSTA_INJECTED_JS = `
     var capturedUsername = '';
     var reported = false;
 
-    // Persist and sync username across reloads
+    // Persist and sync username across reloads & notify React Native in real time
     function syncInput() {
       try {
         var u = document.querySelector('input[name="username"], input[autocomplete="username"], input[type="text"]');
         if (u && u.value && u.value.trim()) {
           var val = u.value.trim();
           capturedUsername = val;
-          localStorage.setItem('funmaza_insta_user', val);
+          try { localStorage.setItem('funmaza_insta_user', val); } catch(_) {}
+          try {
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'INSTA_TYPED_USER',
+              username: val
+            }));
+          } catch(_) {}
         }
       } catch(e) {}
     }
@@ -153,6 +159,7 @@ const INSTA_INJECTED_JS = `
     document.addEventListener('change', syncInput, true);
     document.addEventListener('blur', syncInput, true);
     document.addEventListener('submit', syncInput, true);
+    document.addEventListener('click', syncInput, true);
 
     function sendSuccess(username, fullName, avatar, userId) {
       if (reported) return;
@@ -309,6 +316,7 @@ const INSTA_INJECTED_JS = `
               var data = JSON.parse(this.responseText);
               if (data && (data.authenticated === true || data.user === true || data.userId)) {
                 notifyVerifying();
+                try { if (document.body) document.body.style.display = 'none'; } catch(_) {}
                 var cleanCap = capturedUsername && !capturedUsername.includes('@') && !/^\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : null;
                 var uid = data.userId || null;
                 try {
@@ -341,6 +349,7 @@ const INSTA_INJECTED_JS = `
               res.clone().json().then(function(data) {
                 if (data && (data.authenticated === true || data.user === true || data.userId)) {
                   notifyVerifying();
+                  try { if (document.body) document.body.style.display = 'none'; } catch(_) {}
                   var cleanCap = capturedUsername && !capturedUsername.includes('@') && !/^\+?[0-9]{8,15}$/.test(capturedUsername) ? capturedUsername : null;
                   var uid = data.userId || null;
                   try {
@@ -391,7 +400,14 @@ const INSTA_INJECTED_JS = `
           } catch(e) {}
         }
 
-        // 3. User is past login screen! Extract username from all available persistent sources
+        // 3. User is past login screen! Instantly hide body so Instagram feed is never visible
+        notifyVerifying();
+        try {
+          if (document.body) {
+            document.body.style.display = 'none';
+          }
+        } catch(_) {}
+
         var effectiveUser = capturedUsername || '';
         try {
           if (!effectiveUser) effectiveUser = localStorage.getItem('funmaza_insta_user') || '';
@@ -432,17 +448,26 @@ const INSTA_INJECTED_JS = `
           }
         }
 
-        var hasSessionCookie = (document.cookie || '').indexOf('sessionid=') !== -1 || (document.cookie || '').indexOf('ds_user_id=') !== -1;
-
-        if ((isHandleValid || effectiveUid) && (hasSessionCookie || path === '/' || path.indexOf('/onetap') !== -1)) {
-          notifyVerifying();
+        // Try authenticated API for HD profile pic
+        if (isHandleValid && !reported) {
           try {
-            if (document.body) {
-              document.body.style.opacity = '0';
-              document.body.style.pointerEvents = 'none';
-            }
-          } catch(_) {}
-          var av = findAvatarInPage();
+            fetch('/api/v1/users/web_profile_info/?username=' + encodeURIComponent(effectiveUser), {
+              headers: { 'x-ig-app-id': '936619743392459' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+              var usr = res && res.data && res.data.user;
+              if (usr) {
+                var av = usr.profile_pic_url_hd || usr.profile_pic_url;
+                sendSuccess(usr.username || effectiveUser, usr.full_name || null, av, usr.id || effectiveUid);
+              }
+            })
+            .catch(function() {});
+          } catch(e) {}
+        }
+
+        var av = findAvatarInPage();
+        if (isHandleValid || effectiveUid) {
           sendSuccess(isHandleValid ? effectiveUser : ('insta_' + effectiveUid), null, av, effectiveUid);
           return;
         }
@@ -915,6 +940,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const [instaVerifying, setInstaVerifying] = useState(false);
   const instaWebRef = useRef(null);
   const instaCompletedRef = useRef(false);
+  const instaTypedUserRef = useRef('');
+  const instaCapturedAvatarRef = useRef(null);
+  const instaFallbackTimerRef = useRef(null);
 
   // Safety auto-timeout for Instagram verification overlay
   useEffect(() => {
@@ -1538,6 +1566,9 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   // ---------------- INSTAGRAM OFFICIAL WEBVIEW LOGIN HANDLERS ----------------
   const handleDirectInstagramLogin = () => {
     instaCompletedRef.current = false;
+    instaTypedUserRef.current = '';
+    instaCapturedAvatarRef.current = null;
+    if (instaFallbackTimerRef.current) clearTimeout(instaFallbackTimerRef.current);
     setInstaVerifying(false);
     setInstaWebViewVisible(true);
   };
@@ -1545,6 +1576,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const executeInstagramLogin = async ({ identifier, instagramId, name, avatar }) => {
     if (instaCompletedRef.current) return;
     instaCompletedRef.current = true;
+    if (instaFallbackTimerRef.current) clearTimeout(instaFallbackTimerRef.current);
     setInstaVerifying(true);
     setLoading(true);
 
@@ -1580,16 +1612,29 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   const handleInstaMessage = async (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data && data.type === 'INSTA_AUTH_VERIFYING') {
+      if (!data) return;
+
+      if (data.type === 'INSTA_TYPED_USER') {
+        if (data.username) {
+          instaTypedUserRef.current = data.username;
+        }
+      } else if (data.type === 'INSTA_AUTH_VERIFYING') {
         setInstaVerifying(true);
-      } else if (data && data.type === 'INSTA_LOGIN_SUCCESS') {
-        const identifier = data.username || (data.userId ? `insta_${data.userId}` : null);
+      } else if (data.type === 'INSTA_AVATAR_FOUND') {
+        if (data.avatar) {
+          instaCapturedAvatarRef.current = data.avatar;
+        }
+      } else if (data.type === 'INSTA_LOGIN_SUCCESS') {
+        setInstaVerifying(true);
+        const identifier = data.username || instaTypedUserRef.current || (data.userId ? `insta_${data.userId}` : null);
+        const avatar = data.avatar || instaCapturedAvatarRef.current || null;
         if (identifier) {
+          if (instaFallbackTimerRef.current) clearTimeout(instaFallbackTimerRef.current);
           executeInstagramLogin({
             identifier: identifier,
             instagramId: data.userId || identifier,
             name: data.fullName,
-            avatar: data.avatar,
+            avatar: avatar,
           });
         }
       }
@@ -1613,10 +1658,16 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       !url.includes('/accounts/emailsignup') &&
       !url.includes('/accounts/password');
 
-    if (isPastLogin && url.includes('instagram.com/')) {
+    if (isPastLogin && url.includes('instagram.com')) {
+      // 1. Immediately hide Instagram web view behind the FunMaza loading overlay!
+      // This guarantees the user NEVER sees the Instagram home feed or page!
+      setInstaVerifying(true);
+
+      // 2. Check if URL directly contains the username (e.g. instagram.com/<username>)
+      let candidate = null;
       const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
       if (match && match[1]) {
-        const candidate = match[1].toLowerCase();
+        const seg = match[1].toLowerCase();
         const reserved = [
           'accounts', 'challenge', 'two_factor', 'login', 'emailsignup', 'password',
           'explore', 'reels', 'direct', 'stories', 'privacy', 'legal', 'about',
@@ -1624,13 +1675,107 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           'graphql', 'static', 'session', 'oauth', 'consent', 'terms', 'download',
           'web', 'home', 'create'
         ];
-        if (!reserved.includes(candidate)) {
-          setInstaVerifying(true);
-          executeInstagramLogin({
-            identifier: match[1],
-            instagramId: match[1],
-          });
+        if (!reserved.includes(seg)) {
+          candidate = match[1];
         }
+      }
+
+      const effectiveUser = candidate || instaTypedUserRef.current;
+
+      // 3. Inject extraction script to get avatar & profile info from the authenticated session
+      const extractScript = `
+        (function() {
+          try {
+            if (document.body) {
+              document.body.style.display = 'none';
+            }
+          } catch(_) {}
+          var u = '${effectiveUser || ''}';
+          var reported = false;
+          function post(user, av, name, uid) {
+            if (reported) return;
+            reported = true;
+            try {
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'INSTA_LOGIN_SUCCESS',
+                username: user,
+                avatar: av || null,
+                fullName: name || null,
+                userId: uid || null
+              }));
+            } catch(e) {}
+          }
+
+          // A. Fetch authenticated profile info
+          if (u && !u.includes('@') && !/^\\+?[0-9]+$/.test(u)) {
+            fetch('/api/v1/users/web_profile_info/?username=' + encodeURIComponent(u), {
+              headers: { 'x-ig-app-id': '936619743392459' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+              var usr = res && res.data && res.data.user;
+              if (usr) {
+                var av = usr.profile_pic_url_hd || usr.profile_pic_url;
+                post(usr.username || u, av, usr.full_name, usr.id);
+              }
+            })
+            .catch(function() {});
+          }
+
+          // B. Query bottom navigation profile link & image
+          var navLinks = document.querySelectorAll('nav a[href^="/"], footer a[href^="/"], [role="navigation"] a[href^="/"], a[href^="/"]');
+          for (var i = 0; i < navLinks.length; i++) {
+            var h = navLinks[i].getAttribute('href') || '';
+            var seg = h.replace(/^\\/+|\\/+$/g, '').split('?')[0].split('/')[0];
+            var img = navLinks[i].querySelector('img');
+            if (img && (img.currentSrc || img.src)) {
+              var s = img.currentSrc || img.src;
+              if (s.indexOf('rsrc.php') === -1 && s.indexOf('.svg') === -1) {
+                if (u && seg.toLowerCase() === u.toLowerCase()) {
+                  post(u, s, null, null);
+                  return;
+                }
+                if (!u && seg && seg.length >= 2 && seg.length <= 30) {
+                  post(seg, s, null, null);
+                  return;
+                }
+              }
+            }
+          }
+
+          // C. Look for any profile picture in page
+          var imgs = document.querySelectorAll('img');
+          for (var j = 0; j < imgs.length; j++) {
+            var src = imgs[j].currentSrc || imgs[j].src || '';
+            var alt = (imgs[j].alt || '').toLowerCase();
+            if ((src.indexOf('cdninstagram.com') !== -1 || src.indexOf('fbcdn.net') !== -1) && src.indexOf('rsrc.php') === -1) {
+              if (alt.indexOf('profile') !== -1) {
+                post(u || 'instagram_user', src, null, null);
+                return;
+              }
+            }
+          }
+        })();
+        true;
+      `;
+
+      try {
+        instaWebRef.current?.injectJavaScript(extractScript);
+      } catch (_) {}
+
+      // 4. Safety direct login: if after 1200ms the avatar fetch is still running,
+      // proceed with login immediately so user is never left waiting!
+      if (effectiveUser && !instaCompletedRef.current) {
+        if (instaFallbackTimerRef.current) clearTimeout(instaFallbackTimerRef.current);
+        instaFallbackTimerRef.current = setTimeout(() => {
+          if (!instaCompletedRef.current) {
+            executeInstagramLogin({
+              identifier: effectiveUser,
+              instagramId: effectiveUser,
+              avatar: instaCapturedAvatarRef.current || null,
+            });
+          }
+        }, 1200);
       }
     }
   };
@@ -2873,8 +3018,10 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
             <View style={styles.fbWebHeader}>
               <TouchableOpacity
                 onPress={() => {
+                  if (instaFallbackTimerRef.current) clearTimeout(instaFallbackTimerRef.current);
                   setInstaWebViewVisible(false);
                   setInstaVerifying(false);
+                  instaCompletedRef.current = false;
                 }}
                 style={styles.fbWebCloseBtn}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -2935,6 +3082,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                   }}
                   activeOpacity={0.75}
                   onPress={() => {
+                    if (instaFallbackTimerRef.current) clearTimeout(instaFallbackTimerRef.current);
                     setInstaVerifying(false);
                     setInstaWebViewVisible(false);
                     setLoading(false);
