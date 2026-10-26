@@ -1625,56 +1625,13 @@ exports.checkTelegramLoginSession = async (req, res) => {
   }
 };
 
-// @desc    Direct Login with bound Telegram account (Username or ID)
+// @desc    Direct Login with bound Telegram account (Disabled for security)
 // @route   POST /api/auth/telegram-direct-login
 exports.telegramDirectLogin = async (req, res) => {
-  try {
-    const { identifier } = req.body;
-    if (!identifier || !identifier.trim()) {
-      return res.status(400).json({ success: false, message: 'Please enter your Telegram @username or ID' });
-    }
-    const clean = identifier.trim();
-    const cleanWithAt = clean.startsWith('@') ? clean : `@${clean}`;
-    const cleanWithoutAt = clean.replace('@', '');
-
-    const user = await User.findOne({
-      $or: [
-        { telegramId: clean },
-        { telegramId: cleanWithoutAt },
-        { 'boundAccounts.telegram.id': clean },
-        { 'boundAccounts.telegram.id': cleanWithoutAt },
-        { 'boundAccounts.telegram.username': cleanWithAt },
-        { 'boundAccounts.telegram.username': cleanWithoutAt },
-      ],
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No FunMaza account found bound to this Telegram. Please bind your Telegram account first or use 1-tap Telegram Bot sign-in.',
-      });
-    }
-
-    const banCheck = user.checkActiveBan ? user.checkActiveBan() : { banned: false };
-    if (banCheck.banned) {
-      return res.status(403).json({
-        success: false,
-        banned: true,
-        message: banCheck.message,
-      });
-    }
-
-    const token = generateToken(user._id);
-    return res.status(200).json({
-      success: true,
-      message: 'Logged in with Telegram successfully! 🎉',
-      token,
-      user,
-    });
-  } catch (error) {
-    console.error('telegramDirectLogin error:', error);
-    return res.status(500).json({ success: false, message: error.message });
-  }
+  return res.status(403).json({
+    success: false,
+    message: 'Direct Telegram username login is disabled for account security. Please use 1-Tap Telegram Bot login.',
+  });
 };
 
 // Helper: Verify whether Instagram account actually exists on Instagram

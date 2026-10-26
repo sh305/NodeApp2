@@ -1480,7 +1480,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   // ---------------- TELEGRAM DIRECT & BOT LOGIN HANDLERS ----------------
   const handleDirectTelegramLogin = async () => {
     setTelegramModalVisible(true);
-    setTelegramInput('');
     initTelegramSession();
   };
 
@@ -1532,31 +1531,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  const handleTelegramBoundLogin = async () => {
-    const clean = telegramInput.trim();
-    if (!clean) {
-      showToast(t('Please enter your bound Telegram @username or ID'), 'error');
-      return;
-    }
-    setTelegramDirectLoading(true);
-    try {
-      const res = await api.post('/auth/telegram-direct-login', { identifier: clean });
-      if (res.data?.success && res.data?.token) {
-        if (telegramPollRef.current) clearInterval(telegramPollRef.current);
-        setTelegramModalVisible(false);
-        showToast(t('Logged in with Telegram successfully! 🎉'), 'success');
-        await AsyncStorage.setItem('@auth_token', res.data.token);
-        await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
-        if (onLoginSuccess) onLoginSuccess(res.data.user);
-      } else {
-        showToast(t(res.data?.message || 'Telegram login failed'), 'error');
-      }
-    } catch (err) {
-      showToast(t(err.response?.data?.message || 'No bound account found for this Telegram'), 'error');
-    } finally {
-      setTelegramDirectLoading(false);
-    }
-  };
 
   const closeTelegramModal = () => {
     if (telegramPollRef.current) clearInterval(telegramPollRef.current);
@@ -3154,46 +3128,12 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
                 </Text>
               </View>
 
-              {/* Divider */}
-              <View style={styles.telegramDividerRow}>
-                <View style={styles.telegramDividerLine} />
-                <Text style={styles.telegramDividerText}>
-                  <T>OR BOUND ACCOUNT</T>
+              {/* Helpful Security Tip */}
+              <View style={{ marginTop: 18, paddingHorizontal: 10, alignItems: 'center' }}>
+                <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
+                  <T>Tap the button above to open Telegram and press START to log in securely.</T>
                 </Text>
-                <View style={styles.telegramDividerLine} />
               </View>
-
-              {/* 2. Direct Bound Account Input */}
-              <Text style={styles.telegramInputLabel}>
-                <T>Bound Telegram @username or ID</T>
-              </Text>
-              <TextInput
-                style={styles.telegramTextInput}
-                placeholder={t('Enter @username or Telegram ID')}
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                value={telegramInput}
-                onChangeText={setTelegramInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <TouchableOpacity
-                style={[
-                  styles.telegramDirectSubmitBtn,
-                  telegramDirectLoading && { opacity: 0.6 },
-                ]}
-                activeOpacity={0.8}
-                onPress={handleTelegramBoundLogin}
-                disabled={telegramDirectLoading}
-              >
-                {telegramDirectLoading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.telegramDirectSubmitText}>
-                    <T>Login with Bound Account</T>
-                  </Text>
-                )}
-              </TouchableOpacity>
             </View>
           </View>
         </Modal>
