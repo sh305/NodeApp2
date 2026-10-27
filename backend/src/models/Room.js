@@ -210,6 +210,44 @@ const roomSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    // Room Type: 'chatroom' or 'video_room'
+    roomType: {
+      type: String,
+      enum: ['chatroom', 'video_room'],
+      default: 'chatroom',
+    },
+    // Room Rules displayed in Chatroom
+    rules: {
+      type: String,
+      default:
+        'Sexual and violent contents are not allowed. All violators will be banned from the chatroom. Please respect each other and do not expose your personal info.',
+    },
+    // Video Room Playlist & Playback state
+    videoPlaylist: [
+      {
+        id: { type: String, required: true },
+        title: { type: String, default: 'Video' },
+        url: { type: String, required: true },
+        source: {
+          type: String,
+          enum: ['youtube', 'local_upload', 'direct_url'],
+          default: 'youtube',
+        },
+        duration: { type: Number, default: 0 },
+        addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        addedByName: { type: String, default: 'User' },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
+    currentVideo: {
+      id: { type: String, default: null },
+      title: { type: String, default: null },
+      url: { type: String, default: null },
+      source: { type: String, default: null },
+      isPlaying: { type: Boolean, default: false },
+      currentTime: { type: Number, default: 0 },
+      updatedAt: { type: Date, default: Date.now },
+    },
   },
   {
     timestamps: true,

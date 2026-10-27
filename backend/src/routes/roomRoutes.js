@@ -24,6 +24,10 @@ const {
   rejectSeatApplicant,
   updateSeatLayout,
   sendRoomBroadcast,
+  updateRoomProfile,
+  addRoomVideo,
+  playRoomVideo,
+  deleteRoomVideo,
 } = require('../controllers/roomController');
 const {
   sendLuckyPacket,
@@ -68,4 +72,14 @@ router.post('/:id/lucky-packets/:packetId/claim', protect, claimLuckyPacket);
 router.post('/:id/voice-token', protect, getVoiceToken);
 router.get('/:id/voice-token', protect, getVoiceToken);
 
+// Room Profile Settings (DP, Name, Type, Rules)
+router.put('/:id/profile', protect, updateRoomProfile);
+router.post('/:id/profile', protect, updateRoomProfile);
+
+// Video Room Playlist & Controls
+router.post('/:id/videos/add', protect, addRoomVideo);
+router.post('/:id/videos/play', protect, playRoomVideo);
+router.post('/:id/videos/delete', protect, deleteRoomVideo);
+
 module.exports = router;
+

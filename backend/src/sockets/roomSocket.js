@@ -849,6 +849,19 @@ function initRoomSockets(io) {
       });
     });
 
+    // Real-time Video Playback Sync (Video Room)
+    socket.on('sync_video_playback', async ({ roomId, isPlaying, currentTime, videoId }) => {
+      try {
+        io.to(roomId).emit('video_playback_synced', {
+          isPlaying,
+          currentTime,
+          videoId,
+        });
+      } catch (err) {
+        console.error('sync_video_playback error:', err);
+      }
+    });
+
     socket.on('request_lucky_number', async ({ roomId } = {}) => {
       try {
         if (

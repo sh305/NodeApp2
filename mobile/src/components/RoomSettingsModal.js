@@ -24,6 +24,7 @@ export default function RoomSettingsModal({
   onOpenKickedUsers,
   onOpenBossSeat,
   onOpenSeatSettings,
+  onOpenRoomProfileEdit,
   onToggleFreeMode,
   onToggleRoomLock,
 }) {
@@ -197,7 +198,13 @@ export default function RoomSettingsModal({
           <TouchableOpacity
             style={styles.roomProfileCard}
             activeOpacity={0.8}
-            onPress={() => handleItemClick('room_info', 'Room Info')}
+            onPress={() => {
+              if (onOpenRoomProfileEdit) {
+                onOpenRoomProfileEdit();
+              } else {
+                handleItemClick('room_info', 'Room Info');
+              }
+            }}
           >
             <Image
               source={{ uri: roomCoverUri }}

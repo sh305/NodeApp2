@@ -1275,5 +1275,286 @@ exports.sendRoomBroadcast = async (req, res) => {
   }
 };
 
+// ── Strict NSFW / Adult Content Filter List ──
+const PROHIBITED_VIDEO_KEYWORDS = [
+  'porn', 'xxx', 'sex', 'nude', 'naked', 'adult', 'erotic', 'nsfw',
+  'bhabhi', 'chut', 'boobs', 'fuck', 'strip', 'bra', 'pussy', 'penis',
+  'dick', 'vagina', 'xvideos', 'pornhub', 'xnxx', 'redtube', 'youporn',
+  'onlyfans', 'chaturbate', 'camgirl', 'hentai', 'milf', 'hardcore', 'incest'
+];
+
+function containsAdultContent(text) {
+  if (!text || typeof text !== 'string') return false;
+  const lower = text.toLowerCase();
+  return PROHIBITED_VIDEO_KEYWORDS.some((word) => {
+    // Word boundary or direct match check
+    const regex = new RegExp(`\\b${word}\\b`, 'i');
+    return regex.test(lower) || lower.includes(word);
+  });
+}
+
+// @desc    Update Room Profile (Name, DP Cover, Room Type, Rules)
+// @route   PUT /api/rooms/:id/profile
+exports.updateRoomProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, coverImage, roomType, rules } = req.body;
+    const userId = req.user._id.toString();
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const ownerId = (room.owner?._id || room.owner || '').toString();
+    const isAdmin = (room.admins || []).some(
+      (a) => (a._id ? a._id.toString() : a.toString()) === userId
+    );
+
+    if (ownerId !== userId && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the room owner or admins can update room settings',
+      });
+    }
+
+    if (title && title.trim()) {
+      room.title = title.trim();
+    }
+    if (coverImage) {
+      room.coverImage = coverImage;
+    }
+    if (roomType && ['chatroom', 'video_room'].includes(roomType)) {
+      room.roomType = roomType;
+    }
+    if (rules !== undefined) {
+      room.rules = String(rules).slice(0, 150);
+    }
+
+    await room.save();
+
+    const payload = {
+      roomId: room._id,
+      title: room.title,
+      coverImage: room.coverImage,
+      roomType: room.roomType,
+      rules: room.rules,
+    };
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(id.toString()).emit('room_profile_updated', payload);
+      // Also broadcast general room update for Discover list
+      io.emit('room_updated', {
+        roomId: room._id,
+        title: room.title,
+        coverImage: room.coverImage,
+        roomType: room.roomType,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Room settings updated successfully',
+      room: payload,
+    });
+  } catch (error) {
+    console.error('updateRoomProfile error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Add Video to Room Playlist (With strict NSFW validation)
+// @route   POST /api/rooms/:id/videos/add
+exports.addRoomVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, url, source, duration } = req.body;
+    const user = req.user;
+
+    if (!url || !url.trim()) {
+      return res.status(400).json({ success: false, message: 'Video URL or file is required' });
+    }
+
+    // ── STRICT ADULT / PORN CONTENT VALIDATION ──
+    const testTitle = title || '';
+    const testUrl = url || '';
+    if (containsAdultContent(testTitle) || containsAdultContent(testUrl)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sexual, pornographic, or violent content is strictly prohibited!',
+      });
+    }
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const newVideo = {
+      id: `vid_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title: (title || 'Video Track').trim(),
+      url: url.trim(),
+      source: source || 'youtube',
+      duration: Number(duration) || 0,
+      addedBy: user._id,
+      addedByName: user.name || 'User',
+      addedAt: new Date(),
+    };
+
+    if (!room.videoPlaylist) {
+      room.videoPlaylist = [];
+    }
+    room.videoPlaylist.push(newVideo);
+
+    // If no video is currently selected or playing, automatically set this one as current
+    if (!room.currentVideo || !room.currentVideo.url) {
+      room.currentVideo = {
+        id: newVideo.id,
+        title: newVideo.title,
+        url: newVideo.url,
+        source: newVideo.source,
+        isPlaying: true,
+        currentTime: 0,
+        updatedAt: new Date(),
+      };
+    }
+
+    await room.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(id.toString()).emit('room_video_updated', {
+        currentVideo: room.currentVideo,
+        videoPlaylist: room.videoPlaylist,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Video added successfully',
+      currentVideo: room.currentVideo,
+      videoPlaylist: room.videoPlaylist,
+    });
+  } catch (error) {
+    console.error('addRoomVideo error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Play / Change Room Video
+// @route   POST /api/rooms/:id/videos/play
+exports.playRoomVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { videoId, isPlaying } = req.body;
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    if (videoId) {
+      const found = (room.videoPlaylist || []).find((v) => v.id === videoId);
+      if (found) {
+        room.currentVideo = {
+          id: found.id,
+          title: found.title,
+          url: found.url,
+          source: found.source,
+          isPlaying: isPlaying !== undefined ? Boolean(isPlaying) : true,
+          currentTime: 0,
+          updatedAt: new Date(),
+        };
+      }
+    } else if (room.currentVideo) {
+      room.currentVideo.isPlaying = isPlaying !== undefined ? Boolean(isPlaying) : true;
+      room.currentVideo.updatedAt = new Date();
+    }
+
+    await room.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(id.toString()).emit('room_video_updated', {
+        currentVideo: room.currentVideo,
+        videoPlaylist: room.videoPlaylist,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      currentVideo: room.currentVideo,
+      videoPlaylist: room.videoPlaylist,
+    });
+  } catch (error) {
+    console.error('playRoomVideo error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete Video from Room Playlist
+// @route   POST /api/rooms/:id/videos/delete
+exports.deleteRoomVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { videoId } = req.body;
+
+    const room = await Room.findById(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    room.videoPlaylist = (room.videoPlaylist || []).filter((v) => v.id !== videoId);
+
+    // If deleted video was playing, switch to next or null
+    if (room.currentVideo && room.currentVideo.id === videoId) {
+      if (room.videoPlaylist.length > 0) {
+        const nextVid = room.videoPlaylist[0];
+        room.currentVideo = {
+          id: nextVid.id,
+          title: nextVid.title,
+          url: nextVid.url,
+          source: nextVid.source,
+          isPlaying: true,
+          currentTime: 0,
+          updatedAt: new Date(),
+        };
+      } else {
+        room.currentVideo = {
+          id: null,
+          title: null,
+          url: null,
+          source: null,
+          isPlaying: false,
+          currentTime: 0,
+          updatedAt: new Date(),
+        };
+      }
+    }
+
+    await room.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(id.toString()).emit('room_video_updated', {
+        currentVideo: room.currentVideo,
+        videoPlaylist: room.videoPlaylist,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Video deleted successfully',
+      currentVideo: room.currentVideo,
+      videoPlaylist: room.videoPlaylist,
+    });
+  } catch (error) {
+    console.error('deleteRoomVideo error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
 
 

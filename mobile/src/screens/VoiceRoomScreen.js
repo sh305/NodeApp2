@@ -36,6 +36,9 @@ import VoiceRoomEmojiModal from '../components/VoiceRoomEmojiModal';
 import VoiceRoomToolsModal from '../components/VoiceRoomToolsModal';
 import RoomMembersModal from '../components/RoomMembersModal';
 import RoomSettingsModal from '../components/RoomSettingsModal';
+import RoomProfileEditModal from '../components/RoomProfileEditModal';
+import RoomVideoModal from '../components/RoomVideoModal';
+import RoomVideoPlayer from '../components/RoomVideoPlayer';
 import MyPeopleModal from '../components/MyPeopleModal';
 import KickedUsersModal from '../components/KickedUsersModal';
 import BossSeatModal from '../components/BossSeatModal';
@@ -136,6 +139,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [soundEffectsModalVisible, setSoundEffectsModalVisible] = useState(false);
   const [roomMembersModalVisible, setRoomMembersModalVisible] = useState(false);
   const [roomSettingsModalVisible, setRoomSettingsModalVisible] = useState(false);
+  const [roomProfileEditModalVisible, setRoomProfileEditModalVisible] = useState(false);
+  const [roomVideoModalVisible, setRoomVideoModalVisible] = useState(false);
+  const [videoPlaylist, setVideoPlaylist] = useState([]);
+  const [currentVideo, setCurrentVideo] = useState(null);
   const [myPeopleModalVisible, setMyPeopleModalVisible] = useState(false);
   const [kickedUsersModalVisible, setKickedUsersModalVisible] = useState(false);
   const [bossSeatModalVisible, setBossSeatModalVisible] = useState(false);
@@ -440,6 +447,15 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       const res = await api.get(`/rooms/${roomId}`);
       if (res.data.success) {
         setRoom(res.data.room);
+        if (res.data.room.title) {
+          setRoomTitle(res.data.room.title);
+        }
+        if (res.data.room.currentVideo) {
+          setCurrentVideo(res.data.room.currentVideo);
+        }
+        if (res.data.room.videoPlaylist) {
+          setVideoPlaylist(res.data.room.videoPlaylist);
+        }
         if (res.data.room.goldContributed !== undefined) {
           setRoomGoldContributed(res.data.room.goldContributed);
         }
@@ -693,6 +709,45 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
       setGiftBanner(giftData);
       setTimeout(() => setGiftBanner(null), 4000);
       fetchRoomDetails();
+    });
+
+    // Real-time Room Profile Update (DP, Title, Type, Rules)
+    socket.on('room_profile_updated', (data) => {
+      if (!data) return;
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: data.title !== undefined ? data.title : prev.title,
+              coverImage: data.coverImage !== undefined ? data.coverImage : prev.coverImage,
+              roomType: data.roomType !== undefined ? data.roomType : prev.roomType,
+              rules: data.rules !== undefined ? data.rules : prev.rules,
+            }
+          : prev
+      );
+      if (data.title) {
+        setRoomTitle(data.title);
+      }
+    });
+
+    // Real-time Video Playback & Playlist Updates
+    socket.on('room_video_updated', (data) => {
+      if (!data) return;
+      if (data.currentVideo !== undefined) {
+        setCurrentVideo(data.currentVideo);
+      }
+      if (data.videoPlaylist !== undefined) {
+        setVideoPlaylist(data.videoPlaylist);
+      }
+      setRoom((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentVideo: data.currentVideo !== undefined ? data.currentVideo : prev.currentVideo,
+              videoPlaylist: data.videoPlaylist !== undefined ? data.videoPlaylist : prev.videoPlaylist,
+            }
+          : prev
+      );
     });
 
     // Real-time Global Room Broadcast across all rooms in app
@@ -1676,9 +1731,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
             {/* Title & ID/Member count */}
             <View style={styles.headerTitleCol}>
-              <Text style={styles.headerRoomTitle} numberOfLines={1}>
-                {roomTitle || 'Voice Room'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={styles.headerRoomTitle} numberOfLines={1}>
+                  {roomTitle || 'Voice Room'}
+                </Text>
+                {room?.roomType === 'video_room' && (
+                  <Text style={{ fontSize: 13 }}>🎬</Text>
+                )}
+              </View>
               <View style={styles.headerSubInfoRow}>
                 <Text style={styles.headerRoomIdText}>
                   ID:{room?.roomId || roomId?.slice(-6) || '8181956'}
@@ -1692,6 +1752,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               <Image
                 source={{
                   uri:
+                    room?.coverImage ||
                     room?.owner?.avatar ||
                     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
                 }}
@@ -1760,33 +1821,83 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           </View>
         )}
 
-        {/* ══ 2. CENTER CONTENT (Treasure Box, Host, Seats) ══ */}
-        <ScrollView
-          style={styles.seatsScrollArea}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.seatsScrollContent}
-        >
-          <RoomSeatGrid
-            seats={room?.seats || []}
-            owner={room?.owner}
-            isHostActive={effectiveIsHostActive}
-            isHostMuted={isHostMuted}
-            onSeatPress={handleSeatPress}
-            onHostPress={(hostUser) => {
-              if (hostUser) setSelectedSeatUser(hostUser);
-            }}
-            currentUserId={currentUser?._id}
-            isOwner={isOwner}
-            onTreasureBoxPress={() => setTreasureBoxVisible(true)}
-            roomGoldContributed={roomGoldContributed}
-            activeHostEmoji={activeHostEmoji}
-            activeSeatEmojis={activeSeatEmojis}
-            onEmojiComplete={handleEmojiComplete}
-            bossSeat={room?.bossSeat}
-            onBossSeatPress={handleBossSeatPress}
-            seatLayout={room?.seatLayout}
-          />
-        </ScrollView>
+        {/* ══ 2. CENTER CONTENT (Standard Voice Room vs Video Room) ══ */}
+        {room?.roomType === 'video_room' ? (
+          <View style={styles.videoRoomCenterArea}>
+            {/* 1. Horizontal compact row of 8 seats (Matching Screenshot 3) */}
+            <View style={styles.videoRoomCompactSeatsRow}>
+              {Array.from({ length: 8 }).map((_, idx) => {
+                const seatUser = room?.seats?.[idx]?.user;
+                return (
+                  <TouchableOpacity
+                    key={`vseat_${idx}`}
+                    style={styles.compactSeatCircle}
+                    activeOpacity={0.75}
+                    onPress={() => handleSeatPress(idx)}
+                  >
+                    {seatUser ? (
+                      <Image
+                        source={{ uri: seatUser.avatar }}
+                        style={styles.compactSeatAvatar}
+                      />
+                    ) : (
+                      <Image
+                        source={require('../../assets/icons/SofaSeat.png')}
+                        style={styles.compactSeatIcon}
+                        resizeMode="contain"
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 2. Video Player View (Matching Screenshot 3) */}
+            <RoomVideoPlayer
+              currentVideo={currentVideo}
+              isHostOrAdmin={isOwner || isAdmin}
+              onAddVideoPress={() => setRoomVideoModalVisible(true)}
+              onOpenPlaylist={() => setRoomVideoModalVisible(true)}
+              onStopVideo={async () => {
+                try {
+                  const res = await api.post(`/rooms/${roomId}/videos/play`, { isPlaying: false });
+                  if (res.data?.success) {
+                    setCurrentVideo(null);
+                  }
+                } catch (e) {
+                  console.log('Stop video error:', e);
+                }
+              }}
+            />
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.seatsScrollArea}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.seatsScrollContent}
+          >
+            <RoomSeatGrid
+              seats={room?.seats || []}
+              owner={room?.owner}
+              isHostActive={effectiveIsHostActive}
+              isHostMuted={isHostMuted}
+              onSeatPress={handleSeatPress}
+              onHostPress={(hostUser) => {
+                if (hostUser) setSelectedSeatUser(hostUser);
+              }}
+              currentUserId={currentUser?._id}
+              isOwner={isOwner}
+              onTreasureBoxPress={() => setTreasureBoxVisible(true)}
+              roomGoldContributed={roomGoldContributed}
+              activeHostEmoji={activeHostEmoji}
+              activeSeatEmojis={activeSeatEmojis}
+              onEmojiComplete={handleEmojiComplete}
+              bossSeat={room?.bossSeat}
+              onBossSeatPress={handleBossSeatPress}
+              seatLayout={room?.seatLayout}
+            />
+          </ScrollView>
+        )}
 
         {/* ══ 3. RIGHT FLOATING EVENT/GAME WIDGETS ══ */}
         <View
@@ -1850,7 +1961,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             ListHeaderComponent={
               <View style={styles.noticeBubble}>
                 <Text style={styles.noticeText}>
-                  <T>Sexual and violent contents are not allowed. All violators will be banned from the chatroom. Please respect each other and do not expose your personal info.</T>
+                  {room?.rules ||
+                    t(
+                      'Sexual and violent contents are not allowed. All violators will be banned from the chatroom. Please respect each other and do not expose your personal info.'
+                    )}
                 </Text>
               </View>
             }
@@ -2519,6 +2633,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         visible={roomSettingsModalVisible}
         onClose={() => setRoomSettingsModalVisible(false)}
         room={room}
+        onOpenRoomProfileEdit={() => {
+          setRoomSettingsModalVisible(false);
+          setRoomProfileEditModalVisible(true);
+        }}
         onToggleFreeMode={handleToggleFreeMode}
         onToggleRoomLock={handleToggleRoomLock}
         onOpenPeople={(tab) => {
@@ -2539,7 +2657,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           setSeatSettingsModalVisible(true);
         }}
         onSelectAction={(actionKey) => {
-          if (actionKey === 'room_members') {
+          if (actionKey === 'room_info') {
+            setRoomSettingsModalVisible(false);
+            setRoomProfileEditModalVisible(true);
+          } else if (actionKey === 'room_members') {
             setRoomSettingsModalVisible(false);
             setMyPeopleInitialTab('Members');
             setMyPeopleModalVisible(true);
@@ -2555,6 +2676,43 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           } else {
             showToast(t('Feature coming soon!'), 'info');
           }
+        }}
+      />
+
+      {/* ══ ROOM PROFILE EDIT MODAL (Screenshots 1 & 2 - DP, Name, Type, Rules) ══ */}
+      <RoomProfileEditModal
+        visible={roomProfileEditModalVisible}
+        onClose={() => {
+          setRoomProfileEditModalVisible(false);
+          setRoomSettingsModalVisible(true);
+        }}
+        room={room}
+        onSaveSuccess={(updatedRoom) => {
+          setRoom((prev) => (prev ? { ...prev, ...updatedRoom } : prev));
+          if (updatedRoom.title) setRoomTitle(updatedRoom.title);
+        }}
+      />
+
+      {/* ══ ROOM VIDEO PLAYLIST & ADD MODAL (Screenshot 3) ══ */}
+      <RoomVideoModal
+        visible={roomVideoModalVisible}
+        onClose={() => setRoomVideoModalVisible(false)}
+        roomId={roomId}
+        videoPlaylist={videoPlaylist}
+        currentVideo={currentVideo}
+        isHostOrAdmin={isOwner || isAdmin}
+        onVideoUpdated={(updatedPlaylist, updatedCurrentVideo) => {
+          if (updatedPlaylist !== undefined) setVideoPlaylist(updatedPlaylist);
+          if (updatedCurrentVideo !== undefined) setCurrentVideo(updatedCurrentVideo);
+          setRoom((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  videoPlaylist: updatedPlaylist,
+                  currentVideo: updatedCurrentVideo,
+                }
+              : prev
+          );
         }}
       />
 
@@ -3037,6 +3195,42 @@ const styles = StyleSheet.create({
   },
   seatsScrollContent: {
     paddingBottom: 200,
+  },
+
+  /* ── Video Room Layout Styles (Screenshot 3) ── */
+  videoRoomCenterArea: {
+    width: '100%',
+    zIndex: 5,
+  },
+  videoRoomCompactSeatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  compactSeatCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.38)',
+    overflow: 'hidden',
+  },
+  compactSeatAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  compactSeatIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#FFFFFF',
   },
 
   /* ── 3. Right Floating Event Widgets ── */
