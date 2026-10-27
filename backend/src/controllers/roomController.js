@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const axios = require('axios');
 const Room = require('../models/Room');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
@@ -1293,6 +1294,76 @@ function containsAdultContent(text) {
   });
 }
 
+function extractYoutubeId(url) {
+  if (!url || typeof url !== 'string') return null;
+  const match = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/
+  );
+  return match ? match[1] : null;
+}
+
+// ── Real-time YouTube Official Data API v3 Safety Verification ──
+async function verifyYoutubeVideoSafety(youtubeId) {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) return { isSafe: true };
+
+  try {
+    const res = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
+      params: {
+        part: 'snippet,contentDetails,status',
+        id: youtubeId,
+        key: apiKey,
+      },
+      timeout: 6000,
+    });
+
+    const item = res.data?.items?.[0];
+    if (!item) {
+      return { isSafe: false, reason: 'Video not found or is private on YouTube' };
+    }
+
+    // 1. Check if allowed to embed in third-party mobile apps
+    if (item.status && item.status.embeddable === false) {
+      return {
+        isSafe: false,
+        reason: 'The owner of this YouTube video has restricted playback outside YouTube.',
+      };
+    }
+
+    // 2. Check Official YouTube Age-Restriction (18+ / adult rating)
+    const contentRating = item.contentDetails?.contentRating || {};
+    if (
+      contentRating.ytRating === 'ytAgeRestricted' ||
+      contentRating.mpaaRating === 'mpaaNc17' ||
+      contentRating.mpaaRating === 'mpaaR'
+    ) {
+      return {
+        isSafe: false,
+        reason: 'This YouTube video is Age-Restricted (18+) and cannot be played in public rooms.',
+      };
+    }
+
+    // 3. Check official YouTube video title and description for adult keywords
+    const ytTitle = item.snippet?.title || '';
+    const ytDesc = item.snippet?.description || '';
+    if (containsAdultContent(ytTitle) || containsAdultContent(ytDesc)) {
+      return {
+        isSafe: false,
+        reason: 'Sexual or adult content detected in this YouTube video.',
+      };
+    }
+
+    return {
+      isSafe: true,
+      title: ytTitle || 'YouTube Video',
+    };
+  } catch (err) {
+    console.error('YouTube API validation error:', err?.response?.data || err.message);
+    // If quota or network error, let benign playback continue
+    return { isSafe: true };
+  }
+}
+
 // @desc    Update Room Profile (Name, DP Cover, Room Type, Rules)
 // @route   PUT /api/rooms/:id/profile
 exports.updateRoomProfile = async (req, res) => {
@@ -1364,7 +1435,7 @@ exports.updateRoomProfile = async (req, res) => {
   }
 };
 
-// @desc    Add Video to Room Playlist (With strict NSFW validation)
+// @desc    Add Video to Room Playlist (With strict NSFW & YouTube Data API validation)
 // @route   POST /api/rooms/:id/videos/add
 exports.addRoomVideo = async (req, res) => {
   try {
@@ -1376,7 +1447,7 @@ exports.addRoomVideo = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Video URL or file is required' });
     }
 
-    // ── STRICT ADULT / PORN CONTENT VALIDATION ──
+    // ── 1. LOCAL KEYWORD / SLUG VALIDATION ──
     const testTitle = title || '';
     const testUrl = url || '';
     if (containsAdultContent(testTitle) || containsAdultContent(testUrl)) {
@@ -1386,6 +1457,23 @@ exports.addRoomVideo = async (req, res) => {
       });
     }
 
+    // ── 2. OFFICIAL YOUTUBE DATA API v3 VALIDATION ──
+    const youtubeId = extractYoutubeId(url);
+    let resolvedTitle = (title || 'Video Track').trim();
+
+    if (youtubeId) {
+      const ytCheck = await verifyYoutubeVideoSafety(youtubeId);
+      if (!ytCheck.isSafe) {
+        return res.status(400).json({
+          success: false,
+          message: ytCheck.reason || 'This YouTube video cannot be added due to safety restrictions.',
+        });
+      }
+      if (ytCheck.title && (!title || title === 'YouTube Video')) {
+        resolvedTitle = ytCheck.title;
+      }
+    }
+
     const room = await Room.findById(id);
     if (!room) {
       return res.status(404).json({ success: false, message: 'Room not found' });
@@ -1393,9 +1481,9 @@ exports.addRoomVideo = async (req, res) => {
 
     const newVideo = {
       id: `vid_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      title: (title || 'Video Track').trim(),
+      title: resolvedTitle,
       url: url.trim(),
-      source: source || 'youtube',
+      source: youtubeId ? 'youtube' : source || 'direct_url',
       duration: Number(duration) || 0,
       addedBy: user._id,
       addedByName: user.name || 'User',
