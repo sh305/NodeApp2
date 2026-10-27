@@ -86,8 +86,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
-  const { roomId, roomTitle } = route.params;
+  const { roomId, roomTitle: initialRoomTitle } = route.params || {};
 
+  const [roomTitle, setRoomTitle] = useState(initialRoomTitle || '');
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState([]);
