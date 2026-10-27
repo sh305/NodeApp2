@@ -271,7 +271,7 @@ roomSchema.methods.verifyPassword = async function (enteredPassword) {
 
 // Method to check if a specific user is currently kicked from this room
 roomSchema.methods.isUserKicked = function (userId) {
-  if (!userId) return { kicked: false };
+  if (!userId || !this.kickedUsers || !Array.isArray(this.kickedUsers)) return { kicked: false };
   const kickRecord = this.kickedUsers.find((k) => {
     if (!k || !k.user) return false;
     const uid = k.user._id ? k.user._id.toString() : k.user.toString();
@@ -313,6 +313,7 @@ roomSchema.methods.isUserKicked = function (userId) {
 // Synchronize seat array length when room level upgrades
 roomSchema.methods.syncSeats = function () {
   const totalSeats = this.calculateTotalSeats();
+  if (!this.seats) this.seats = [];
   if (this.seats.length < totalSeats) {
     for (let i = this.seats.length; i < totalSeats; i++) {
       this.seats.push({

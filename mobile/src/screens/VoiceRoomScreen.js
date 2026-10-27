@@ -443,6 +443,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
   // Fetch Room info from API
   const fetchRoomDetails = async () => {
+    if (!roomId) {
+      Alert.alert('Error', 'Invalid or missing Room ID');
+      navigation.goBack();
+      return;
+    }
+
     try {
       const res = await api.get(`/rooms/${roomId}`);
       if (res.data.success) {
@@ -470,8 +476,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           }
         }
 
-        const mySeat = res.data.room.seats.findIndex(
-          (s) => s.user && s.user._id === currentUser?._id
+        const mySeat = (res.data.room.seats || []).findIndex(
+          (s) => s.user && (s.user._id || s.user) === currentUser?._id
         );
         setMySeatIndex(mySeat !== -1 ? mySeat : null);
         fetchRoomLuckyPackets();
@@ -483,7 +489,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
       } else {
-        Alert.alert('Error', err.response?.data?.message || 'Failed to load room');
+        const errorMsg =
+          err.response?.data?.message ||
+          (err.code === 'ECONNABORTED'
+            ? 'Server is starting up, please try again in a moment'
+            : err.message || 'Failed to load room');
+        Alert.alert('Error', errorMsg);
         navigation.goBack();
       }
     } finally {

@@ -138,6 +138,10 @@ exports.getRoomById = async (req, res) => {
     const { id } = req.params;
     const userId = req.user._id;
 
+    if (!id || id === 'undefined' || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid room ID' });
+    }
+
     const room = await Room.findById(id)
       .populate('owner', 'name avatar wealthLevel activeFrame customId gender')
       .populate('hosts', 'name avatar wealthLevel activeFrame customId gender')
