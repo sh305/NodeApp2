@@ -8,6 +8,9 @@ import {
   FlatList,
   StyleSheet,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -155,186 +158,196 @@ export default function RoomVideoModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalCard, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
-          {/* Header Row */}
-          <View style={styles.headerRow}>
-            <Text style={styles.headerTitle}>
-              <T>Room Videos</T>
-            </Text>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              activeOpacity={0.75}
-              onPress={onClose}
-            >
-              <Text style={styles.closeIcon}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Tab Navigation */}
-          <View style={styles.tabBar}>
-            <TouchableOpacity
-              style={[styles.tabItem, activeTab === 'playlist' && styles.tabItemActive]}
-              activeOpacity={0.8}
-              onPress={() => setActiveTab('playlist')}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === 'playlist' && styles.tabTextActive,
-                ]}
-              >
-                <T>Playlist</T> ({videoPlaylist.length})
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardAvoidWrap}
+        >
+          <View style={[styles.modalCard, { paddingBottom: Math.max(32, insets.bottom + 22) }]}>
+            {/* Header Row */}
+            <View style={styles.headerRow}>
+              <Text style={styles.headerTitle}>
+                <T>Room Videos</T>
               </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tabItem, activeTab === 'url_input' && styles.tabItemActive]}
-              activeOpacity={0.8}
-              onPress={() => setActiveTab('url_input')}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === 'url_input' && styles.tabTextActive,
-                ]}
-              >
-                🎬 <T>Add YouTube Video</T>
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* TAB 1: PLAYLIST */}
-          {activeTab === 'playlist' && (
-            <View style={styles.contentWrap}>
-              {videoPlaylist.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>🎬</Text>
-                  <Text style={styles.emptyText}>
-                    <T>There is no video can be played.</T>
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.addNowBtn}
-                    activeOpacity={0.8}
-                    onPress={() => setActiveTab('url_input')}
-                  >
-                    <Text style={styles.addNowText}>
-                      <T>Add YouTube Video</T>
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <FlatList
-                  data={videoPlaylist}
-                  keyExtractor={(item) => item.id}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingVertical: 10 }}
-                  renderItem={({ item, index }) => {
-                    const isPlaying = currentVideo?.id === item.id;
-                    return (
-                      <TouchableOpacity
-                        style={[
-                          styles.videoItemRow,
-                          isPlaying && styles.videoItemRowPlaying,
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => handlePlayVideo(item)}
-                      >
-                        <View style={styles.videoIndexBadge}>
-                          {isPlaying ? (
-                            <Text style={styles.playingEmoji}>▶️</Text>
-                          ) : (
-                            <Text style={styles.videoIndexText}>{index + 1}</Text>
-                          )}
-                        </View>
-                        <View style={styles.videoMetaCol}>
-                          <Text
-                            style={[
-                              styles.videoTitleText,
-                              isPlaying && styles.videoTitlePlaying,
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {item.title}
-                          </Text>
-                          <Text style={styles.videoSourceText}>
-                            {item.source === 'youtube'
-                              ? 'YouTube'
-                              : 'Online Video'}
-                          </Text>
-                        </View>
-                        {isHostOrAdmin && (
-                          <TouchableOpacity
-                            style={styles.deleteVideoBtn}
-                            activeOpacity={0.7}
-                            onPress={() => handleDeleteVideo(item.id)}
-                          >
-                            <Text style={styles.deleteVideoIcon}>🗑️</Text>
-                          </TouchableOpacity>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-              )}
-            </View>
-          )}
-
-          {/* TAB 2: ENTER VIDEO URL */}
-          {activeTab === 'url_input' && (
-            <View style={styles.contentWrap}>
-              <Text style={styles.inputLabel}>
-                <T>YouTube Video Link or ID</T>
-              </Text>
-              <TextInput
-                style={styles.textInput}
-                value={videoUrl}
-                onChangeText={setVideoUrl}
-                placeholder="https://www.youtube.com/watch?v=..."
-                placeholderTextColor="#64748B"
-                autoCapitalize="none"
-              />
-
-              <Text style={styles.inputLabel}>
-                <T>Video Title (Optional)</T>
-              </Text>
-              <TextInput
-                style={styles.textInput}
-                value={videoTitle}
-                onChangeText={setVideoTitle}
-                placeholder={t('Enter a title for this video')}
-                placeholderTextColor="#64748B"
-              />
-
-              <View style={styles.prohibitedNotice}>
-                <Text style={styles.prohibitedText}>
-                  ⚠️ <T>Sexual and adult content is strictly prohibited and will be blocked automatically.</T>
-                </Text>
-              </View>
-
               <TouchableOpacity
-                style={styles.actionBtn}
-                activeOpacity={0.8}
-                onPress={handleAddUrl}
-                disabled={addingUrl}
+                style={styles.closeBtn}
+                activeOpacity={0.75}
+                onPress={onClose}
               >
-                <LinearGradient
-                  colors={['#00E676', '#00C853']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.actionGrad}
-                >
-                  {addingUrl ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.actionBtnText}>
-                      <T>Add Video to Playlist</T>
-                    </Text>
-                  )}
-                </LinearGradient>
+                <Text style={styles.closeIcon}>✕</Text>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
+
+            {/* Tab Navigation */}
+            <View style={styles.tabBar}>
+              <TouchableOpacity
+                style={[styles.tabItem, activeTab === 'playlist' && styles.tabItemActive]}
+                activeOpacity={0.8}
+                onPress={() => setActiveTab('playlist')}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === 'playlist' && styles.tabTextActive,
+                  ]}
+                >
+                  <T>Playlist</T> ({videoPlaylist.length})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.tabItem, activeTab === 'url_input' && styles.tabItemActive]}
+                activeOpacity={0.8}
+                onPress={() => setActiveTab('url_input')}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === 'url_input' && styles.tabTextActive,
+                  ]}
+                >
+                  🎬 <T>Add YouTube Video</T>
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* TAB 1: PLAYLIST */}
+            {activeTab === 'playlist' && (
+              <View style={styles.contentWrap}>
+                {videoPlaylist.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyIcon}>🎬</Text>
+                    <Text style={styles.emptyText}>
+                      <T>There is no video can be played.</T>
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.addNowBtn}
+                      activeOpacity={0.8}
+                      onPress={() => setActiveTab('url_input')}
+                    >
+                      <Text style={styles.addNowText}>
+                        <T>Add YouTube Video</T>
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={videoPlaylist}
+                    keyExtractor={(item) => item.id}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingVertical: 10 }}
+                    renderItem={({ item, index }) => {
+                      const isPlaying = currentVideo?.id === item.id;
+                      return (
+                        <TouchableOpacity
+                          style={[
+                            styles.videoItemRow,
+                            isPlaying && styles.videoItemRowPlaying,
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={() => handlePlayVideo(item)}
+                        >
+                          <View style={styles.videoIndexBadge}>
+                            {isPlaying ? (
+                              <Text style={styles.playingEmoji}>▶️</Text>
+                            ) : (
+                              <Text style={styles.videoIndexText}>{index + 1}</Text>
+                            )}
+                          </View>
+                          <View style={styles.videoMetaCol}>
+                            <Text
+                              style={[
+                                styles.videoTitleText,
+                                isPlaying && styles.videoTitlePlaying,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {item.title}
+                            </Text>
+                            <Text style={styles.videoSourceText}>
+                              {item.source === 'youtube'
+                                ? 'YouTube'
+                                : 'Online Video'}
+                            </Text>
+                          </View>
+                          {isHostOrAdmin && (
+                            <TouchableOpacity
+                              style={styles.deleteVideoBtn}
+                              activeOpacity={0.7}
+                              onPress={() => handleDeleteVideo(item.id)}
+                            >
+                              <Text style={styles.deleteVideoIcon}>🗑️</Text>
+                            </TouchableOpacity>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    }}
+                  />
+                )}
+              </View>
+            )}
+
+            {/* TAB 2: ENTER VIDEO URL */}
+            {activeTab === 'url_input' && (
+              <ScrollView
+                style={styles.scrollWrap}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.inputLabel}>
+                  <T>YouTube Video Link or ID</T>
+                </Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={videoUrl}
+                  onChangeText={setVideoUrl}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  placeholderTextColor="#64748B"
+                  autoCapitalize="none"
+                />
+
+                <Text style={styles.inputLabel}>
+                  <T>Video Title (Optional)</T>
+                </Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={videoTitle}
+                  onChangeText={setVideoTitle}
+                  placeholder={t('Enter a title for this video')}
+                  placeholderTextColor="#64748B"
+                />
+
+                <View style={styles.prohibitedNotice}>
+                  <Text style={styles.prohibitedText}>
+                    ⚠️ <T>Sexual and adult content is strictly prohibited and will be blocked automatically.</T>
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.8}
+                  onPress={handleAddUrl}
+                  disabled={addingUrl}
+                >
+                  <LinearGradient
+                    colors={['#00E676', '#00C853']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.actionGrad}
+                  >
+                    {addingUrl ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.actionBtnText}>
+                        <T>Add Video to Playlist</T>
+                      </Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -346,15 +359,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoidWrap: {
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
   modalCard: {
     backgroundColor: '#1E1E2E',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '80%',
-    minHeight: 400,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    maxHeight: '90%',
     borderTopWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  scrollWrap: {
+    maxHeight: 440,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   headerRow: {
     flexDirection: 'row',
@@ -518,7 +541,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     overflow: 'hidden',
-    marginTop: 10,
+    marginTop: 14,
+    marginBottom: 20,
   },
   actionGrad: {
     width: '100%',
