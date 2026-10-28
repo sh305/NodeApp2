@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import * as FileSystem from 'expo-file-system';
 import { T } from './TranslatedText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -93,6 +94,44 @@ export default function RoomVideoPlayer({
     currentVideo.source === 'youtube' ||
     Boolean(youtubeId) ||
     /youtube\.com|youtu\.be/i.test(currentVideo.url || '');
+
+  const [resolvedUri, setResolvedUri] = useState(currentVideo?.url || '');
+
+  useEffect(() => {
+    let isMounted = true;
+    async function resolveMediaUri() {
+      if (!currentVideo?.url) {
+        if (isMounted) setResolvedUri('');
+        return;
+      }
+      const rawUrl = currentVideo.url;
+      if (rawUrl.startsWith('content://')) {
+        try {
+          const safeName = (currentVideo.title || 'phone_video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
+          const cachePath = `${FileSystem.cacheDirectory}rvid_${currentVideo.id || 'curr'}_${safeName}`;
+          const info = await FileSystem.getInfoAsync(cachePath);
+          if (!info.exists) {
+            await FileSystem.copyAsync({
+              from: rawUrl,
+              to: cachePath,
+            });
+          }
+          if (isMounted) setResolvedUri(cachePath);
+        } catch (err) {
+          console.log('resolveMediaUri error:', err);
+          if (isMounted) setResolvedUri(rawUrl);
+        }
+      } else {
+        if (isMounted) setResolvedUri(rawUrl);
+      }
+    }
+    resolveMediaUri();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentVideo?.url, currentVideo?.id]);
+
+  const rawVideoSrc = resolvedUri || currentVideo?.url || '';
 
   // ── YouTube Embed with official IFrame API & automatic HTML5 fallback ──
   const htmlContent = isYoutube && youtubeId
@@ -189,24 +228,43 @@ export default function RoomVideoPlayer({
         <body>
           <video
             id="mediaPlayer"
-            src="${currentVideo.url}"
+            src="${rawVideoSrc}"
             autoplay
             controls
             playsinline
             webkit-playsinline
-          ></video>
+            style="width: 100%; height: 100%; object-fit: contain; background: #000;"
+          >
+            <source src="${rawVideoSrc}" type="video/mp4" />
+          </video>
           <script>
             var v = document.getElementById('mediaPlayer');
             if (v) {
+              function notifyReady() {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'READY' }));
+                }
+              }
+              v.addEventListener('playing', notifyReady);
+              v.addEventListener('loadeddata', notifyReady);
+              v.addEventListener('canplay', notifyReady);
+              v.addEventListener('ended', function() {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIDEO_ENDED' }));
+                }
+              });
+              v.addEventListener('error', function() {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'ERROR',
+                    code: v.error ? v.error.code : 'unknown'
+                  }));
+                }
+              });
               v.play().catch(function() {
                 v.muted = true;
                 v.play();
               });
-              v.onended = function() {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIDEO_ENDED' }));
-                }
-              };
             }
           </script>
         </body>
@@ -231,12 +289,12 @@ export default function RoomVideoPlayer({
   return (
     <View style={styles.container}>
       <WebView
-        key={`video_${currentVideo.id || currentVideo.url}_${reloadKey}`}
+        key={`video_${currentVideo.id || currentVideo.url}_${rawVideoSrc}_${reloadKey}`}
         ref={webViewRef}
         originWhitelist={['*']}
         source={{
           html: htmlContent,
-          baseUrl: isYoutube ? 'https://www.youtube.com' : undefined,
+          baseUrl: isYoutube ? 'https://www.youtube.com' : 'file:///',
         }}
         style={styles.webview}
         allowsInlineMediaPlayback={true}
@@ -244,8 +302,9 @@ export default function RoomVideoPlayer({
         javaScriptEnabled={true}
         domStorageEnabled={true}
         allowFileAccess={true}
-        allowUniversalAccessFromFileURLs={true}
+        allowContentAccess={true}
         allowFileAccessFromFileURLs={true}
+        allowUniversalAccessFromFileURLs={true}
         mixedContentMode="always"
         androidHardwareAccelerationDisabled={false}
         androidLayerType="hardware"

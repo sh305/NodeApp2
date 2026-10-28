@@ -28,6 +28,8 @@ const {
   addRoomVideo,
   playRoomVideo,
   deleteRoomVideo,
+  uploadVideoMiddleware,
+  uploadRoomVideo,
 } = require('../controllers/roomController');
 const {
   sendLuckyPacket,
@@ -78,6 +80,7 @@ router.post('/:id/profile', protect, updateRoomProfile);
 
 // Video Room Playlist & Controls
 router.post('/:id/videos/add', protect, addRoomVideo);
+router.post('/:id/videos/upload', protect, uploadVideoMiddleware, uploadRoomVideo);
 router.post('/:id/videos/play', protect, playRoomVideo);
 router.post('/:id/videos/delete', protect, deleteRoomVideo);
 

@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const Room = require('../models/Room');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
@@ -1693,6 +1696,118 @@ exports.deleteRoomVideo = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ── Multer Storage Configuration for Phone MP4 Video Uploads ──
+const videoUploadDir = path.join(__dirname, '../../uploads/videos');
+if (!fs.existsSync(videoUploadDir)) {
+  fs.mkdirSync(videoUploadDir, { recursive: true });
+}
+
+const videoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, videoUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.mp4';
+    const cleanBase = path
+      .basename(file.originalname, ext)
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 30);
+    cb(null, `${cleanBase}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`);
+  },
+});
+
+exports.uploadVideoMiddleware = multer({
+  storage: videoStorage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+}).single('video');
+
+// @desc    Upload Phone MP4 Video to Server & Stream to Room
+// @route   POST /api/rooms/:id/videos/upload
+exports.uploadRoomVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+    const user = req.user;
+
+    if (!file) {
+      return res.status(400).json({ success: false, message: 'No video file provided' });
+    }
+
+    const host = req.get('host');
+    const protocol =
+      req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const videoUrl = `${protocol}://${host}/uploads/videos/${file.filename}`;
+
+    const rawTitle = req.body.title || file.originalname || 'Phone Video';
+
+    // NSFW / Prohibited content check on title
+    if (containsAdultContent(rawTitle)) {
+      try {
+        fs.unlinkSync(file.path);
+      } catch (e) {}
+      return res.status(400).json({
+        success: false,
+        message: 'Sexual, pornographic, or violent content is strictly prohibited!',
+      });
+    }
+
+    const room = await Room.findById(id);
+    if (!room) {
+      try {
+        fs.unlinkSync(file.path);
+      } catch (e) {}
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const newVideo = {
+      id: `vid_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title: rawTitle,
+      url: videoUrl,
+      source: 'local_upload',
+      duration: Number(req.body.duration) || 0,
+      addedBy: user._id,
+      addedByName: user.name || 'User',
+      addedAt: new Date(),
+    };
+
+    if (!room.videoPlaylist) room.videoPlaylist = [];
+    room.videoPlaylist.push(newVideo);
+
+    // Auto-play immediately
+    room.currentVideo = {
+      id: newVideo.id,
+      title: newVideo.title,
+      url: newVideo.url,
+      source: newVideo.source,
+      isPlaying: true,
+      currentTime: 0,
+      updatedAt: new Date(),
+    };
+
+    await room.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(id.toString()).emit('room_video_updated', {
+        currentVideo: room.currentVideo,
+        videoPlaylist: room.videoPlaylist,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Video uploaded and playing',
+      videoUrl,
+      currentVideo: room.currentVideo,
+      videoPlaylist: room.videoPlaylist,
+    });
+  } catch (error) {
+    console.error('uploadRoomVideo error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
 
 

@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect, Polyline } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { T } from './TranslatedText';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from './Toast';
@@ -169,6 +171,53 @@ export default function RoomVideoModal({
     scanPhoneVideos();
   };
 
+  const uploadPhoneVideoToServer = async (uri, fileName, durationSec) => {
+    try {
+      let fileToUpload = uri;
+      if (uri.startsWith('content://')) {
+        const safeName = (fileName || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const dest = `${FileSystem.cacheDirectory}upl_${Date.now()}_${safeName}`;
+        await FileSystem.copyAsync({ from: uri, to: dest });
+        fileToUpload = dest;
+      }
+
+      showToast(t('Processing & uploading video to room...'), 'info');
+      const token = await AsyncStorage.getItem('@auth_token');
+
+      const uploadRes = await FileSystem.uploadAsync(
+        `${api.defaults.baseURL}/rooms/${roomId}/videos/upload`,
+        fileToUpload,
+        {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'video',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          parameters: {
+            title: fileName || 'Phone Video',
+            duration: String(durationSec || 0),
+          },
+        }
+      );
+
+      if (uploadRes.status === 200) {
+        const data = JSON.parse(uploadRes.body);
+        if (data.success) {
+          if (onVideoUpdated) {
+            onVideoUpdated(data.videoPlaylist, data.currentVideo);
+          }
+          showToast(t('Video uploaded and now playing!'), 'success');
+          setTimeout(() => onClose(), 600);
+          return true;
+        }
+      }
+    } catch (e) {
+      console.log('uploadPhoneVideoToServer error:', e);
+    }
+    return false;
+  };
+
   const handlePickSingleFromGallery = async () => {
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
@@ -186,12 +235,29 @@ export default function RoomVideoModal({
           return;
         }
 
-        await addVideoToBackend({
-          title: fileName,
-          url: asset.uri,
-          source: 'local_upload',
-          duration: asset.duration ? Math.round(asset.duration / 1000) : 0,
-        });
+        const durationSec = asset.duration ? Math.round(asset.duration / 1000) : 0;
+        const uploaded = await uploadPhoneVideoToServer(asset.uri, fileName, durationSec);
+
+        if (!uploaded) {
+          // Local cache fallback
+          let localPath = asset.uri;
+          if (asset.uri.startsWith('content://')) {
+            try {
+              const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+              const dest = `${FileSystem.cacheDirectory}loc_${Date.now()}_${safeName}`;
+              await FileSystem.copyAsync({ from: asset.uri, to: dest });
+              localPath = dest;
+            } catch (err) {}
+          }
+          await addVideoToBackend({
+            title: fileName,
+            url: localPath,
+            source: 'local_upload',
+            duration: durationSec,
+          });
+          showToast(t('Playing: ') + fileName, 'success');
+          setTimeout(() => onClose(), 600);
+        }
       }
     } catch (err) {
       showToast(t('Failed to pick video from gallery'), 'error');
@@ -225,12 +291,27 @@ export default function RoomVideoModal({
           showToast(t('Adult content skipped: ') + item.title, 'error');
           continue;
         }
-        await addVideoToBackend({
-          title: item.title,
-          url: item.uri,
-          source: 'local_upload',
-          duration: Math.round(item.duration || 0),
-        });
+
+        const durationSec = Math.round(item.duration || 0);
+        const uploaded = await uploadPhoneVideoToServer(item.uri, item.title, durationSec);
+
+        if (!uploaded) {
+          let localPath = item.uri;
+          if (item.uri.startsWith('content://')) {
+            try {
+              const safeName = (item.title || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
+              const dest = `${FileSystem.cacheDirectory}loc_${Date.now()}_${safeName}`;
+              await FileSystem.copyAsync({ from: item.uri, to: dest });
+              localPath = dest;
+            } catch (err) {}
+          }
+          await addVideoToBackend({
+            title: item.title,
+            url: localPath,
+            source: 'local_upload',
+            duration: durationSec,
+          });
+        }
       }
 
       showToast(t('Videos added to room playlist!'), 'success');
