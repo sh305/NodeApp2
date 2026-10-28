@@ -5,38 +5,16 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Image,
   FlatList,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Rect, Polyline } from 'react-native-svg';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { T } from './TranslatedText';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from './Toast';
 import api from '../api/client';
-
-let MediaLibrary = null;
-try {
-  // eslint-disable-next-line global-require
-  MediaLibrary = require('expo-media-library');
-} catch (e) {
-  // Silent fallback
-}
-
-let DocumentPicker = null;
-try {
-  // eslint-disable-next-line global-require
-  DocumentPicker = require('expo-document-picker');
-} catch (e) {
-  // Silent fallback
-}
 
 // ── STRICT ADULT / PORN CONTENT FILTER ──
 const PROHIBITED_KEYWORDS = [
@@ -55,44 +33,6 @@ function isAdultContent(text) {
   });
 }
 
-function formatDuration(seconds) {
-  if (!seconds || seconds <= 0) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-}
-
-function CheckboxIcon({ checked = false, size = 22 }) {
-  if (checked) {
-    return (
-      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-        <Rect width="24" height="24" rx="6" fill="#00E676" />
-        <Polyline
-          points="6 12 10.5 16.5 18 8"
-          stroke="#FFFFFF"
-          strokeWidth="2.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
-    );
-  }
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect
-        x="1"
-        y="1"
-        width="22"
-        height="22"
-        rx="5.5"
-        stroke="#94A3B8"
-        strokeWidth="1.6"
-        fill="transparent"
-      />
-    </Svg>
-  );
-}
-
 export default function RoomVideoModal({
   visible,
   onClose,
@@ -106,19 +46,13 @@ export default function RoomVideoModal({
   const { t } = useLanguage();
   const { showToast } = useToast();
 
-  // Tabs: 'playlist' | 'url_input' | 'phone_scan'
+  // Tabs: 'playlist' | 'url_input'
   const [activeTab, setActiveTab] = useState('playlist');
 
   // URL Input State
   const [videoUrl, setVideoUrl] = useState('');
   const [videoTitle, setVideoTitle] = useState('');
   const [addingUrl, setAddingUrl] = useState(false);
-
-  // Phone Videos State
-  const [phoneVideos, setPhoneVideos] = useState([]);
-  const [scanning, setScanning] = useState(false);
-  const [selectedVideos, setSelectedVideos] = useState(new Set());
-  const [uploadingVideos, setUploadingVideos] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -127,201 +61,8 @@ export default function RoomVideoModal({
       } else {
         setActiveTab('playlist');
       }
-      setSelectedVideos(new Set());
     }
   }, [visible, videoPlaylist.length]);
-
-  // ── Scan Phone for MP4 Videos ──
-  const scanPhoneVideos = async () => {
-    try {
-      setScanning(true);
-      if (MediaLibrary) {
-        const perm = await MediaLibrary.requestPermissionsAsync();
-        if (perm.status === 'granted') {
-          const res = await MediaLibrary.getAssetsAsync({
-            mediaType: 'video',
-            first: 100,
-            sortBy: [['creationTime', false]],
-          });
-
-          if (res && res.assets && res.assets.length > 0) {
-            const list = res.assets.map((asset) => ({
-              id: asset.id,
-              title: asset.filename || 'Local MP4 Video',
-              uri: asset.uri,
-              duration: asset.duration,
-            }));
-            setPhoneVideos(list);
-            setScanning(false);
-            return;
-          }
-        }
-      }
-
-      // Fallback: Pick via ImagePicker or DocumentPicker
-      setScanning(false);
-    } catch (e) {
-      console.log('scanPhoneVideos error:', e);
-      setScanning(false);
-    }
-  };
-
-  const handleOpenPhoneScanner = () => {
-    setActiveTab('phone_scan');
-    scanPhoneVideos();
-  };
-
-  const uploadPhoneVideoToServer = async (uri, fileName, durationSec) => {
-    try {
-      let fileToUpload = uri;
-      if (uri.startsWith('content://')) {
-        const safeName = (fileName || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
-        const dest = `${FileSystem.cacheDirectory}upl_${Date.now()}_${safeName}`;
-        await FileSystem.copyAsync({ from: uri, to: dest });
-        fileToUpload = dest;
-      }
-
-      showToast(t('Processing & uploading video to room...'), 'info');
-      const token = await AsyncStorage.getItem('@auth_token');
-
-      const uploadRes = await FileSystem.uploadAsync(
-        `${api.defaults.baseURL}/rooms/${roomId}/videos/upload`,
-        fileToUpload,
-        {
-          httpMethod: 'POST',
-          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-          fieldName: 'video',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          parameters: {
-            title: fileName || 'Phone Video',
-            duration: String(durationSec || 0),
-          },
-        }
-      );
-
-      if (uploadRes.status === 200) {
-        const data = JSON.parse(uploadRes.body);
-        if (data.success) {
-          if (onVideoUpdated) {
-            onVideoUpdated(data.videoPlaylist, data.currentVideo);
-          }
-          showToast(t('Video uploaded and now playing!'), 'success');
-          setTimeout(() => onClose(), 600);
-          return true;
-        }
-      }
-    } catch (e) {
-      console.log('uploadPhoneVideoToServer error:', e);
-    }
-    return false;
-  };
-
-  const handlePickSingleFromGallery = async () => {
-    try {
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['videos'],
-        allowsEditing: false,
-        quality: 0.8,
-      });
-
-      if (!res.canceled && res.assets && res.assets.length > 0) {
-        const asset = res.assets[0];
-        const fileName = asset.fileName || 'Phone Video';
-
-        if (isAdultContent(fileName) || isAdultContent(asset.uri)) {
-          showToast(t('Sexual and adult content is strictly prohibited!'), 'error');
-          return;
-        }
-
-        const durationSec = asset.duration ? Math.round(asset.duration / 1000) : 0;
-        const uploaded = await uploadPhoneVideoToServer(asset.uri, fileName, durationSec);
-
-        if (!uploaded) {
-          // Local cache fallback
-          let localPath = asset.uri;
-          if (asset.uri.startsWith('content://')) {
-            try {
-              const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-              const dest = `${FileSystem.cacheDirectory}loc_${Date.now()}_${safeName}`;
-              await FileSystem.copyAsync({ from: asset.uri, to: dest });
-              localPath = dest;
-            } catch (err) {}
-          }
-          await addVideoToBackend({
-            title: fileName,
-            url: localPath,
-            source: 'local_upload',
-            duration: durationSec,
-          });
-          showToast(t('Playing: ') + fileName, 'success');
-          setTimeout(() => onClose(), 600);
-        }
-      }
-    } catch (err) {
-      showToast(t('Failed to pick video from gallery'), 'error');
-    }
-  };
-
-  const toggleSelectPhoneVideo = (vidId) => {
-    setSelectedVideos((prev) => {
-      const next = new Set(prev);
-      if (next.has(vidId)) {
-        next.delete(vidId);
-      } else {
-        next.add(vidId);
-      }
-      return next;
-    });
-  };
-
-  const handleConfirmAddSelectedPhoneVideos = async () => {
-    if (selectedVideos.size === 0) {
-      showToast(t('Please select at least one video'), 'info');
-      return;
-    }
-
-    try {
-      setUploadingVideos(true);
-      const toAdd = phoneVideos.filter((v) => selectedVideos.has(v.id));
-
-      for (const item of toAdd) {
-        if (isAdultContent(item.title) || isAdultContent(item.uri)) {
-          showToast(t('Adult content skipped: ') + item.title, 'error');
-          continue;
-        }
-
-        const durationSec = Math.round(item.duration || 0);
-        const uploaded = await uploadPhoneVideoToServer(item.uri, item.title, durationSec);
-
-        if (!uploaded) {
-          let localPath = item.uri;
-          if (item.uri.startsWith('content://')) {
-            try {
-              const safeName = (item.title || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
-              const dest = `${FileSystem.cacheDirectory}loc_${Date.now()}_${safeName}`;
-              await FileSystem.copyAsync({ from: item.uri, to: dest });
-              localPath = dest;
-            } catch (err) {}
-          }
-          await addVideoToBackend({
-            title: item.title,
-            url: localPath,
-            source: 'local_upload',
-            duration: durationSec,
-          });
-        }
-      }
-
-      showToast(t('Videos added to room playlist!'), 'success');
-      setActiveTab('playlist');
-    } catch (err) {
-      showToast(t('Error adding selected videos'), 'error');
-    } finally {
-      setUploadingVideos(false);
-    }
-  };
 
   // ── Add URL (YouTube or Direct MP4) ──
   const handleAddUrl = async () => {
@@ -457,22 +198,7 @@ export default function RoomVideoModal({
                   activeTab === 'url_input' && styles.tabTextActive,
                 ]}
               >
-                <T>Enter Video URL</T>
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tabItem, activeTab === 'phone_scan' && styles.tabItemActive]}
-              activeOpacity={0.8}
-              onPress={handleOpenPhoneScanner}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === 'phone_scan' && styles.tabTextActive,
-                ]}
-              >
-                <T>Phone Videos</T>
+                🎬 <T>Add YouTube Video</T>
               </Text>
             </TouchableOpacity>
           </View>
@@ -492,7 +218,7 @@ export default function RoomVideoModal({
                     onPress={() => setActiveTab('url_input')}
                   >
                     <Text style={styles.addNowText}>
-                      <T>Add Video</T>
+                      <T>Add YouTube Video</T>
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -533,9 +259,7 @@ export default function RoomVideoModal({
                           <Text style={styles.videoSourceText}>
                             {item.source === 'youtube'
                               ? 'YouTube'
-                              : item.source === 'local_upload'
-                              ? 'Phone Storage'
-                              : 'Online MP4'}
+                              : 'Online Video'}
                           </Text>
                         </View>
                         {isHostOrAdmin && (
@@ -559,7 +283,7 @@ export default function RoomVideoModal({
           {activeTab === 'url_input' && (
             <View style={styles.contentWrap}>
               <Text style={styles.inputLabel}>
-                <T>Video URL (YouTube or MP4)</T>
+                <T>YouTube Video Link or ID</T>
               </Text>
               <TextInput
                 style={styles.textInput}
@@ -608,111 +332,6 @@ export default function RoomVideoModal({
                   )}
                 </LinearGradient>
               </TouchableOpacity>
-            </View>
-          )}
-
-          {/* TAB 3: PHONE VIDEOS */}
-          {activeTab === 'phone_scan' && (
-            <View style={styles.contentWrap}>
-              <View style={styles.phoneScanHeader}>
-                <TouchableOpacity
-                  style={styles.pickGalleryBtn}
-                  activeOpacity={0.8}
-                  onPress={handlePickSingleFromGallery}
-                >
-                  <Text style={styles.pickGalleryText}>
-                    📁 <T>Choose File from Gallery</T>
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.refreshScanBtn}
-                  activeOpacity={0.7}
-                  onPress={scanPhoneVideos}
-                >
-                  <Text style={styles.refreshScanText}>🔄 <T>Scan</T></Text>
-                </TouchableOpacity>
-              </View>
-
-              {scanning ? (
-                <View style={styles.loadingWrap}>
-                  <ActivityIndicator size="large" color="#00E676" />
-                  <Text style={styles.loadingText}>
-                    <T>Scanning phone for MP4 videos...</T>
-                  </Text>
-                </View>
-              ) : phoneVideos.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>
-                    <T>No local videos found or permission not granted.</T>
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.addNowBtn}
-                    activeOpacity={0.8}
-                    onPress={handlePickSingleFromGallery}
-                  >
-                    <Text style={styles.addNowText}>
-                      <T>Pick from Phone Gallery</T>
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <>
-                  <FlatList
-                    data={phoneVideos}
-                    keyExtractor={(item) => item.id}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingVertical: 10 }}
-                    renderItem={({ item }) => {
-                      const isSelected = selectedVideos.has(item.id);
-                      return (
-                        <TouchableOpacity
-                          style={[
-                            styles.phoneItemRow,
-                            isSelected && styles.phoneItemRowSelected,
-                          ]}
-                          activeOpacity={0.75}
-                          onPress={() => toggleSelectPhoneVideo(item.id)}
-                        >
-                          <CheckboxIcon checked={isSelected} size={22} />
-                          <View style={styles.phoneMetaCol}>
-                            <Text style={styles.phoneVideoTitle} numberOfLines={1}>
-                              {item.title}
-                            </Text>
-                            <Text style={styles.phoneVideoDuration}>
-                              {formatDuration(item.duration)}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    }}
-                  />
-
-                  {selectedVideos.size > 0 && (
-                    <TouchableOpacity
-                      style={styles.actionBtn}
-                      activeOpacity={0.8}
-                      onPress={handleConfirmAddSelectedPhoneVideos}
-                      disabled={uploadingVideos}
-                    >
-                      <LinearGradient
-                        colors={['#00E676', '#00C853']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.actionGrad}
-                      >
-                        {uploadingVideos ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text style={styles.actionBtnText}>
-                            <T>Add Selected Videos</T> ({selectedVideos.size})
-                          </Text>
-                        )}
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  )}
-                </>
-              )}
             </View>
           )}
         </View>

@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import * as FileSystem from 'expo-file-system';
 import { T } from './TranslatedText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -62,7 +61,6 @@ export default function RoomVideoPlayer({
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [resolvedUri, setResolvedUri] = useState(currentVideo?.url || '');
   const webViewRef = useRef(null);
 
   useEffect(() => {
@@ -70,41 +68,7 @@ export default function RoomVideoPlayer({
     setHasError(false);
   }, [currentVideo?.id, currentVideo?.url, reloadKey]);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function resolveMediaUri() {
-      if (!currentVideo?.url) {
-        if (isMounted) setResolvedUri('');
-        return;
-      }
-      const rawUrl = currentVideo.url;
-      if (rawUrl.startsWith('content://')) {
-        try {
-          const safeName = (currentVideo.title || 'phone_video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
-          const cachePath = `${FileSystem.cacheDirectory}rvid_${currentVideo.id || 'curr'}_${safeName}`;
-          const info = await FileSystem.getInfoAsync(cachePath);
-          if (!info.exists) {
-            await FileSystem.copyAsync({
-              from: rawUrl,
-              to: cachePath,
-            });
-          }
-          if (isMounted) setResolvedUri(cachePath);
-        } catch (err) {
-          console.log('resolveMediaUri error:', err);
-          if (isMounted) setResolvedUri(rawUrl);
-        }
-      } else {
-        if (isMounted) setResolvedUri(rawUrl);
-      }
-    }
-    resolveMediaUri();
-    return () => {
-      isMounted = false;
-    };
-  }, [currentVideo?.url, currentVideo?.id]);
-
-  // If no video is present or playing, render clean Screenshot 3 empty state:
+  // If no video is present or playing, render clean empty state:
   if (!currentVideo || !currentVideo.url || currentVideo.isPlaying === false) {
     return (
       <View style={styles.container}>
@@ -130,7 +94,7 @@ export default function RoomVideoPlayer({
     Boolean(youtubeId) ||
     /youtube\.com|youtu\.be/i.test(currentVideo.url || '');
 
-  const rawVideoSrc = resolvedUri || currentVideo?.url || '';
+  const rawVideoSrc = currentVideo?.url || '';
 
   // ── YouTube Embed with official IFrame API & automatic HTML5 fallback ──
   const htmlContent = isYoutube && youtubeId
@@ -306,7 +270,6 @@ export default function RoomVideoPlayer({
         allowUniversalAccessFromFileURLs={true}
         mixedContentMode="always"
         androidHardwareAccelerationDisabled={false}
-        androidLayerType="hardware"
         allowsFullscreenVideo={true}
         userAgent={
           isYoutube
