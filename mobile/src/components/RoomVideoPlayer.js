@@ -62,40 +62,13 @@ export default function RoomVideoPlayer({
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [resolvedUri, setResolvedUri] = useState(currentVideo?.url || '');
   const webViewRef = useRef(null);
 
   useEffect(() => {
     setLoading(true);
     setHasError(false);
   }, [currentVideo?.id, currentVideo?.url, reloadKey]);
-
-  // If no video is present or playing, render clean Screenshot 3 empty state:
-  if (!currentVideo || !currentVideo.url || currentVideo.isPlaying === false) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.noVideoText}>
-          <T>There is no video can be played. Do you want to add now?</T>
-        </Text>
-        <TouchableOpacity
-          style={styles.addVideoBtn}
-          activeOpacity={0.8}
-          onPress={onAddVideoPress}
-        >
-          <Text style={styles.addVideoBtnText}>
-            <T>Add Video</T>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const youtubeId = extractYoutubeId(currentVideo.url);
-  const isYoutube =
-    currentVideo.source === 'youtube' ||
-    Boolean(youtubeId) ||
-    /youtube\.com|youtu\.be/i.test(currentVideo.url || '');
-
-  const [resolvedUri, setResolvedUri] = useState(currentVideo?.url || '');
 
   useEffect(() => {
     let isMounted = true;
@@ -130,6 +103,32 @@ export default function RoomVideoPlayer({
       isMounted = false;
     };
   }, [currentVideo?.url, currentVideo?.id]);
+
+  // If no video is present or playing, render clean Screenshot 3 empty state:
+  if (!currentVideo || !currentVideo.url || currentVideo.isPlaying === false) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.noVideoText}>
+          <T>There is no video can be played. Do you want to add now?</T>
+        </Text>
+        <TouchableOpacity
+          style={styles.addVideoBtn}
+          activeOpacity={0.8}
+          onPress={onAddVideoPress}
+        >
+          <Text style={styles.addVideoBtnText}>
+            <T>Add Video</T>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const youtubeId = extractYoutubeId(currentVideo.url);
+  const isYoutube =
+    currentVideo.source === 'youtube' ||
+    Boolean(youtubeId) ||
+    /youtube\.com|youtu\.be/i.test(currentVideo.url || '');
 
   const rawVideoSrc = resolvedUri || currentVideo?.url || '';
 
