@@ -516,6 +516,38 @@ function initRoomSockets(io) {
       }
     });
 
+    // Synchronize Real-time Video Playback Across Room Participants
+    socket.on('sync_video_playback', async ({ roomId, isPlaying, currentTime, videoId }) => {
+      try {
+        if (!roomId) return;
+        const room = await Room.findById(roomId);
+        if (!room) return;
+
+        if (room.currentVideo) {
+          if (isPlaying !== undefined) room.currentVideo.isPlaying = Boolean(isPlaying);
+          if (currentTime !== undefined) room.currentVideo.currentTime = Number(currentTime);
+          if (videoId && room.currentVideo.id !== videoId) {
+            const v = (room.videoPlaylist || []).find((p) => p.id === videoId);
+            if (v) {
+              room.currentVideo.id = v.id;
+              room.currentVideo.title = v.title;
+              room.currentVideo.url = v.url;
+              room.currentVideo.source = v.source;
+            }
+          }
+          room.currentVideo.updatedAt = new Date();
+          await room.save();
+        }
+
+        io.to(roomId.toString()).emit('room_video_updated', {
+          currentVideo: room.currentVideo,
+          videoPlaylist: room.videoPlaylist,
+        });
+      } catch (err) {
+        console.error('Socket sync_video_playback error:', err);
+      }
+    });
+
     // Update Seat Layout & Special Theme
     socket.on('update_seat_layout', async ({ roomId, seatLayout, seats }) => {
       try {

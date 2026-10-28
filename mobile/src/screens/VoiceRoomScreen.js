@@ -1870,6 +1870,41 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               isHostOrAdmin={isOwner || isAdmin}
               onAddVideoPress={() => setRoomVideoModalVisible(true)}
               onOpenPlaylist={() => setRoomVideoModalVisible(true)}
+              onTogglePlayPause={async () => {
+                try {
+                  const nextState = !currentVideo?.isPlaying;
+                  const res = await api.post(`/rooms/${roomId}/videos/play`, {
+                    videoId: currentVideo?.id,
+                    isPlaying: nextState,
+                  });
+                  if (res.data?.success && res.data?.currentVideo) {
+                    setCurrentVideo(res.data.currentVideo);
+                  }
+                } catch (e) {
+                  console.log('Toggle play error:', e);
+                }
+              }}
+              onVideoEnded={async () => {
+                if (!isOwner && !isAdmin) return;
+                if (videoPlaylist && videoPlaylist.length > 1) {
+                  const currentIdx = videoPlaylist.findIndex((v) => v.id === currentVideo?.id);
+                  const nextIdx = (currentIdx + 1) % videoPlaylist.length;
+                  const nextVideo = videoPlaylist[nextIdx];
+                  if (nextVideo) {
+                    try {
+                      const res = await api.post(`/rooms/${roomId}/videos/play`, {
+                        videoId: nextVideo.id,
+                        isPlaying: true,
+                      });
+                      if (res.data?.success && res.data?.currentVideo) {
+                        setCurrentVideo(res.data.currentVideo);
+                      }
+                    } catch (e) {
+                      console.log('Auto-play next video error:', e);
+                    }
+                  }
+                }
+              }}
               onStopVideo={async () => {
                 try {
                   const res = await api.post(`/rooms/${roomId}/videos/play`, { isPlaying: false });

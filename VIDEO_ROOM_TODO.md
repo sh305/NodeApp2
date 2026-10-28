@@ -10,26 +10,16 @@
 - [x] Room loading & crash fixed (`setRoomTitle` ReferenceError resolved in build `61405605`).
 - [x] Room Profile Edit modal functional.
 - [x] Video Add flow functional (YouTube URL & Phone scans with NSFW filters).
-- [ ] **NEXT PRIORITY (Tomorrow): Video Playback Execution & Streaming**.
-
----
-
-## 🔍 Investigation Checklist for Tomorrow
-
-### 1. `mobile/src/components/RoomVideoPlayer.js` (Video Player Component)
-- **YouTube Embed Handling:**
-  - YouTube iframe embeds inside React Native WebView on Android often require specific HTML/CSS properties:
-    - Origin whitelist: `originWhitelist={['*']}`
-    - Dom storage: `domStorageEnabled={true}`
-    - Hardware acceleration: `androidHardwareAccelerationDisabled={false}`
-    - User agent string: Sometimes Android WebView needs a mobile Safari/Chrome user-agent to allow embedded YouTube iframes to play without "Error occurred, please try again later".
-    - YouTube Iframe Player API: Ensure valid parameters (`playsinline=1`, `autoplay=1`, `enablejsapi=1`).
-- **Local / Direct MP4 Video Playback:**
-  - For phone MP4 uploads, ensure video URI is converted to base64 data URI or accessible via local file server / backend media stream endpoint, as raw Android content URIs (`content://...`) cannot be directly rendered inside WebView.
-
-### 2. Backend & Socket State (`backend/src/controllers/roomController.js`)
-- Verify that `addRoomVideo` sets `currentVideo.isPlaying = true` and `currentVideo.url` properly.
-- Verify `sync_video_playback` / `room_video_updated` Socket.io events emit the updated video state so all room listeners immediately switch to playing state.
+- [x] **Video Playback Execution & Streaming (COMPLETED - 28 Oct 2026)**:
+  - [x] Comprehensive YouTube ID extraction regex (Shorts, Live, Watch, Embed, youtu.be, bare ID) implemented on frontend and backend.
+  - [x] YouTube IFrame API integration with direct iframe fallback.
+  - [x] Android WebView `baseUrl="https://www.youtube.com"` origin embed bypass (resolves YouTube Error 150/101 & "Video unavailable" black screens).
+  - [x] Mobile Chrome `userAgent` applied on Android WebView to avoid WebView restriction blocks.
+  - [x] Hardware acceleration (`androidHardwareAccelerationDisabled={false}`, `androidLayerType="hardware"`) enabled for smooth rendering.
+  - [x] Auto-play newly added video when room has no active video.
+  - [x] Auto-next video playback on song end (`onVideoEnded`).
+  - [x] Host playback controls (Play / Pause / Stop / Playlist / Add Video).
+  - [x] Real-time Socket.io video playback synchronization (`sync_video_playback` & `room_video_updated`).
 
 ---
 

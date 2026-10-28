@@ -258,7 +258,10 @@ export default function RoomVideoModal({
 
     try {
       setAddingUrl(true);
-      const isYoutube = trimmedUrl.includes('youtube.com') || trimmedUrl.includes('youtu.be');
+      const isYoutube =
+        trimmedUrl.includes('youtube.com') ||
+        trimmedUrl.includes('youtu.be') ||
+        /^[a-zA-Z0-9_-]{11}$/.test(trimmedUrl);
       const defaultTitle = isYoutube ? 'YouTube Video' : 'Online Video';
 
       await addVideoToBackend({
@@ -270,8 +273,11 @@ export default function RoomVideoModal({
 
       setVideoUrl('');
       setVideoTitle('');
-      showToast(t('Video added successfully!'), 'success');
+      showToast(t('Video added! Starting playback...'), 'success');
       setActiveTab('playlist');
+      setTimeout(() => {
+        onClose();
+      }, 700);
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to add video';
       showToast(t(msg), 'error');
@@ -296,6 +302,9 @@ export default function RoomVideoModal({
       if (res.data?.success && onVideoUpdated) {
         onVideoUpdated(res.data.videoPlaylist, res.data.currentVideo);
         showToast(t('Playing: ') + video.title, 'success');
+        setTimeout(() => {
+          onClose();
+        }, 600);
       }
     } catch (err) {
       showToast(t('Failed to play video'), 'error');

@@ -1300,11 +1300,40 @@ function containsAdultContent(text) {
 
 function extractYoutubeId(url) {
   if (!url || typeof url !== 'string') return null;
-  const match = url.match(
-    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/
-  );
-  return match ? match[1] : null;
+  const clean = url.trim();
+
+  // Bare 11-character YouTube video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(clean)) {
+    return clean;
+  }
+
+  // Standard watch query params (e.g. ?v=... or &v=...)
+  const vMatch = clean.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (vMatch && vMatch[1]) return vMatch[1];
+
+  // youtu.be shortlinks (e.g. https://youtu.be/...)
+  const youtuBeMatch = clean.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (youtuBeMatch && youtuBeMatch[1]) return youtuBeMatch[1];
+
+  // YouTube Shorts (e.g. https://youtube.com/shorts/...)
+  const shortsMatch = clean.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shortsMatch && shortsMatch[1]) return shortsMatch[1];
+
+  // YouTube Embed (e.g. https://youtube.com/embed/...)
+  const embedMatch = clean.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (embedMatch && embedMatch[1]) return embedMatch[1];
+
+  // YouTube Live (e.g. https://youtube.com/live/...)
+  const liveMatch = clean.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+  if (liveMatch && liveMatch[1]) return liveMatch[1];
+
+  // /v/ path
+  const vPathMatch = clean.match(/\/v\/([a-zA-Z0-9_-]{11})/);
+  if (vPathMatch && vPathMatch[1]) return vPathMatch[1];
+
+  return null;
 }
+
 
 // ── Real-time YouTube Official Data API v3 Safety Verification ──
 async function verifyYoutubeVideoSafety(youtubeId) {
@@ -1500,7 +1529,12 @@ exports.addRoomVideo = async (req, res) => {
     room.videoPlaylist.push(newVideo);
 
     // If no video is currently selected or playing, automatically set this one as current
-    if (!room.currentVideo || !room.currentVideo.url) {
+    if (
+      !room.currentVideo ||
+      !room.currentVideo.url ||
+      room.currentVideo.isPlaying === false ||
+      (room.videoPlaylist && room.videoPlaylist.length === 1)
+    ) {
       room.currentVideo = {
         id: newVideo.id,
         title: newVideo.title,
@@ -1560,8 +1594,21 @@ exports.playRoomVideo = async (req, res) => {
         };
       }
     } else if (room.currentVideo) {
-      room.currentVideo.isPlaying = isPlaying !== undefined ? Boolean(isPlaying) : true;
-      room.currentVideo.updatedAt = new Date();
+      if (isPlaying === false) {
+        // Complete stop
+        room.currentVideo = {
+          id: null,
+          title: null,
+          url: null,
+          source: null,
+          isPlaying: false,
+          currentTime: 0,
+          updatedAt: new Date(),
+        };
+      } else {
+        room.currentVideo.isPlaying = true;
+        room.currentVideo.updatedAt = new Date();
+      }
     }
 
     await room.save();
