@@ -67,7 +67,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'online',
     version: 'v5-live-build',
-    appId: '4171729949789896',
+    appId: '1919593492737791',
     message: 'YoYo Voice Backend Engine is running smoothly 🚀',
     timestamp: new Date(),
   });
