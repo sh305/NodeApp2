@@ -11,7 +11,11 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
+  Dimensions,
 } from 'react-native';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MODAL_HEIGHT = Math.max(420, Math.min(540, Math.round(SCREEN_HEIGHT * 0.62)));
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { T } from './TranslatedText';
@@ -234,7 +238,8 @@ export default function RoomVideoModal({
                     data={videoPlaylist}
                     keyExtractor={(item) => item.id}
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingVertical: 10 }}
+                    style={styles.flatList}
+                    contentContainerStyle={{ paddingVertical: 10, paddingBottom: 40 }}
                     renderItem={({ item, index }) => {
                       const isPlaying = currentVideo?.id === item.id;
                       return (
@@ -369,15 +374,16 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 18,
-    maxHeight: '90%',
+    height: MODAL_HEIGHT,
+    maxHeight: '85%',
     borderTopWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
   scrollWrap: {
-    maxHeight: 440,
+    flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 30,
   },
   headerRow: {
     flexDirection: 'row',
@@ -430,6 +436,11 @@ const styles = StyleSheet.create({
   },
   contentWrap: {
     flex: 1,
+    width: '100%',
+  },
+  flatList: {
+    flex: 1,
+    width: '100%',
   },
   emptyContainer: {
     alignItems: 'center',

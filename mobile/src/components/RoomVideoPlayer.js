@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import YoutubePlayer from 'react-native-youtube-iframe';
 import { T } from './TranslatedText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -68,8 +69,35 @@ export default function RoomVideoPlayer({
     setHasError(false);
   }, [currentVideo?.id, currentVideo?.url, reloadKey]);
 
-  // If no video is present or playing, render clean empty state:
-  if (!currentVideo || !currentVideo.url || currentVideo.isPlaying === false) {
+  // Handle Play / Pause commands dynamically for HTML5 videos:
+  useEffect(() => {
+    if (!webViewRef.current) return;
+    if (currentVideo?.isPlaying) {
+      webViewRef.current.injectJavaScript(`
+        try { playVideo(); } catch(e){}
+        true;
+      `);
+    } else {
+      webViewRef.current.injectJavaScript(`
+        try { pauseVideo(); } catch(e){}
+        true;
+      `);
+    }
+  }, [currentVideo?.isPlaying]);
+
+  const onStateChange = useCallback(
+    (state) => {
+      if (state === 'ended') {
+        if (onVideoEnded) {
+          onVideoEnded();
+        }
+      }
+    },
+    [onVideoEnded]
+  );
+
+  // If no video is present at all, render clean empty state:
+  if (!currentVideo || !currentVideo.url) {
     return (
       <View style={styles.container}>
         <Text style={styles.noVideoText}>
@@ -96,143 +124,62 @@ export default function RoomVideoPlayer({
 
   const rawVideoSrc = currentVideo?.url || '';
 
-  // ── YouTube Embed with official IFrame API & automatic HTML5 fallback ──
-  const htmlContent = isYoutube && youtubeId
-    ? `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
-            #player-container { width: 100% !important; height: 100% !important; display: flex; align-items: center; justify-content: center; background: #000; }
-            iframe { width: 100% !important; height: 100% !important; border: 0 !important; }
-          </style>
-        </head>
-        <body>
-          <div id="player-container">
-            <div id="player"></div>
-          </div>
-          <script>
-            var tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            var firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-            var ytPlayer = null;
-            function onYouTubeIframeAPIReady() {
-              try {
-                ytPlayer = new YT.Player('player', {
-                  height: '100%',
-                  width: '100%',
-                  videoId: '${youtubeId}',
-                  playerVars: {
-                    autoplay: 1,
-                    playsinline: 1,
-                    controls: 1,
-                    rel: 0,
-                    modestbranding: 1,
-                    fs: 1,
-                    enablejsapi: 1,
-                    origin: 'https://www.youtube.com'
-                  },
-                  events: {
-                    'onReady': function(e) {
-                      try { e.target.playVideo(); } catch(err){}
-                      if (window.ReactNativeWebView) {
-                        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'READY' }));
-                      }
-                    },
-                    'onStateChange': function(e) {
-                      // 0 = YT.PlayerState.ENDED
-                      if (e.data === 0 && window.ReactNativeWebView) {
-                        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIDEO_ENDED' }));
-                      }
-                    },
-                    'onError': function(e) {
-                      loadDirectIframe();
-                    }
-                  }
-                });
-              } catch(err) {
-                loadDirectIframe();
+  // HTML5 Video markup for non-YouTube video files (e.g. mp4)
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body, html { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+          video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        </style>
+      </head>
+      <body>
+        <video
+          id="mediaPlayer"
+          src="${rawVideoSrc}"
+          ${currentVideo.isPlaying !== false ? 'autoplay' : ''}
+          controls
+          playsinline
+          webkit-playsinline
+          style="width: 100%; height: 100%; object-fit: contain; background: #000;"
+        >
+          <source src="${rawVideoSrc}" type="video/mp4" />
+        </video>
+        <script>
+          var v = document.getElementById('mediaPlayer');
+          function playVideo() { if (v) v.play(); }
+          function pauseVideo() { if (v) v.pause(); }
+          if (v) {
+            function notifyReady() {
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'READY' }));
               }
             }
-
-            function loadDirectIframe() {
-              var container = document.getElementById('player-container');
-              if (container) {
-                container.innerHTML = '<iframe src="https://www.youtube.com/embed/${youtubeId}?autoplay=1&playsinline=1&controls=1&rel=0&modestbranding=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%;height:100%;border:0;"></iframe>';
+            v.addEventListener('playing', notifyReady);
+            v.addEventListener('loadeddata', notifyReady);
+            v.addEventListener('canplay', notifyReady);
+            v.addEventListener('ended', function() {
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIDEO_ENDED' }));
               }
-            }
-
-            // Fallback: If YouTube API takes > 2.2 seconds to load, switch to direct iframe
-            setTimeout(function() {
-              if (!ytPlayer || !ytPlayer.playVideo) {
-                loadDirectIframe();
+            });
+            v.addEventListener('error', function() {
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'ERROR',
+                  code: v.error ? v.error.code : 'unknown'
+                }));
               }
-            }, 2200);
-          </script>
-        </body>
-      </html>
-    `
-    : `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body, html { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-          </style>
-        </head>
-        <body>
-          <video
-            id="mediaPlayer"
-            src="${rawVideoSrc}"
-            autoplay
-            controls
-            playsinline
-            webkit-playsinline
-            style="width: 100%; height: 100%; object-fit: contain; background: #000;"
-          >
-            <source src="${rawVideoSrc}" type="video/mp4" />
-          </video>
-          <script>
-            var v = document.getElementById('mediaPlayer');
-            if (v) {
-              function notifyReady() {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'READY' }));
-                }
-              }
-              v.addEventListener('playing', notifyReady);
-              v.addEventListener('loadeddata', notifyReady);
-              v.addEventListener('canplay', notifyReady);
-              v.addEventListener('ended', function() {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIDEO_ENDED' }));
-                }
-              });
-              v.addEventListener('error', function() {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'ERROR',
-                    code: v.error ? v.error.code : 'unknown'
-                  }));
-                }
-              });
-              v.play().catch(function() {
-                v.muted = true;
-                v.play();
-              });
-            }
-          </script>
-        </body>
-      </html>
-    `;
+            });
+            ${currentVideo.isPlaying !== false ? 'v.play().catch(function(){ v.muted = true; v.play(); });' : ''}
+          }
+        </script>
+      </body>
+    </html>
+  `;
 
   const handleMessage = (event) => {
     try {
@@ -251,42 +198,65 @@ export default function RoomVideoPlayer({
 
   return (
     <View style={styles.container}>
-      <WebView
-        key={`video_${currentVideo.id || currentVideo.url}_${rawVideoSrc}_${reloadKey}`}
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={{
-          html: htmlContent,
-          baseUrl: isYoutube ? 'https://www.youtube.com' : 'file:///',
-        }}
-        style={styles.webview}
-        allowsInlineMediaPlayback={true}
-        mediaPlaybackRequiresUserAction={false}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        allowFileAccess={true}
-        allowContentAccess={true}
-        allowFileAccessFromFileURLs={true}
-        allowUniversalAccessFromFileURLs={true}
-        mixedContentMode="always"
-        androidHardwareAccelerationDisabled={false}
-        allowsFullscreenVideo={true}
-        userAgent={
-          isYoutube
-            ? 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36'
-            : undefined
-        }
-        onLoadStart={() => setLoading(true)}
-        onLoadEnd={() => setLoading(false)}
-        onMessage={handleMessage}
-        onError={() => {
-          setLoading(false);
-          setHasError(true);
-        }}
-        onHttpError={() => {
-          setLoading(false);
-        }}
-      />
+      {isYoutube && youtubeId ? (
+        <YoutubePlayer
+          key={`yt_${youtubeId}_${reloadKey}`}
+          height={VIDEO_HEIGHT}
+          width={SCREEN_WIDTH}
+          play={currentVideo.isPlaying !== false}
+          videoId={youtubeId}
+          onReady={() => setLoading(false)}
+          onChangeState={onStateChange}
+          onError={(e) => {
+            console.log('YouTube player error:', e);
+            setLoading(false);
+            setHasError(true);
+          }}
+          initialPlayerParams={{
+            controls: true,
+            modestbranding: true,
+            rel: false,
+            preventFullScreen: false,
+          }}
+          webViewProps={{
+            androidHardwareAccelerationDisabled: false,
+            domStorageEnabled: true,
+            mediaPlaybackRequiresUserAction: false,
+            allowsInlineMediaPlayback: true,
+          }}
+          webViewStyle={{ opacity: 0.99 }}
+        />
+      ) : (
+        <WebView
+          key={`video_${currentVideo.id || currentVideo.url}_${reloadKey}`}
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={{
+            html: htmlContent,
+            baseUrl: 'https://nodeapp2-yl8c.onrender.com',
+          }}
+          style={styles.webview}
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          allowFileAccess={true}
+          allowContentAccess={true}
+          mixedContentMode="always"
+          androidHardwareAccelerationDisabled={false}
+          allowsFullscreenVideo={true}
+          onLoadStart={() => setLoading(true)}
+          onLoadEnd={() => setLoading(false)}
+          onMessage={handleMessage}
+          onError={() => {
+            setLoading(false);
+            setHasError(true);
+          }}
+          onHttpError={() => {
+            setLoading(false);
+          }}
+        />
+      )}
 
       {loading && (
         <View style={styles.loadingOverlay} pointerEvents="none">
@@ -329,7 +299,7 @@ export default function RoomVideoPlayer({
               onPress={onTogglePlayPause}
             >
               <Text style={styles.overlayBtnText}>
-                {currentVideo.isPlaying ? '⏸️' : '▶️'}
+                {currentVideo.isPlaying !== false ? '⏸️' : '▶️'}
               </Text>
             </TouchableOpacity>
           )}
@@ -443,8 +413,8 @@ const styles = StyleSheet.create({
   videoOverlayHeader: {
     position: 'absolute',
     top: 8,
-    left: 8,
-    right: 8,
+    left: 10,
+    right: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -453,22 +423,25 @@ const styles = StyleSheet.create({
   videoTitlePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(15, 15, 26, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 14,
-    maxWidth: '60%',
-    gap: 6,
+    maxWidth: '52%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   videoPlayingBadge: {
     color: '#00E676',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
+    marginRight: 6,
   },
   videoTitleText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
+    flexShrink: 1,
   },
   videoOverlayActions: {
     flexDirection: 'row',
@@ -476,25 +449,25 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   overlayCircleBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(15, 15, 26, 0.85)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  overlayBtnText: {
-    fontSize: 12,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   overlayCloseBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.75)',
-    borderColor: '#EF4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.85)',
+    borderColor: 'rgba(239, 68, 68, 0.5)',
+  },
+  overlayBtnText: {
+    fontSize: 14,
   },
   overlayCloseText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
