@@ -50,11 +50,18 @@ function extractYoutubeId(url) {
   return null;
 }
 
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds) || seconds < 0) return '0:00';
+  const totalSecs = Math.floor(seconds);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
 export default function RoomVideoPlayer({
   currentVideo = null,
   isHostOrAdmin = false,
   onAddVideoPress,
-  onOpenPlaylist,
   onStopVideo,
   onTogglePlayPause,
   onVideoEnded,
@@ -62,12 +69,88 @@ export default function RoomVideoPlayer({
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [barWidth, setBarWidth] = useState(0);
+  const [showControls, setShowControls] = useState(true);
+
+  const playerRef = useRef(null);
   const webViewRef = useRef(null);
+  const hideControlsTimer = useRef(null);
+
+  // Auto-hide controls after 3.5 seconds of inactivity when video is playing
+  const resetHideTimer = useCallback(() => {
+    setShowControls(true);
+    if (hideControlsTimer.current) {
+      clearTimeout(hideControlsTimer.current);
+    }
+    if (currentVideo?.isPlaying !== false) {
+      hideControlsTimer.current = setTimeout(() => {
+        setShowControls(false);
+      }, 3500);
+    }
+  }, [currentVideo?.isPlaying]);
+
+  const toggleControls = () => {
+    if (showControls) {
+      setShowControls(false);
+      if (hideControlsTimer.current) {
+        clearTimeout(hideControlsTimer.current);
+      }
+    } else {
+      resetHideTimer();
+    }
+  };
+
+  useEffect(() => {
+    if (currentVideo?.isPlaying === false) {
+      setShowControls(true);
+      if (hideControlsTimer.current) {
+        clearTimeout(hideControlsTimer.current);
+      }
+    } else {
+      resetHideTimer();
+    }
+    return () => {
+      if (hideControlsTimer.current) {
+        clearTimeout(hideControlsTimer.current);
+      }
+    };
+  }, [currentVideo?.isPlaying, resetHideTimer]);
 
   useEffect(() => {
     setLoading(true);
     setHasError(false);
+    setCurrentTime(0);
+    setDuration(0);
   }, [currentVideo?.id, currentVideo?.url, reloadKey]);
+
+  // Poll current time and duration every second while playing
+  useEffect(() => {
+    let interval = null;
+    if (currentVideo?.isPlaying !== false) {
+      interval = setInterval(async () => {
+        if (playerRef.current) {
+          try {
+            const time = await playerRef.current.getCurrentTime();
+            const dur = await playerRef.current.getDuration();
+            if (typeof time === 'number' && !isNaN(time)) {
+              setCurrentTime(time);
+            }
+            if (typeof dur === 'number' && !isNaN(dur) && dur > 0) {
+              setDuration(dur);
+            }
+          } catch (e) {
+            // Ignore polling errors
+          }
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [currentVideo?.isPlaying]);
 
   // Handle Play / Pause commands dynamically for HTML5 videos:
   useEffect(() => {
@@ -85,9 +168,75 @@ export default function RoomVideoPlayer({
     }
   }, [currentVideo?.isPlaying]);
 
+  // Rewind 10 seconds
+  const handleSeekBackward10 = async () => {
+    resetHideTimer();
+    if (playerRef.current) {
+      try {
+        const time = await playerRef.current.getCurrentTime();
+        const newTime = Math.max(0, (time || 0) - 10);
+        playerRef.current.seekTo(newTime, true);
+        setCurrentTime(newTime);
+      } catch (e) {
+        console.log('Seek backward error:', e);
+      }
+    } else if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+        try { seekVideo(-10); } catch(e){}
+        true;
+      `);
+    }
+  };
+
+  // Forward 10 seconds
+  const handleSeekForward10 = async () => {
+    resetHideTimer();
+    if (playerRef.current) {
+      try {
+        const time = await playerRef.current.getCurrentTime();
+        const maxTime = duration > 0 ? duration : (time || 0) + 10;
+        const newTime = Math.min(maxTime, (time || 0) + 10);
+        playerRef.current.seekTo(newTime, true);
+        setCurrentTime(newTime);
+      } catch (e) {
+        console.log('Seek forward error:', e);
+      }
+    } else if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+        try { seekVideo(10); } catch(e){}
+        true;
+      `);
+    }
+  };
+
+  // Interactive timeline progress scrubber click
+  const handleProgressPress = async (e) => {
+    resetHideTimer();
+    if (duration > 0 && barWidth > 0) {
+      const clickX = e.nativeEvent.locationX;
+      const ratio = Math.max(0, Math.min(1, clickX / barWidth));
+      const targetTime = Math.round(ratio * duration);
+      if (playerRef.current) {
+        try {
+          playerRef.current.seekTo(targetTime, true);
+          setCurrentTime(targetTime);
+        } catch (err) {
+          console.log('Seek progress error:', err);
+        }
+      } else if (webViewRef.current) {
+        webViewRef.current.injectJavaScript(`
+          try { if (v) v.currentTime = ${targetTime}; } catch(e){}
+          true;
+        `);
+        setCurrentTime(targetTime);
+      }
+    }
+  };
+
   const onStateChange = useCallback(
     (state) => {
       if (state === 'ended') {
+        setCurrentTime(0);
         if (onVideoEnded) {
           onVideoEnded();
         }
@@ -141,7 +290,6 @@ export default function RoomVideoPlayer({
           id="mediaPlayer"
           src="${rawVideoSrc}"
           ${currentVideo.isPlaying !== false ? 'autoplay' : ''}
-          controls
           playsinline
           webkit-playsinline
           style="width: 100%; height: 100%; object-fit: contain; background: #000;"
@@ -152,15 +300,28 @@ export default function RoomVideoPlayer({
           var v = document.getElementById('mediaPlayer');
           function playVideo() { if (v) v.play(); }
           function pauseVideo() { if (v) v.pause(); }
+          function seekVideo(delta) { if (v) v.currentTime = Math.max(0, (v.currentTime || 0) + delta); }
           if (v) {
             function notifyReady() {
               if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'READY' }));
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'READY',
+                  duration: v.duration || 0
+                }));
               }
             }
             v.addEventListener('playing', notifyReady);
-            v.addEventListener('loadeddata', notifyReady);
+            v.addEventListener('loadedmetadata', notifyReady);
             v.addEventListener('canplay', notifyReady);
+            v.addEventListener('timeupdate', function() {
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'TIME_UPDATE',
+                  currentTime: v.currentTime,
+                  duration: v.duration
+                }));
+              }
+            });
             v.addEventListener('ended', function() {
               if (window.ReactNativeWebView) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIDEO_ENDED' }));
@@ -186,7 +347,12 @@ export default function RoomVideoPlayer({
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'READY') {
         setLoading(false);
+        if (data.duration) setDuration(data.duration);
+      } else if (data.type === 'TIME_UPDATE') {
+        if (typeof data.currentTime === 'number') setCurrentTime(data.currentTime);
+        if (typeof data.duration === 'number' && data.duration > 0) setDuration(data.duration);
       } else if (data.type === 'VIDEO_ENDED') {
+        setCurrentTime(0);
         if (onVideoEnded) {
           onVideoEnded();
         }
@@ -196,10 +362,14 @@ export default function RoomVideoPlayer({
     }
   };
 
+  const progressPercent =
+    duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+
   return (
     <View style={styles.container}>
       {isYoutube && youtubeId ? (
         <YoutubePlayer
+          ref={playerRef}
           key={`yt_${youtubeId}_${reloadKey}`}
           height={VIDEO_HEIGHT}
           width={SCREEN_WIDTH}
@@ -213,16 +383,18 @@ export default function RoomVideoPlayer({
             setHasError(true);
           }}
           initialPlayerParams={{
-            controls: true,
+            controls: false, // 100% hides all default YouTube controls!
             modestbranding: true,
             rel: false,
-            preventFullScreen: false,
+            preventFullScreen: true, // Fullscreen disabled as requested
+            showClosedCaptions: false,
           }}
           webViewProps={{
             androidHardwareAccelerationDisabled: false,
             domStorageEnabled: true,
             mediaPlaybackRequiresUserAction: false,
             allowsInlineMediaPlayback: true,
+            scrollEnabled: false,
           }}
           webViewStyle={{ opacity: 0.99 }}
         />
@@ -244,7 +416,7 @@ export default function RoomVideoPlayer({
           allowContentAccess={true}
           mixedContentMode="always"
           androidHardwareAccelerationDisabled={false}
-          allowsFullscreenVideo={true}
+          allowsFullscreenVideo={false}
           onLoadStart={() => setLoading(true)}
           onLoadEnd={() => setLoading(false)}
           onMessage={handleMessage}
@@ -281,59 +453,125 @@ export default function RoomVideoPlayer({
         </View>
       )}
 
-      {/* Floating Header Info & Controls Overlay */}
-      <View style={styles.videoOverlayHeader} pointerEvents="box-none">
-        <View style={styles.videoTitlePill}>
-          <Text style={styles.videoPlayingBadge}>LIVE 🎬</Text>
-          <Text style={styles.videoTitleText} numberOfLines={1}>
-            {currentVideo.title || 'Video Track'}
-          </Text>
-        </View>
+      {/* ── BACKDROP TOUCH LAYER: Tap on video to show / hide custom controls ── */}
+      <TouchableOpacity
+        style={StyleSheet.absoluteFillObject}
+        activeOpacity={1}
+        onPress={toggleControls}
+      />
 
-        <View style={styles.videoOverlayActions}>
-          {/* Host Play / Pause toggle */}
-          {isHostOrAdmin && onTogglePlayPause && (
-            <TouchableOpacity
-              style={styles.overlayCircleBtn}
-              activeOpacity={0.75}
-              onPress={onTogglePlayPause}
-            >
-              <Text style={styles.overlayBtnText}>
-                {currentVideo.isPlaying !== false ? '⏸️' : '▶️'}
+      {/* ── CUSTOM IN-APP CONTROLS LAYER (Replaces YouTube's native controls) ── */}
+      {showControls && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          {/* 1. TOP HEADER: Video title badge, Add Video (+) & Close (✕) */}
+          <View style={styles.videoOverlayHeader} pointerEvents="box-none">
+            <View style={styles.videoTitlePill}>
+              <Text style={styles.videoPlayingBadge}>LIVE 🎬</Text>
+              <Text style={styles.videoTitleText} numberOfLines={1}>
+                {currentVideo.title || 'Video Track'}
               </Text>
-            </TouchableOpacity>
-          )}
+            </View>
 
-          {/* Playlist Icon */}
-          <TouchableOpacity
-            style={styles.overlayCircleBtn}
-            activeOpacity={0.75}
-            onPress={onOpenPlaylist}
-          >
-            <Text style={styles.overlayBtnText}>📋</Text>
-          </TouchableOpacity>
+            <View style={styles.videoOverlayActions}>
+              {/* Add video shortcut */}
+              <TouchableOpacity
+                style={styles.overlayCircleBtn}
+                activeOpacity={0.75}
+                onPress={() => {
+                  resetHideTimer();
+                  onAddVideoPress?.();
+                }}
+              >
+                <Text style={styles.overlayBtnText}>➕</Text>
+              </TouchableOpacity>
 
-          {/* Add video shortcut */}
-          <TouchableOpacity
-            style={styles.overlayCircleBtn}
-            activeOpacity={0.75}
-            onPress={onAddVideoPress}
-          >
-            <Text style={styles.overlayBtnText}>➕</Text>
-          </TouchableOpacity>
+              {/* Stop / Close video (for host/admin) */}
+              {isHostOrAdmin && (
+                <TouchableOpacity
+                  style={[styles.overlayCircleBtn, styles.overlayCloseBtn]}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    resetHideTimer();
+                    onStopVideo?.();
+                  }}
+                >
+                  <Text style={styles.overlayCloseText}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
 
-          {/* Stop / Close video (for host/admin) */}
+          {/* 2. CENTER CONTROLS: [-10s] [▶ / ⏸ in middle] [+10s] */}
           {isHostOrAdmin && (
-            <TouchableOpacity
-              style={[styles.overlayCircleBtn, styles.overlayCloseBtn]}
-              activeOpacity={0.75}
-              onPress={onStopVideo}
-            >
-              <Text style={styles.overlayCloseText}>✕</Text>
-            </TouchableOpacity>
+            <View style={styles.centerControlsRow} pointerEvents="box-none">
+              {/* -10s Rewind Button */}
+              <TouchableOpacity
+                style={styles.seekBtn}
+                activeOpacity={0.75}
+                onPress={handleSeekBackward10}
+              >
+                <Text style={styles.seekBtnIcon}>⏪</Text>
+                <Text style={styles.seekBtnLabel}>10s</Text>
+              </TouchableOpacity>
+
+              {/* Center Play / Pause Button */}
+              <TouchableOpacity
+                style={styles.centerPlayPauseBtn}
+                activeOpacity={0.8}
+                onPress={() => {
+                  resetHideTimer();
+                  onTogglePlayPause?.();
+                }}
+              >
+                <Text style={styles.centerPlayPauseIcon}>
+                  {currentVideo.isPlaying !== false ? '⏸' : '▶'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* +10s Forward Button */}
+              <TouchableOpacity
+                style={styles.seekBtn}
+                activeOpacity={0.75}
+                onPress={handleSeekForward10}
+              >
+                <Text style={styles.seekBtnIcon}>⏩</Text>
+                <Text style={styles.seekBtnLabel}>10s</Text>
+              </TouchableOpacity>
+            </View>
           )}
+
+          {/* 3. BOTTOM TIMELINE & PROGRESS BAR (0:26 / 1:05 with Scrubber) */}
+          <View style={styles.bottomTimelineBar} pointerEvents="box-none">
+            <View style={styles.timeInfoRow}>
+              <Text style={styles.timeText}>
+                {formatTime(currentTime)} / {duration > 0 ? formatTime(duration) : '--:--'}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.progressBarHitArea}
+              activeOpacity={1}
+              onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
+              onPress={isHostOrAdmin ? handleProgressPress : undefined}
+            >
+              <View style={styles.progressBarTrack}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${progressPercent}%` },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.progressScrubberDot,
+                    { left: `${progressPercent}%` },
+                  ]}
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -427,7 +665,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
-    maxWidth: '52%',
+    maxWidth: '65%',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
   },
@@ -446,7 +684,7 @@ const styles = StyleSheet.create({
   videoOverlayActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   overlayCircleBtn: {
     width: 32,
@@ -469,5 +707,114 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+
+  /* ── Center Controls Row ([-10s] [▶/⏸ in middle] [+10s]) ── */
+  centerControlsRow: {
+    position: 'absolute',
+    top: 0,
+    bottom: 26,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 28,
+    zIndex: 10,
+  },
+  centerPlayPauseBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(15, 15, 26, 0.88)',
+    borderWidth: 2,
+    borderColor: '#00E676',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#00E676',
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  centerPlayPauseIcon: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '900',
+    marginLeft: 2,
+  },
+  seekBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(15, 15, 26, 0.82)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  seekBtnIcon: {
+    fontSize: 16,
+  },
+  seekBtnLabel: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    marginTop: -2,
+  },
+
+  /* ── Bottom Timeline & Progress Bar ── */
+  bottomTimelineBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 12,
+    paddingBottom: 6,
+    paddingTop: 4,
+    backgroundColor: 'rgba(15, 15, 26, 0.85)',
+    zIndex: 10,
+  },
+  timeInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  timeText: {
+    color: '#E2E8F0',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  progressBarHitArea: {
+    width: '100%',
+    height: 16,
+    justifyContent: 'center',
+  },
+  progressBarTrack: {
+    width: '100%',
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 2,
+    position: 'relative',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#FF0000',
+    borderRadius: 2,
+  },
+  progressScrubberDot: {
+    position: 'absolute',
+    top: -5,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#FFFFFF',
+    marginLeft: -7,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
 });
