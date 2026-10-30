@@ -2007,7 +2007,29 @@ exports.renderTelegramLoginPage = async (req, res) => {
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 20px;
+      margin-bottom: 14px;
+    }
+    .direct-tg-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(42, 171, 238, 0.35);
+      margin-bottom: 8px;
+    }
+    .direct-tg-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: #FFFFFF;
     }
     .divider {
       display: flex;
@@ -2111,6 +2133,12 @@ exports.renderTelegramLoginPage = async (req, res) => {
     <h1>Sign in with Telegram</h1>
     <p class="subtitle">Fast, secure 1-tap authentication</p>
 
+    <!-- Direct Telegram 1-Tap Login Button -->
+    <button type="button" class="direct-tg-btn" onclick="openDirectTgAuth()">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/></svg>
+      <span>Continue with Telegram</span>
+    </button>
+
     <!-- Official Telegram Login Widget -->
     <div class="widget-container" id="widget-container">
       <script async src="https://telegram.org/js/telegram-widget.js?22"
@@ -2146,9 +2174,29 @@ exports.renderTelegramLoginPage = async (req, res) => {
 
   <script>
     const sessionId = "${sessionId}";
+    const botId = "8836145749";
+
+    // Ensure window.open in WebView navigates the current frame instead of being dropped
+    const origOpen = window.open;
+    window.open = function(url, target, features) {
+      if (url && (url.indexOf('oauth.telegram.org') !== -1 || url.indexOf('/auth') !== -1)) {
+        window.location.href = url;
+        return window;
+      }
+      return origOpen ? origOpen.apply(window, arguments) : null;
+    };
 
     function showLoading() {
       document.getElementById('loading-overlay').style.display = 'flex';
+    }
+
+    function openDirectTgAuth() {
+      showLoading();
+      const origin = window.location.origin;
+      const returnTo = window.location.origin + '/api/auth/telegram-login-page';
+      window.location.href = 'https://oauth.telegram.org/auth?bot_id=' + encodeURIComponent(botId) +
+        '&origin=' + encodeURIComponent(origin) +
+        '&request_access=write&return_to=' + encodeURIComponent(returnTo);
     }
 
     function handleSuccess(token, user) {
@@ -2162,6 +2210,24 @@ exports.renderTelegramLoginPage = async (req, res) => {
         window.ReactNativeWebView.postMessage(JSON.stringify(payload));
       } else {
         window.location.href = 'funmaza://auth-callback?token=' + encodeURIComponent(token);
+      }
+    }
+
+    // Check if redirected back with tgAuthResult in URL hash/query
+    function checkTgAuthResult() {
+      try {
+        const fullUrl = window.location.href;
+        const match = fullUrl.match(/[#\?\&]tgAuthResult=([A-Za-z0-9\-_=]+)/);
+        if (match && match[1]) {
+          let b64 = match[1].replace(/-/g, '+').replace(/_/g, '/');
+          while (b64.length % 4) b64 += '=';
+          const tgUser = JSON.parse(atob(b64));
+          if (tgUser && tgUser.id) {
+            window.onTelegramAuth(tgUser);
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing tgAuthResult:', e);
       }
     }
 
@@ -2187,6 +2253,8 @@ exports.renderTelegramLoginPage = async (req, res) => {
         document.getElementById('loading-overlay').style.display = 'none';
       });
     };
+
+    checkTgAuthResult();
 
     // Auto-polling for bot-initiated login
     const pollInterval = setInterval(() => {
