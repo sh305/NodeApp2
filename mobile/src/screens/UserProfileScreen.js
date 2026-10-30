@@ -1097,6 +1097,8 @@ export default function UserProfileScreen({ route, navigation, currentUser, onLo
                   navigation.navigate('VoiceRoom', {
                     roomId: targetRoomId,
                     roomTitle: profile.currentRoom.title || '',
+                    roomType: profile.currentRoom.roomType,
+                    initialRoom: typeof profile.currentRoom === 'object' ? profile.currentRoom : null,
                   });
                 }
               }}

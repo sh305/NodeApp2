@@ -158,6 +158,8 @@ export default function SearchScreen({ route, navigation, currentUser }) {
       navigation.navigate('VoiceRoom', {
         roomId: room._id,
         roomTitle: room.title,
+        roomType: room.roomType,
+        initialRoom: room,
       });
     }
   };
@@ -168,7 +170,7 @@ export default function SearchScreen({ route, navigation, currentUser }) {
     if (res.data.success) {
       const target = lockedRoomTarget;
       setLockedRoomTarget(null);
-      navigation.navigate('VoiceRoom', { roomId: target._id, roomTitle: target.title });
+      navigation.navigate('VoiceRoom', { roomId: target._id, roomTitle: target.title, roomType: target.roomType, initialRoom: target });
     }
   };
 

@@ -40,6 +40,42 @@ function isAdultContent(text) {
   });
 }
 
+function extractYoutubeId(url) {
+  if (!url || typeof url !== 'string') return null;
+  const clean = url.trim();
+
+  // Bare 11-character YouTube video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(clean)) {
+    return clean;
+  }
+
+  // Standard watch query params (e.g. ?v=... or &v=...)
+  const vMatch = clean.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (vMatch && vMatch[1]) return vMatch[1];
+
+  // youtu.be shortlinks (e.g. https://youtu.be/...)
+  const youtuBeMatch = clean.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (youtuBeMatch && youtuBeMatch[1]) return youtuBeMatch[1];
+
+  // YouTube Shorts (e.g. https://youtube.com/shorts/...)
+  const shortsMatch = clean.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shortsMatch && shortsMatch[1]) return shortsMatch[1];
+
+  // YouTube Embed (e.g. https://youtube.com/embed/...)
+  const embedMatch = clean.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (embedMatch && embedMatch[1]) return embedMatch[1];
+
+  // YouTube Live (e.g. https://youtube.com/live/...)
+  const liveMatch = clean.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+  if (liveMatch && liveMatch[1]) return liveMatch[1];
+
+  // /v/ path
+  const vPathMatch = clean.match(/\/v\/([a-zA-Z0-9_-]{11})/);
+  if (vPathMatch && vPathMatch[1]) return vPathMatch[1];
+
+  return null;
+}
+
 export default function RoomVideoModal({
   visible,
   onClose,
@@ -58,7 +94,6 @@ export default function RoomVideoModal({
 
   // URL Input State
   const [videoUrl, setVideoUrl] = useState('');
-  const [videoTitle, setVideoTitle] = useState('');
   const [addingUrl, setAddingUrl] = useState(false);
 
   useEffect(() => {
@@ -80,28 +115,44 @@ export default function RoomVideoModal({
     }
 
     // Adult validation
-    if (isAdultContent(trimmedUrl) || isAdultContent(videoTitle)) {
+    if (isAdultContent(trimmedUrl)) {
       showToast(t('Sexual, pornographic or violent content is strictly prohibited!'), 'error');
       return;
     }
 
     try {
       setAddingUrl(true);
+      const ytId = extractYoutubeId(trimmedUrl);
       const isYoutube =
+        Boolean(ytId) ||
         trimmedUrl.includes('youtube.com') ||
-        trimmedUrl.includes('youtu.be') ||
-        /^[a-zA-Z0-9_-]{11}$/.test(trimmedUrl);
-      const defaultTitle = isYoutube ? 'YouTube Video' : 'Online Video';
+        trimmedUrl.includes('youtu.be');
+      let resolvedTitle = isYoutube ? 'YouTube Video' : 'Online Video';
+
+      if (ytId) {
+        try {
+          const oembedRes = await fetch(
+            `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`
+          );
+          if (oembedRes.ok) {
+            const data = await oembedRes.json();
+            if (data?.title) {
+              resolvedTitle = data.title;
+            }
+          }
+        } catch (e) {
+          // If network fetch fails, backend will also try to resolve it
+        }
+      }
 
       await addVideoToBackend({
-        title: videoTitle.trim() || defaultTitle,
+        title: resolvedTitle,
         url: trimmedUrl,
         source: isYoutube ? 'youtube' : 'direct_url',
         duration: 0,
       });
 
       setVideoUrl('');
-      setVideoTitle('');
       showToast(t('Video added! Starting playback...'), 'success');
       setActiveTab('playlist');
       setTimeout(() => {
@@ -309,17 +360,6 @@ export default function RoomVideoModal({
                   placeholder="https://www.youtube.com/watch?v=..."
                   placeholderTextColor="#64748B"
                   autoCapitalize="none"
-                />
-
-                <Text style={styles.inputLabel}>
-                  <T>Video Title (Optional)</T>
-                </Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={videoTitle}
-                  onChangeText={setVideoTitle}
-                  placeholder={t('Enter a title for this video')}
-                  placeholderTextColor="#64748B"
                 />
 
                 <View style={styles.prohibitedNotice}>

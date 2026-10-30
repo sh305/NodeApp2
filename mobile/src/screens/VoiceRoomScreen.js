@@ -86,11 +86,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
-  const { roomId, roomTitle: initialRoomTitle } = route.params || {};
+  const { roomId, roomTitle: initialRoomTitle, roomType: initialRoomType, initialRoom } = route.params || {};
 
   const [roomTitle, setRoomTitle] = useState(initialRoomTitle || '');
-  const [room, setRoom] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [room, setRoom] = useState(initialRoom || (initialRoomType ? { _id: roomId, title: initialRoomTitle, roomType: initialRoomType } : null));
+  const [loading, setLoading] = useState(!initialRoom);
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatInputActive, setIsChatInputActive] = useState(false);
@@ -142,8 +142,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [roomSettingsModalVisible, setRoomSettingsModalVisible] = useState(false);
   const [roomProfileEditModalVisible, setRoomProfileEditModalVisible] = useState(false);
   const [roomVideoModalVisible, setRoomVideoModalVisible] = useState(false);
-  const [videoPlaylist, setVideoPlaylist] = useState([]);
-  const [currentVideo, setCurrentVideo] = useState(null);
+  const [videoPlaylist, setVideoPlaylist] = useState(initialRoom?.videoPlaylist || []);
+  const [currentVideo, setCurrentVideo] = useState(initialRoom?.currentVideo || null);
   const [myPeopleModalVisible, setMyPeopleModalVisible] = useState(false);
   const [kickedUsersModalVisible, setKickedUsersModalVisible] = useState(false);
   const [bossSeatModalVisible, setBossSeatModalVisible] = useState(false);
@@ -1747,7 +1747,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
                 <Text style={styles.headerRoomTitle} numberOfLines={1}>
                   {roomTitle || 'Voice Room'}
                 </Text>
-                {room?.roomType === 'video_room' && (
+                {(room?.roomType === 'video_room' || initialRoomType === 'video_room') && (
                   <Text style={{ fontSize: 13 }}>🎬</Text>
                 )}
               </View>
@@ -1795,19 +1795,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               <Text style={styles.headerCircleEmoji}>🛍️</Text>
             </TouchableOpacity>
 
-            {/* Share */}
-            <TouchableOpacity
-              style={styles.headerActionCircle}
-              activeOpacity={0.75}
-              onPress={handleShareRoom}
-            >
-              <Image
-                source={require('../../assets/icons/Share.png')}
-                style={styles.headerShareIcon}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
-
+            
             {/* Close */}
             <TouchableOpacity
               style={[styles.headerActionCircle, styles.headerCloseCircle]}
@@ -1834,7 +1822,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         )}
 
         {/* ══ 2. CENTER CONTENT (Standard Voice Room vs Video Room) ══ */}
-        {room?.roomType === 'video_room' ? (
+        {(room?.roomType === 'video_room' || initialRoomType === 'video_room') ? (
           <View style={styles.videoRoomCenterArea}>
             {/* 1. Horizontal compact row of 8 seats (Matching Screenshot 3) */}
             <View style={styles.videoRoomCompactSeatsRow}>

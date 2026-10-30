@@ -509,7 +509,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
     if (room.isLocked && !isOwner) {
       setLockedRoomTarget(room);
     } else {
-      navigation.navigate('VoiceRoom', { roomId: room._id, roomTitle: room.title });
+      navigation.navigate('VoiceRoom', { roomId: room._id, roomTitle: room.title, roomType: room.roomType, initialRoom: room });
     }
   };
 
@@ -519,7 +519,7 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
     if (res.data.success) {
       const target = lockedRoomTarget;
       setLockedRoomTarget(null);
-      navigation.navigate('VoiceRoom', { roomId: target._id, roomTitle: target.title });
+      navigation.navigate('VoiceRoom', { roomId: target._id, roomTitle: target.title, roomType: target.roomType, initialRoom: target });
     }
   };
 
@@ -561,6 +561,8 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
         navigation.navigate('VoiceRoom', {
           roomId: res.data.room._id,
           roomTitle: res.data.room.title,
+          roomType: res.data.room.roomType,
+          initialRoom: res.data.room,
         });
       }
     } catch (e) {
@@ -570,6 +572,8 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
         navigation.navigate('VoiceRoom', {
           roomId: e.response.data.room._id,
           roomTitle: e.response.data.room.title,
+          roomType: e.response.data.room.roomType,
+          initialRoom: e.response.data.room,
         });
       } else {
         showToast(t(e.response?.data?.message || 'Failed to create room'), 'error');
@@ -619,6 +623,8 @@ export default function HomeScreen({ navigation, currentUser, onLogout }) {
                   navigation.navigate('VoiceRoom', {
                     roomId: myRoom._id,
                     roomTitle: myRoom.title,
+                    roomType: myRoom.roomType,
+                    initialRoom: myRoom,
                   });
                 } else {
                   setCreateModalVisible(true);

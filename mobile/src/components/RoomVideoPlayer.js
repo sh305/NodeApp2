@@ -374,6 +374,7 @@ export default function RoomVideoPlayer({
           height={VIDEO_HEIGHT}
           width={SCREEN_WIDTH}
           play={currentVideo.isPlaying !== false}
+          forceAndroidAutoplay={true}
           videoId={youtubeId}
           onReady={() => setLoading(false)}
           onChangeState={onStateChange}
@@ -713,7 +714,7 @@ const styles = StyleSheet.create({
   centerControlsRow: {
     position: 'absolute',
     top: 0,
-    bottom: 26,
+    bottom: 0,
     left: 0,
     right: 0,
     flexDirection: 'row',

@@ -1505,8 +1505,18 @@ exports.addRoomVideo = async (req, res) => {
           message: ytCheck.reason || 'This YouTube video cannot be added due to safety restrictions.',
         });
       }
-      if (ytCheck.title && (!title || title === 'YouTube Video')) {
+      if (ytCheck.title && ytCheck.title !== 'YouTube Video') {
         resolvedTitle = ytCheck.title;
+      } else {
+        try {
+          const oembedRes = await axios.get(
+            `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${youtubeId}&format=json`,
+            { timeout: 4000 }
+          );
+          if (oembedRes.data?.title) {
+            resolvedTitle = oembedRes.data.title;
+          }
+        } catch (e) {}
       }
     }
 

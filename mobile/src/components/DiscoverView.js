@@ -697,6 +697,8 @@ export default function DiscoverView({ currentUser, insets, navigation }) {
                   navigation.navigate('VoiceRoom', {
                     roomId: targetRoomId,
                     roomTitle: user.currentRoom.title || '',
+                    roomType: user.currentRoom.roomType,
+                    initialRoom: typeof user.currentRoom === 'object' ? user.currentRoom : null,
                   });
                 } else if (user._id && navigation) {
                   navigation.navigate('UserProfile', { userId: user._id });
