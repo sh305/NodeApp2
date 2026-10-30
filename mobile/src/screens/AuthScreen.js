@@ -23,7 +23,7 @@ import ScreenContainer from '../components/ScreenContainer';
 
 const FB_APP_ID = '1919593492737791';
 const FB_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
-const FB_AUTH_URL = `https://www.facebook.com/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email&display=touch`;
+const FB_AUTH_URL = `https://m.facebook.com/v19.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email`;
 
 const TW_CLIENT_ID = 'N3JzYXhzQ3BNSGVaQWMydnFTU2E6MTpjaQ';
 const TW_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
@@ -920,6 +920,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   // Facebook In-App OAuth WebView Modal
   const [fbWebViewVisible, setFbWebViewVisible] = useState(false);
+  const fbProcessingRef = useRef(false);
 
   // Twitter In-App OAuth WebView Modal
   const [twWebViewVisible, setTwWebViewVisible] = useState(false);
@@ -1274,20 +1275,17 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   };
 
   const handleDirectFacebookLogin = async () => {
-    try {
-      const result = await WebBrowser.openAuthSessionAsync(FB_AUTH_URL, FB_REDIRECT_URI);
-      if (result.type === 'success' && result.url) {
-        handleFbNavStateChange({ url: result.url });
-      }
-    } catch (err) {
-      console.warn('Facebook WebBrowser fallback:', err);
-      setFbWebViewVisible(true);
-    }
+    // Open in-app Modal WebView directly to prevent Chrome Custom Tabs sessionStorage clearing & stretched UI
+    setFbWebViewVisible(true);
   };
 
   const handleFbNavStateChange = async (navState) => {
     const url = navState.url;
     if (!url || !url.includes('funapp-2e00d.firebaseapp.com')) return;
+    if (fbProcessingRef.current) return;
+    if (url.includes('access_token=') || url.includes('code=')) {
+      fbProcessingRef.current = true;
+    }
 
     if (url.includes('access_token=') || url.includes('code=')) {
       let token = null;

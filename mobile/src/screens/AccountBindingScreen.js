@@ -29,7 +29,7 @@ try {
 
 const FB_APP_ID = '1919593492737791';
 const FB_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
-const FB_AUTH_URL = `https://www.facebook.com/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email&display=touch`;
+const FB_AUTH_URL = `https://m.facebook.com/v19.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&response_type=code&scope=public_profile,email`;
 
 const TW_CLIENT_ID = 'N3JzYXhzQ3BNSGVaQWMydnFTU2E6MTpjaQ';
 const TW_REDIRECT_URI = 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
@@ -312,6 +312,7 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   const [fbSending, setFbSending] = useState(false);
   const [fbVerifying, setFbVerifying] = useState(false);
   const [fbWebViewVisible, setFbWebViewVisible] = useState(false);
+  const fbProcessedRef = useRef(false);
 
   // ── 3. Twitter Binding State ──
   const [twChooserVisible, setTwChooserVisible] = useState(false);
@@ -627,23 +628,17 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
   // ══════════════════════════════════════════════════
   // 3. FACEBOOK BINDING (OFFICIAL 1-CLICK & MESSENGER FLOW)
   // ══════════════════════════════════════════════════
-  const handleStartFbOAuth = async () => {
+  const handleStartFbOAuth = () => {
     setFbChooserVisible(false);
-    try {
-      const result = await WebBrowser.openAuthSessionAsync(FB_AUTH_URL, FB_REDIRECT_URI);
-      if (result.type === 'success' && result.url) {
-        handleFbNavStateChange({ url: result.url });
-      }
-    } catch (err) {
-      console.warn('FB WebBrowser fallback:', err);
-      setFbWebViewVisible(true);
-    }
+    fbProcessedRef.current = false;
+    setFbWebViewVisible(true);
   };
 
   const handleFbNavStateChange = async (navState) => {
     const url = navState.url;
     if (!url || !url.includes('funapp-2e00d.firebaseapp.com')) return;
 
+    if (fbProcessedRef.current) return;
     if (url.includes('access_token=') || url.includes('code=')) {
       let token = null;
       let code = null;
