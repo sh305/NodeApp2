@@ -34,6 +34,9 @@ const {
   telegramDirectLogin,
   handleTelegramRedirect,
   handleTelegramWebhook,
+  renderTelegramLoginPage,
+  handleTelegramWidgetLogin,
+  handleTelegramWidgetCallback,
   instagramDirectLogin,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
@@ -66,6 +69,9 @@ router.post('/telegram-login-init', initTelegramLoginSession);
 router.get('/telegram-login-status/:sessionId', checkTelegramLoginSession);
 router.get('/telegram-redirect', handleTelegramRedirect);
 router.post('/telegram-webhook', handleTelegramWebhook);
+router.get('/telegram-login-page', renderTelegramLoginPage);
+router.post('/telegram-widget-login', handleTelegramWidgetLogin);
+router.get('/telegram-widget-callback', handleTelegramWidgetCallback);
 router.post('/telegram-direct-login', telegramDirectLogin);
 router.post('/instagram-direct-login', instagramDirectLogin);
 router.post('/bind-account', protect, bindAccount);

@@ -1938,3 +1938,410 @@ exports.handleTelegramWebhook = async (req, res) => {
   }
   return res.status(200).send('OK');
 };
+
+// @desc    Render In-App Telegram Login WebView Page (Solution 1)
+// @route   GET /api/auth/telegram-login-page
+exports.renderTelegramLoginPage = async (req, res) => {
+  const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'FunMazaApp_bot';
+  const session = createLoginSession();
+  const sessionId = session.sessionId;
+
+  return res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Login with Telegram - FunMaza</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: #0F0F1A;
+      color: #FFFFFF;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px;
+    }
+    .card {
+      background: #1E1E2D;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 30px 22px;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+    }
+    .icon-circle {
+      width: 68px;
+      height: 68px;
+      background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      box-shadow: 0 8px 24px rgba(42, 171, 238, 0.35);
+    }
+    .icon-circle svg {
+      width: 36px;
+      height: 36px;
+      fill: #FFFFFF;
+    }
+    h1 {
+      font-size: 21px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #FFFFFF;
+    }
+    p.subtitle {
+      font-size: 13px;
+      color: #94A3B8;
+      line-height: 1.4;
+      margin-bottom: 24px;
+    }
+    .widget-container {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 18px 0;
+      color: #64748B;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .divider:not(:empty)::before { margin-right: .75em; }
+    .divider:not(:empty)::after { margin-left: .75em; }
+    .bot-section {
+      background: rgba(42, 171, 238, 0.08);
+      border: 1px dashed rgba(42, 171, 238, 0.3);
+      border-radius: 16px;
+      padding: 14px;
+      text-align: center;
+    }
+    .bot-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #2AABEE;
+      margin-bottom: 4px;
+    }
+    .bot-section-text {
+      font-size: 12px;
+      color: #94A3B8;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+    .code-badge {
+      display: inline-block;
+      background: #0F0F1A;
+      color: #38BDF8;
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      user-select: all;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #22C55E;
+      margin-top: 18px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22C55E;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.3; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 0.3; transform: scale(0.9); }
+    }
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 15, 26, 0.95);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid rgba(255,255,255,0.1);
+      border-top-color: #2AABEE;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-circle">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/>
+      </svg>
+    </div>
+
+    <h1>Sign in with Telegram</h1>
+    <p class="subtitle">Fast, secure 1-tap authentication</p>
+
+    <!-- Official Telegram Login Widget -->
+    <div class="widget-container" id="widget-container">
+      <script async src="https://telegram.org/js/telegram-widget.js?22"
+        data-telegram-login="${botUsername}"
+        data-size="large"
+        data-radius="12"
+        data-onauth="onTelegramAuth(user)"
+        data-request-access="write">
+      </script>
+    </div>
+
+    <div class="divider">or bot verification</div>
+
+    <div class="bot-section">
+      <div class="bot-section-title">⚡ 1-Tap Bot Code</div>
+      <p class="bot-section-text">Send this code to <b>@${botUsername}</b>:</p>
+      <div>
+        <span class="code-badge">/start login_${sessionId}</span>
+      </div>
+    </div>
+
+    <div class="status-pill">
+      <div class="pulse-dot"></div>
+      <span>Listening for Telegram login...</span>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+    <div style="font-size: 16px; font-weight: 700; color: #FFFFFF;">Logging in...</div>
+    <div style="font-size: 13px; color: #94A3B8; margin-top: 6px;">Entering FunMaza</div>
+  </div>
+
+  <script>
+    const sessionId = "${sessionId}";
+
+    function showLoading() {
+      document.getElementById('loading-overlay').style.display = 'flex';
+    }
+
+    function handleSuccess(token, user) {
+      showLoading();
+      const payload = {
+        type: 'TELEGRAM_AUTH_SUCCESS',
+        token: token,
+        user: user
+      };
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+      } else {
+        window.location.href = 'funmaza://auth-callback?token=' + encodeURIComponent(token);
+      }
+    }
+
+    // Called automatically by Telegram Widget on success
+    window.onTelegramAuth = function(tgUser) {
+      showLoading();
+      fetch('/api/auth/telegram-widget-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tgUser)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.token) {
+          handleSuccess(data.token, data.user);
+        } else {
+          alert(data.message || 'Telegram login failed');
+          document.getElementById('loading-overlay').style.display = 'none';
+        }
+      })
+      .catch(err => {
+        alert('Authentication error: ' + (err.message || 'Network error'));
+        document.getElementById('loading-overlay').style.display = 'none';
+      });
+    };
+
+    // Auto-polling for bot-initiated login
+    const pollInterval = setInterval(() => {
+      fetch('/api/auth/telegram-login-status/' + sessionId)
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.success && data.status === 'success' && data.token) {
+            clearInterval(pollInterval);
+            handleSuccess(data.token, data.user);
+          }
+        })
+        .catch(() => {});
+    }, 1800);
+  </script>
+</body>
+</html>`);
+};
+
+// @desc    Handle Telegram Login Widget POST callback
+// @route   POST /api/auth/telegram-widget-login
+exports.handleTelegramWidgetLogin = async (req, res) => {
+  try {
+    const authData = req.body;
+    if (!authData || !authData.id || !authData.hash) {
+      return res.status(400).json({ success: false, message: 'Invalid Telegram authentication payload' });
+    }
+
+    const { verifyTelegramWidgetData } = require('../services/telegramBotService');
+    const isValid = verifyTelegramWidgetData(authData);
+    if (!isValid) {
+      return res.status(401).json({ success: false, message: 'Telegram authentication hash verification failed' });
+    }
+
+    let user = await User.findOne({
+      $or: [
+        { telegramId: String(authData.id) },
+        { 'boundAccounts.telegram.id': String(authData.id) },
+      ],
+    });
+
+    if (!user) {
+      const displayName = [authData.first_name, authData.last_name].filter(Boolean).join(' ') || authData.username || `User_${String(authData.id).slice(-4)}`;
+      user = await User.create({
+        name: displayName,
+        telegramId: String(authData.id),
+        avatar: authData.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        boundAccounts: {
+          telegram: {
+            id: String(authData.id),
+            username: authData.username ? `@${authData.username.replace('@', '')}` : '',
+            firstName: authData.first_name || '',
+            lastName: authData.last_name || '',
+            boundAt: new Date(),
+          },
+        },
+      });
+    }
+
+    const banCheck = user.checkActiveBan ? user.checkActiveBan() : { banned: false };
+    if (banCheck.banned) {
+      return res.status(403).json({ success: false, message: `Account suspended: ${banCheck.message}` });
+    }
+
+    const token = generateToken(user._id);
+    return res.status(200).json({
+      success: true,
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error('handleTelegramWidgetLogin error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Handle Telegram Login Widget GET callback (redirect mode)
+// @route   GET /api/auth/telegram-widget-callback
+exports.handleTelegramWidgetCallback = async (req, res) => {
+  try {
+    const authData = req.query;
+    if (!authData || !authData.id || !authData.hash) {
+      return res.status(400).send('Invalid Telegram auth request');
+    }
+
+    const { verifyTelegramWidgetData } = require('../services/telegramBotService');
+    const isValid = verifyTelegramWidgetData(authData);
+    if (!isValid) {
+      return res.status(401).send('Telegram verification failed: Invalid signature');
+    }
+
+    let user = await User.findOne({
+      $or: [
+        { telegramId: String(authData.id) },
+        { 'boundAccounts.telegram.id': String(authData.id) },
+      ],
+    });
+
+    if (!user) {
+      const displayName = [authData.first_name, authData.last_name].filter(Boolean).join(' ') || authData.username || `User_${String(authData.id).slice(-4)}`;
+      user = await User.create({
+        name: displayName,
+        telegramId: String(authData.id),
+        avatar: authData.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        boundAccounts: {
+          telegram: {
+            id: String(authData.id),
+            username: authData.username ? `@${authData.username.replace('@', '')}` : '',
+            firstName: authData.first_name || '',
+            lastName: authData.last_name || '',
+            boundAt: new Date(),
+          },
+        },
+      });
+    }
+
+    const banCheck = user.checkActiveBan ? user.checkActiveBan() : { banned: false };
+    if (banCheck.banned) {
+      return res.status(403).send(`Account Suspended: ${banCheck.message}`);
+    }
+
+    const token = generateToken(user._id);
+
+    return res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Successful</title>
+  <style>
+    body { background: #0F0F1A; color: #FFF; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+    .spinner { width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #2AABEE; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <h2>Login Successful!</h2>
+  <p style="color: #94A3B8; margin-top: 8px;">Connecting to FunMaza...</p>
+  <script>
+    const payload = {
+      type: 'TELEGRAM_AUTH_SUCCESS',
+      token: '${token}',
+      user: ${JSON.stringify(user)}
+    };
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+    }
+    setTimeout(() => {
+      window.location.href = 'funmaza://auth-callback?token=${token}';
+    }, 600);
+  </script>
+</body>
+</html>`);
+  } catch (error) {
+    console.error('handleTelegramWidgetCallback error:', error);
+    return res.status(500).send('Authentication Error: ' + error.message);
+  }
+};

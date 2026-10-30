@@ -929,7 +929,10 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   // Snapchat In-App OAuth WebView Modal
   const [snapWebViewVisible, setSnapWebViewVisible] = useState(false);
 
-  // Telegram Direct Login Modal & Polling State
+  // Telegram In-App WebView & Bot Login State
+  const [telegramWebViewVisible, setTelegramWebViewVisible] = useState(false);
+  const [telegramVerifying, setTelegramVerifying] = useState(false);
+  const telegramWebRef = useRef(null);
   const [telegramModalVisible, setTelegramModalVisible] = useState(false);
   const [telegramInput, setTelegramInput] = useState('');
   const [telegramSession, setTelegramSession] = useState(null);
@@ -1537,10 +1540,59 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  // ---------------- TELEGRAM DIRECT & BOT LOGIN HANDLERS ----------------
-  const handleDirectTelegramLogin = async () => {
-    setTelegramModalVisible(true);
-    initTelegramSession();
+  // ---------------- TELEGRAM IN-APP WEBVIEW & DIRECT LOGIN HANDLERS (SOLUTION 1) ----------------
+  const handleDirectTelegramLogin = () => {
+    setTelegramVerifying(false);
+    setTelegramWebViewVisible(true);
+  };
+
+  const handleTelegramWebMessage = async (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data?.type === 'TELEGRAM_AUTH_SUCCESS' && data?.token) {
+        setTelegramWebViewVisible(false);
+        setTelegramVerifying(false);
+        setLoading(false);
+        showToast(t('Logged in with Telegram successfully! 🎉'), 'success');
+        await AsyncStorage.setItem('@auth_token', data.token);
+        await AsyncStorage.setItem('@user_info', JSON.stringify(data.user));
+        if (onLoginSuccess) onLoginSuccess(data.user);
+      } else if (data?.type === 'TELEGRAM_AUTH_ERROR') {
+        setTelegramVerifying(false);
+        showToast(t(data.message || 'Telegram login failed'), 'error');
+      }
+    } catch (err) {
+      console.warn('Telegram web message parse error:', err);
+    }
+  };
+
+  const handleTelegramNavStateChange = async (navState) => {
+    const url = navState.url;
+    if (!url) return;
+
+    if (url.includes('telegram-widget-callback') || url.includes('auth-callback') || (url.includes('funmaza://') && url.includes('token='))) {
+      const tokenMatch = url.match(/[?&]token=([^&#]+)/);
+      if (tokenMatch && tokenMatch[1]) {
+        const token = decodeURIComponent(tokenMatch[1]);
+        setTelegramWebViewVisible(false);
+        setTelegramVerifying(false);
+        setLoading(true);
+        try {
+          const userRes = await api.get('/auth/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const user = userRes.data?.user || userRes.data;
+          showToast(t('Logged in with Telegram successfully! 🎉'), 'success');
+          await AsyncStorage.setItem('@auth_token', token);
+          await AsyncStorage.setItem('@user_info', JSON.stringify(user));
+          if (onLoginSuccess) onLoginSuccess(user);
+        } catch (err) {
+          showToast(t('Failed to load user profile'), 'error');
+        } finally {
+          setLoading(false);
+        }
+      }
+    }
   };
 
   const initTelegramSession = async () => {
@@ -1565,6 +1617,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         const res = await api.get(`/auth/telegram-login-status/${sessionId}`);
         if (res.data?.success && res.data?.status === 'success' && res.data?.token) {
           clearInterval(telegramPollRef.current);
+          setTelegramWebViewVisible(false);
           setTelegramModalVisible(false);
           showToast(t('Logged in with Telegram successfully! 🎉'), 'success');
           await AsyncStorage.setItem('@auth_token', res.data.token);
@@ -1590,7 +1643,6 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
       await WebBrowser.openBrowserAsync(url);
     }
   };
-
 
   const closeTelegramModal = () => {
     if (telegramPollRef.current) clearInterval(telegramPollRef.current);
@@ -3132,69 +3184,93 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
           </View>
         </Modal>
 
-        {/* ══ TELEGRAM DIRECT & BOT LOGIN MODAL ══ */}
+        {/* ══ TELEGRAM IN-APP WEBVIEW LOGIN MODAL (SOLUTION 1) ══ */}
         <Modal
-          visible={telegramModalVisible}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={closeTelegramModal}
+          visible={telegramWebViewVisible}
+          animationType="slide"
+          onRequestClose={() => {
+            setTelegramWebViewVisible(false);
+            setTelegramVerifying(false);
+          }}
         >
-          <View style={styles.telegramModalBackdrop}>
-            <View style={styles.telegramModalCard}>
-              {/* Header */}
-              <View style={styles.telegramModalHeader}>
-                <View style={styles.telegramModalHeaderTitleWrap}>
-                  <SocialTelegramIcon size={26} />
-                  <Text style={styles.telegramModalTitle}>
-                    <T>Login with Telegram</T>
-                  </Text>
+          <View style={{ flex: 1, backgroundColor: '#0F0F1A', paddingTop: Platform.OS === 'android' ? 24 : 44 }}>
+            <View style={styles.fbWebHeader}>
+              <TouchableOpacity
+                onPress={() => {
+                  setTelegramWebViewVisible(false);
+                  setTelegramVerifying(false);
+                }}
+                style={styles.fbWebCloseBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.fbWebCloseText}>← <T>Cancel</T></Text>
+              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <SocialTelegramIcon size={22} />
+                <Text style={[styles.fbWebTitle, { marginLeft: 8 }]}>
+                  <T>Login with Telegram</T>
+                </Text>
+              </View>
+              <View style={{ width: 60 }} />
+            </View>
+
+            <WebView
+              ref={telegramWebRef}
+              source={{ uri: `${BASE_URL}/api/auth/telegram-login-page` }}
+              onNavigationStateChange={handleTelegramNavStateChange}
+              onMessage={handleTelegramWebMessage}
+              onShouldStartLoadWithRequest={(request) => {
+                const url = request.url;
+                if (!url) return true;
+                // STRICT: Block launching external Telegram app or store - stay inside FunMaza!
+                if (url.startsWith('tg://') || url.startsWith('intent://') || url.includes('play.google.com')) {
+                  return false;
+                }
+                return true;
+              }}
+              setSupportMultipleWindows={false}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.webLoadingContainer}>
+                  <ActivityIndicator size="large" color="#2AABEE" />
                 </View>
+              )}
+            />
+
+            {(telegramVerifying || loading) && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0F0F1A', justifyContent: 'center', alignItems: 'center', zIndex: 999 }]}>
+                <ActivityIndicator size="large" color="#2AABEE" />
+                <Text style={{ color: '#FFFFFF', marginTop: 16, fontSize: 16, fontWeight: '700' }}>
+                  <T>Logging into FunMaza...</T>
+                </Text>
+                <Text style={{ color: '#94A3B8', marginTop: 6, fontSize: 13 }}>
+                  <T>Verifying your Telegram account...</T>
+                </Text>
                 <TouchableOpacity
-                  onPress={closeTelegramModal}
-                  style={styles.telegramModalCloseBtn}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={{
+                    marginTop: 20,
+                    paddingHorizontal: 22,
+                    paddingVertical: 10,
+                    backgroundColor: '#1E1E2D',
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.15)',
+                  }}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    setTelegramVerifying(false);
+                    setTelegramWebViewVisible(false);
+                    setLoading(false);
+                  }}
                 >
-                  <Text style={styles.telegramModalCloseText}>✕</Text>
+                  <Text style={{ color: '#EF4444', fontSize: 14, fontWeight: '600' }}>
+                    <T>Cancel</T>
+                  </Text>
                 </TouchableOpacity>
               </View>
-
-              <Text style={styles.telegramSubtitle}>
-                <T>Instant 1-Tap sign-in with your Telegram account</T>
-              </Text>
-
-              {/* 1. Instant 1-Tap Button via Bot */}
-              <TouchableOpacity
-                style={styles.telegramBotBtn}
-                activeOpacity={0.8}
-                onPress={handleOpenTelegramBot}
-              >
-                <SocialTelegramIcon size={30} />
-                <View style={styles.telegramBotBtnTextWrap}>
-                  <Text style={styles.telegramBotBtnTitle}>
-                    <T>1-Tap Login via Telegram Bot</T>
-                  </Text>
-                  <Text style={styles.telegramBotBtnSub}>
-                    <T>Tap START in Telegram to log in instantly</T>
-                  </Text>
-                </View>
-                {telegramWaiting && <ActivityIndicator size="small" color="#FFFFFF" />}
-              </TouchableOpacity>
-
-              {/* Polling / Waiting Status Indicator */}
-              <View style={styles.telegramWaitingIndicatorRow}>
-                <View style={styles.telegramPulseDot} />
-                <Text style={styles.telegramWaitingText}>
-                  <T>Listening for Telegram authorization...</T>
-                </Text>
-              </View>
-
-              {/* Helpful Security Tip */}
-              <View style={{ marginTop: 18, paddingHorizontal: 10, alignItems: 'center' }}>
-                <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
-                  <T>Tap the button above to open Telegram and press START to log in securely.</T>
-                </Text>
-              </View>
-            </View>
+            )}
           </View>
         </Modal>
 

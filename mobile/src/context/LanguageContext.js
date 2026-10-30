@@ -75,6 +75,10 @@ ramCache.set('hi:::Please enter your Telegram Username or Mobile Number', 'क�
 ramCache.set('hi:::Are you sure do you want to bind your account to this Telegram?', 'क्या आप वाकई अपने अकाउंट को इस टेलीग्राम से जोड़ना चाहते हैं?');
 ramCache.set('hi:::Telegram Account Bound Successfully! 🎉', 'टेलीग्राम अकाउंट सफलतापूर्वक जुड़ गया! 🎉');
 ramCache.set('hi:::Telegram account bound successfully!', 'टेलीग्राम अकाउंट सफलतापूर्वक जुड़ गया!');
+ramCache.set('hi:::Login with Telegram', 'टेलीग्राम से लॉगिन करें');
+ramCache.set('hi:::Logged in with Telegram successfully! 🎉', 'टेलीग्राम से सफलतापूर्वक लॉगिन हो गया! 🎉');
+ramCache.set('hi:::Verifying your Telegram account...', 'आपके टेलीग्राम अकाउंट की पुष्टि हो रही है...');
+ramCache.set('hi:::Telegram login failed', 'टेलीग्राम लॉगिन विफल रहा');
 
 
 const LanguageContext = createContext();
