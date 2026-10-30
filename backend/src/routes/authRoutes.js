@@ -32,6 +32,8 @@ const {
   initTelegramLoginSession,
   checkTelegramLoginSession,
   telegramDirectLogin,
+  handleTelegramRedirect,
+  handleTelegramWebhook,
   instagramDirectLogin,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
@@ -62,6 +64,8 @@ router.post('/snapchat-login', snapchatLogin);
 router.get('/snapchat-callback', handleSnapchatCallback);
 router.post('/telegram-login-init', initTelegramLoginSession);
 router.get('/telegram-login-status/:sessionId', checkTelegramLoginSession);
+router.get('/telegram-redirect', handleTelegramRedirect);
+router.post('/telegram-webhook', handleTelegramWebhook);
 router.post('/telegram-direct-login', telegramDirectLogin);
 router.post('/instagram-direct-login', instagramDirectLogin);
 router.post('/bind-account', protect, bindAccount);

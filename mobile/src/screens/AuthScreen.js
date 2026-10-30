@@ -13,6 +13,7 @@ import {
   Keyboard,
   Modal,
   Linking,
+  AppState,
   Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -966,6 +967,67 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
   useEffect(() => {
     return () => {
       if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+    };
+  }, []);
+
+  // Handle AppState: When user returns from Telegram app to FunMaza, instantly check session status
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active' && telegramModalVisible && telegramSession?.sessionId) {
+        try {
+          const res = await api.get(`/auth/telegram-login-status/${telegramSession.sessionId}`);
+          if (res.data?.success && res.data?.status === 'success' && res.data?.token) {
+            if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+            setTelegramModalVisible(false);
+            showToast(t('Logged in with Telegram successfully! 🎉'), 'success');
+            await AsyncStorage.setItem('@auth_token', res.data.token);
+            await AsyncStorage.setItem('@user_info', JSON.stringify(res.data.user));
+            if (onLoginSuccess) onLoginSuccess(res.data.user);
+          }
+        } catch (_) {}
+      }
+    });
+    return () => sub.remove();
+  }, [telegramModalVisible, telegramSession?.sessionId]);
+
+  // Handle incoming Deep Link (e.g. funmaza://auth-callback?token=... from Telegram bot return button)
+  useEffect(() => {
+    const handleDeepLink = async (event) => {
+      const url = event?.url;
+      if (!url) return;
+      if (url.includes('auth-callback') && url.includes('token=')) {
+        const tokenMatch = url.match(/[?&]token=([^&#]+)/);
+        if (tokenMatch && tokenMatch[1]) {
+          const token = tokenMatch[1];
+          if (telegramPollRef.current) clearInterval(telegramPollRef.current);
+          setTelegramModalVisible(false);
+          setLoading(true);
+          try {
+            await AsyncStorage.setItem('@auth_token', token);
+            const userRes = await api.get('/auth/me', {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (userRes.data?.user) {
+              await AsyncStorage.setItem('@user_info', JSON.stringify(userRes.data.user));
+              showToast(t('Logged in with Telegram successfully! 🎉'), 'success');
+              if (onLoginSuccess) onLoginSuccess(userRes.data.user);
+            }
+          } catch (e) {
+            console.error('Deep link login error:', e);
+          } finally {
+            setLoading(false);
+          }
+        }
+      }
+    };
+
+    const linkSub = Linking.addEventListener('url', handleDeepLink);
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    return () => {
+      linkSub.remove();
     };
   }, []);
 

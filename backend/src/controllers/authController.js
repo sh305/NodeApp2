@@ -1839,3 +1839,102 @@ exports.instagramDirectLogin = async (req, res) => {
 };
 
 
+
+
+// @desc    Handle 1-Tap redirect back into FunMaza mobile app from Telegram
+// @route   GET /api/auth/telegram-redirect
+exports.handleTelegramRedirect = async (req, res) => {
+  const { token, sessionId } = req.query;
+  const deepLink = `funmaza://auth-callback?token=${encodeURIComponent(token || '')}&sessionId=${encodeURIComponent(sessionId || '')}`;
+
+  return res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Returning to FunMaza...</title>
+        <style>
+          body {
+            background-color: #0F0F1A;
+            color: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+          }
+          .card {
+            background: rgba(30, 30, 45, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 24px;
+            padding: 36px 24px;
+            max-width: 360px;
+            width: 100%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+          }
+          .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+          }
+          h2 {
+            margin: 0 0 8px 0;
+            color: #00E676;
+            font-size: 22px;
+          }
+          p {
+            color: #94A3B8;
+            font-size: 14px;
+            margin: 0 0 24px 0;
+            line-height: 20px;
+          }
+          .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #6366F1, #8B5CF6);
+            color: #FFFFFF;
+            padding: 14px 32px;
+            border-radius: 20px;
+            font-weight: 800;
+            text-decoration: none;
+            font-size: 16px;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+          }
+        </style>
+        <script>
+          window.location.href = "${deepLink}";
+          setTimeout(function() {
+            window.location.href = "${deepLink}";
+          }, 300);
+        </script>
+      </head>
+      <body>
+        <div class="card">
+          <div class="icon">🎉</div>
+          <h2>Authentication Successful!</h2>
+          <p>Redirecting back to FunMaza app now...</p>
+          <a class="btn" href="${deepLink}">Open FunMaza App</a>
+        </div>
+      </body>
+    </html>
+  `);
+};
+
+// @desc    Handle incoming Telegram Webhook updates
+// @route   POST /api/auth/telegram-webhook
+exports.handleTelegramWebhook = async (req, res) => {
+  try {
+    const update = req.body;
+    if (update && update.message) {
+      const { handleTelegramMessage } = require('../services/telegramBotService');
+      await handleTelegramMessage(update.message);
+    }
+  } catch (err) {
+    console.error('Telegram webhook handler error:', err.message);
+  }
+  return res.status(200).send('OK');
+};

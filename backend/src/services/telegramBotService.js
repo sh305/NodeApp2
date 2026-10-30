@@ -212,12 +212,25 @@ async function handleTelegramMessage(message) {
         });
 
         const welcomeName = from.first_name || from.username || user.name || 'Member';
+        const returnUrl = `https://nodeapp2-yl8c.onrender.com/api/auth/telegram-redirect?token=${token}&sessionId=${sessionId}`;
         await sendMessage(
           chatId,
           `🎉 <b>Login Successful!</b>\n\n` +
           `Welcome back, <b>${welcomeName}</b>!\n` +
           `You have successfully authenticated with FunMaza.\n\n` +
-          `👉 <i>Return to the FunMaza app now to continue!</i>`
+          `👇 Tap the button below to return to FunMaza immediately:`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '🚀 Open FunMaza App Now',
+                    url: returnUrl,
+                  },
+                ],
+              ],
+            },
+          }
         );
 
         if (ioInstance) {
@@ -237,7 +250,75 @@ async function handleTelegramMessage(message) {
       return;
     }
 
-    // Default /start greeting
+    // Handle plain /start command (auto-login if user is already recognized in FunMaza)
+    try {
+      let user = await User.findOne({
+        $or: [
+          { telegramId: String(from.id) },
+          { 'boundAccounts.telegram.id': String(from.id) },
+        ],
+      });
+
+      // Find if there is an active pending session (within last 10 minutes)
+      let activeSessionId = null;
+      for (const [sId, sess] of telegramLoginSessions.entries()) {
+        if (sess.status === 'pending' && Date.now() - sess.createdAt < 10 * 60 * 1000) {
+          activeSessionId = sId;
+          break;
+        }
+      }
+
+      if (user) {
+        const token = jwt.sign(
+          { id: user._id },
+          process.env.JWT_SECRET || 'yoyo_super_secret_jwt_key_2026_!@#$%^',
+          { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+        );
+
+        if (activeSessionId) {
+          telegramLoginSessions.set(activeSessionId, {
+            status: 'success',
+            token,
+            user,
+            updatedAt: Date.now(),
+          });
+          if (ioInstance) {
+            ioInstance.emit(`telegram_login_done:${activeSessionId}`, {
+              success: true,
+              token,
+              user,
+            });
+          }
+        }
+
+        const welcomeName = from.first_name || from.username || user.name || 'Member';
+        const returnUrl = `https://nodeapp2-yl8c.onrender.com/api/auth/telegram-redirect?token=${token}&sessionId=${activeSessionId || ''}`;
+        await sendMessage(
+          chatId,
+          `🎉 <b>Login Successful!</b>\n\n` +
+          `Welcome back, <b>${welcomeName}</b>!\n` +
+          `You have successfully authenticated with FunMaza.\n\n` +
+          `👇 Tap the button below to return to FunMaza immediately:`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '🚀 Open FunMaza App Now',
+                    url: returnUrl,
+                  },
+                ],
+              ],
+            },
+          }
+        );
+        return;
+      }
+    } catch (err) {
+      console.error('Error handling plain /start auto-auth:', err);
+    }
+
+    // Default /start greeting for new visitors
     const welcomeName = from.first_name || 'Friend';
     await sendMessage(
       chatId,
@@ -314,6 +395,7 @@ function stopTelegramBot() {
 module.exports = {
   initTelegramBot,
   stopTelegramBot,
+  handleTelegramMessage,
   sendMessage,
   verifyTelegramWidgetData,
   createLoginSession,
