@@ -389,6 +389,7 @@ export default function RoomVideoPlayer({
             rel: false,
             preventFullScreen: true, // Fullscreen disabled as requested
             showClosedCaptions: false,
+            iv_load_policy: 3, // Disable video annotations
           }}
           webViewProps={{
             androidHardwareAccelerationDisabled: false,
@@ -396,6 +397,25 @@ export default function RoomVideoPlayer({
             mediaPlaybackRequiresUserAction: false,
             allowsInlineMediaPlayback: true,
             scrollEnabled: false,
+            injectedJavaScript: `
+              (function() {
+                try {
+                  var hideYtButtons = function() {
+                    var selectors = ['.ytp-share-button', '.ytp-share-panel', 'button[aria-label*="Share"]', 'button[title*="Share"]', '.ytp-share-title'];
+                    selectors.forEach(function(sel) {
+                      var els = document.querySelectorAll(sel);
+                      for (var i = 0; i < els.length; i++) {
+                        els[i].style.display = 'none';
+                        els[i].style.visibility = 'hidden';
+                        els[i].style.pointerEvents = 'none';
+                      }
+                    });
+                  };
+                  setInterval(hideYtButtons, 500);
+                } catch(e) {}
+              })();
+              true;
+            `,
           }}
           webViewStyle={{ opacity: 0.99 }}
         />
@@ -452,6 +472,11 @@ export default function RoomVideoPlayer({
             </Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* ── YOUTUBE SHARE BUTTON HIDE COVER ── */}
+      {isYoutube && (
+        <View style={styles.ytShareCover} pointerEvents="none" />
       )}
 
       {/* ── BACKDROP TOUCH LAYER: Tap on video to show / hide custom controls ── */}
@@ -623,6 +648,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
+  },
+  ytShareCover: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    width: 65,
+    height: 58,
+    backgroundColor: '#000000',
+    zIndex: 4,
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,

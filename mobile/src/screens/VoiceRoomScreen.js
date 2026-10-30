@@ -1796,6 +1796,18 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             </TouchableOpacity>
 
             
+            {/* Share */}
+            <TouchableOpacity
+              style={styles.headerActionCircle}
+              activeOpacity={0.75}
+              onPress={handleShareRoom}
+            >
+              <Image
+                source={require('../assets/icons/Share.png')}
+                style={styles.headerShareIcon}
+              />
+            </TouchableOpacity>
+
             {/* Close */}
             <TouchableOpacity
               style={[styles.headerActionCircle, styles.headerCloseCircle]}
