@@ -20,6 +20,7 @@ const directMessageRoutes = require('./routes/directMessageRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const postRoutes = require('./routes/postRoutes');
 const familyRoutes = require('./routes/familyRoutes');
+const gameRoutes = require('./routes/gameRoutes');
 
 const path = require('path');
 
@@ -61,6 +62,7 @@ app.use('/api/messages', directMessageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/families', familyRoutes);
+app.use('/api/games', gameRoutes);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {

@@ -79,6 +79,40 @@ ramCache.set('hi:::Login with Telegram', 'टेलीग्राम से ल
 ramCache.set('hi:::Logged in with Telegram successfully! 🎉', 'टेलीग्राम से सफलतापूर्वक लॉगिन हो गया! 🎉');
 ramCache.set('hi:::Verifying your Telegram account...', 'आपके टेलीग्राम अकाउंट की पुष्टि हो रही है...');
 ramCache.set('hi:::Telegram login failed', 'टेलीग्राम लॉगिन विफल रहा');
+ramCache.set('hi:::Games', 'गेम्स');
+ramCache.set('hi:::Greedy Baby', 'ग्रीडी बेबी');
+ramCache.set('hi:::HOT GAME', 'हॉट गेम');
+ramCache.set('hi:::Spin & win up to 45x gold coins!', 'स्पिन करें और 45 गुना तक सोने के सिक्के जीतें!');
+ramCache.set('hi:::Play with your FunMaza gold coins & win big!', 'अपने फनमाज़ा गोल्ड कॉइन्स के साथ खेलें और बड़ा जीतें!');
+ramCache.set('hi:::Select Food Now', 'अब भोजन चुनें');
+ramCache.set('hi:::Spinning...', 'घूम रहा है...');
+ramCache.set('hi:::Winner!', 'विजेता!');
+ramCache.set('hi:::Choose the amount of wager > Choose food', 'दांव की राशि चुनें > भोजन चुनें');
+ramCache.set('hi:::Insufficient coins! Please recharge first.', 'अपर्याप्त सिक्के! कृपया पहले रिचार्ज करें।');
+ramCache.set('hi:::Chocolate', 'चॉकलेट');
+ramCache.set('hi:::Pastry', 'पेस्ट्री');
+ramCache.set('hi:::Burger', 'बर्गर');
+ramCache.set('hi:::Pani Puri', 'पानी पूरी');
+ramCache.set('hi:::Chhola Bhatura', 'छोला भटूरा');
+ramCache.set('hi:::Noodles', 'नूडल्स');
+ramCache.set('hi:::Idli', 'इडली');
+ramCache.set('hi:::Dosa', 'डोसा');
+ramCache.set('hi:::Win 5 times', '5 गुना जीतें');
+ramCache.set('hi:::Win 10 times', '10 गुना जीतें');
+ramCache.set('hi:::Win 15 times', '15 गुना जीतें');
+ramCache.set('hi:::Win 25 times', '25 गुना जीतें');
+ramCache.set('hi:::Win 45 times', '45 गुना जीतें');
+ramCache.set('hi:::Coins:', 'सिक्के:');
+ramCache.set('hi:::Today Earnings', 'आज की कमाई');
+ramCache.set('hi:::Weekly Prize', 'साप्ताहिक पुरस्कार');
+ramCache.set('hi:::Result:', 'परिणाम:');
+ramCache.set('hi:::Clear', 'हटाएं');
+ramCache.set('hi:::BIG WIN!', 'बड़ी जीत!');
+ramCache.set('hi:::Greedy Baby ate', 'ग्रीडी बेबी ने खाया');
+ramCache.set('hi:::Coins added to your wallet successfully!', 'सिक्के आपके वॉलेट में सफलतापूर्वक जोड़े गए!');
+ramCache.set('hi:::Greedy Baby Rules', 'ग्रीडी बेबी के नियम');
+ramCache.set('hi:::Got It!', 'समझ गया!');
+
 
 
 const LanguageContext = createContext();

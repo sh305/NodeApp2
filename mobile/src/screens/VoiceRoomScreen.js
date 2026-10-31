@@ -60,6 +60,8 @@ import LocalMusicPlayerModal from '../components/LocalMusicPlayerModal';
 import MyMusicModal from '../components/MyMusicModal';
 import SoundEffectsModal from '../components/SoundEffectsModal';
 import PersonalTasksModal from '../components/PersonalTasksModal';
+import GamesListModal from '../components/GamesListModal';
+import GreedyBabyGameModal from '../components/GreedyBabyGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -167,6 +169,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [seatPopoverCoords, setSeatPopoverCoords] = useState(null);
 
   // PK Battle State
+  const [gamesListModalVisible, setGamesListModalVisible] = useState(false);
+  const [greedyBabyModalVisible, setGreedyBabyModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3032,6 +3036,34 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         resultData={pkResult}
         currentRoomId={roomId}
         onClose={() => setPkResult(null)}
+      />
+
+      {/* ══ GAMES LIST BOTTOM SHEET MODAL (Screenshot 1) ══ */}
+      <GamesListModal
+        visible={gamesListModalVisible}
+        onClose={() => setGamesListModalVisible(false)}
+        onSelectGame={(gameId) => {
+          setGamesListModalVisible(false);
+          if (gameId === 'greedy_baby') {
+            setGreedyBabyModalVisible(true);
+          }
+        }}
+      />
+
+      {/* ══ GREEDY BABY FLAGSHIP GAME MODAL (Screenshot 2) ══ */}
+      <GreedyBabyGameModal
+        visible={greedyBabyModalVisible}
+        onClose={() => setGreedyBabyModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setGreedyBabyModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
       />
     </View>
   );

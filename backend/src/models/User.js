@@ -78,6 +78,12 @@ const userSchema = new mongoose.Schema(
       default: 0, // Initial wallet coins (0 as requested)
       min: 0,
     },
+    greedyBabyStats: {
+      todayEarnings: { type: Number, default: 0 },
+      lastEarningsDate: { type: String, default: null },
+      totalWinnings: { type: Number, default: 0 },
+      gamesPlayed: { type: Number, default: 0 },
+    },
     gameCoins: {
       type: Number,
       default: 0, // Initial game coins (0 as requested, claim from silver chest)
