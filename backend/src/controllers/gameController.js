@@ -212,3 +212,162 @@ exports.claimGreedyBabyPayout = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+
+// ==================== SUPER SLOTS CONTROLLER ====================
+const SUPER_SLOTS_PAYTABLE = [
+  { id: 'seven', name: '7', multiplier: 500, symbol: '7', weight: 8 },
+  { id: 'diamond', name: 'Diamond', multiplier: 100, symbol: '💎', weight: 14 },
+  { id: 'watermelon', name: 'Watermelon', multiplier: 50, symbol: '🍉', weight: 22 },
+  { id: 'grapes', name: 'Grapes', multiplier: 20, symbol: '🍇', weight: 32 },
+  { id: 'cherry', name: 'Cherry', multiplier: 10, symbol: '🍒', weight: 44 },
+];
+
+function pickRandomSlotSymbol() {
+  const totalWeight = SUPER_SLOTS_PAYTABLE.reduce((sum, item) => sum + item.weight, 0);
+  let random = Math.random() * totalWeight;
+  for (const item of SUPER_SLOTS_PAYTABLE) {
+    if (random < item.weight) {
+      return item.id;
+    }
+    random -= item.weight;
+  }
+  return 'cherry';
+}
+
+/**
+ * @desc    Get Super Slots game state & user info
+ * @route   GET /api/games/super-slots/state
+ */
+exports.getSuperSlotsState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins superSlotsStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.superSlotsStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.superSlotsStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      paytable: SUPER_SLOTS_PAYTABLE,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 500000,
+    });
+  } catch (error) {
+    console.error('getSuperSlotsState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Execute a spin in Super Slots
+ * @route   POST /api/games/super-slots/spin
+ */
+exports.spinSuperSlots = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { betAmount } = req.body;
+    const bet = Math.floor(Number(betAmount) || 0);
+
+    const validBets = [10, 50, 100, 1000, 10000];
+    if (!validBets.includes(bet)) {
+      return res.status(400).json({ success: false, message: 'Invalid bet amount' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < bet) {
+      return res.status(400).json({
+        success: false,
+        code: 'INSUFFICIENT_COINS',
+        message: 'Insufficient coins balance. Please recharge first.',
+        currentCoins: user.coins || 0,
+        requiredCoins: bet,
+      });
+    }
+
+    // Determine the 3 reel results
+    const r1 = pickRandomSlotSymbol();
+    const r2 = pickRandomSlotSymbol();
+    const r3 = pickRandomSlotSymbol();
+    const reels = [r1, r2, r3];
+
+    // Calculate payout
+    let multiplier = 0;
+    let winType = 'none';
+
+    if (r1 === r2 && r2 === r3) {
+      const match = SUPER_SLOTS_PAYTABLE.find((p) => p.id === r1);
+      multiplier = match ? match.multiplier : 10;
+      winType = multiplier >= 500 ? 'jackpot' : 'win';
+    } else {
+      const cherryCount = reels.filter((r) => r === 'cherry').length;
+      const sevenCount = reels.filter((r) => r === 'seven').length;
+      if (sevenCount === 2) {
+        multiplier = 5;
+        winType = 'small';
+      } else if (cherryCount === 2) {
+        multiplier = 2;
+        winType = 'small';
+      }
+    }
+
+    const wonCoins = bet * multiplier;
+    const netCoinChange = wonCoins - bet;
+    const todayStr = getTodayString();
+
+    let currentTodayEarnings = 0;
+    if (user.superSlotsStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.superSlotsStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = Math.max(0, currentTodayEarnings + wonCoins);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: netCoinChange,
+          'superSlotsStats.totalWinnings': wonCoins,
+          'superSlotsStats.spinsPlayed': 1,
+        },
+        $set: {
+          'superSlotsStats.todayEarnings': newTodayEarnings,
+          'superSlotsStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      reels,
+      multiplier,
+      wonCoins,
+      winType,
+      spentCoins: bet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+    });
+  } catch (error) {
+    console.error('spinSuperSlots error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

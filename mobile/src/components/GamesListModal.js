@@ -7,11 +7,13 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { GreedyBabyCharacter, ShinyCoinIcon } from './FoodIcons';
+import { SlotMachineIcon, SevenIcon } from './SlotIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -53,8 +55,12 @@ export default function GamesListModal({
                 </TouchableOpacity>
               </View>
 
-              {/* Games Grid Container */}
-              <View style={styles.gamesContent}>
+              {/* Games Scrollable Grid */}
+              <ScrollView
+                style={styles.gamesScroll}
+                contentContainerStyle={styles.gamesContent}
+                showsVerticalScrollIndicator={false}
+              >
                 {/* 1. Flagship Game: GREEDY BABY */}
                 <TouchableOpacity
                   style={styles.gameCard}
@@ -78,7 +84,7 @@ export default function GamesListModal({
                     {/* Game Visual / Character */}
                     <View style={styles.gameVisualWrap}>
                       <View style={styles.characterGlow}>
-                        <GreedyBabyCharacter size={76} />
+                        <GreedyBabyCharacter size={72} />
                       </View>
                     </View>
 
@@ -124,7 +130,77 @@ export default function GamesListModal({
                     </View>
                   </LinearGradient>
                 </TouchableOpacity>
-              </View>
+
+                {/* 2. Flagship Game: SUPER SLOTS (500x Jackpot) */}
+                <TouchableOpacity
+                  style={[styles.gameCard, styles.slotsCardSpacing]}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    onClose();
+                    onSelectGame('super_slots');
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#78350F', '#451A03', '#1C0A00']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.gameCardGradient}
+                  >
+                    {/* 500x Jackpot Badge */}
+                    <View style={styles.jackpotBadge}>
+                      <Text style={styles.jackpotBadgeText}>👑 <T>500X JACKPOT</T></Text>
+                    </View>
+
+                    {/* Game Visual / Slot Machine Icon */}
+                    <View style={styles.gameVisualWrap}>
+                      <View style={styles.slotIconGlow}>
+                        <SlotMachineIcon size={68} />
+                      </View>
+                    </View>
+
+                    {/* Game Details */}
+                    <View style={styles.gameInfoWrap}>
+                      <Text style={styles.gameTitle}>
+                        <T>Super Slots</T>
+                      </Text>
+                      <Text style={styles.gameSub}>
+                        <T>3-Reel Slots - Match 777 for 500x!</T>
+                      </Text>
+                      <View style={styles.multiplierRow}>
+                        <View style={styles.tagPill}>
+                          <Text style={styles.tagPillText}>10x</Text>
+                        </View>
+                        <View style={styles.tagPill}>
+                          <Text style={styles.tagPillText}>20x</Text>
+                        </View>
+                        <View style={styles.tagPill}>
+                          <Text style={styles.tagPillText}>50x</Text>
+                        </View>
+                        <View style={styles.tagPill}>
+                          <Text style={styles.tagPillText}>100x</Text>
+                        </View>
+                        <View style={[styles.tagPill, styles.tagPillSlotsJackpot]}>
+                          <Text style={styles.tagPillSlotsJackpotText}>500x 👑</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Play Button */}
+                    <View style={styles.playBtnWrap}>
+                      <LinearGradient
+                        colors={['#F59E0B', '#D97706']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.playBtn}
+                      >
+                        <Text style={styles.playBtnText}>
+                          <T>PLAY</T>
+                        </Text>
+                      </LinearGradient>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </ScrollView>
 
               {/* Bottom Footer Note */}
               <View style={styles.footerNoteRow}>
@@ -153,7 +229,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingTop: 12,
     paddingBottom: 32,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
+    maxHeight: '82%',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -163,13 +240,13 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 14,
     paddingHorizontal: 4,
   },
   headerTitle: {
@@ -191,35 +268,43 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '700',
   },
+  gamesScroll: {
+    maxHeight: 380,
+  },
   gamesContent: {
-    marginBottom: 16,
+    paddingBottom: 10,
   },
   gameCard: {
-    borderRadius: 22,
+    borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: 'rgba(168, 85, 247, 0.45)',
     shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  slotsCardSpacing: {
+    marginTop: 14,
+    borderColor: 'rgba(245, 158, 11, 0.45)',
+    shadowColor: '#F59E0B',
   },
   gameCardGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
     position: 'relative',
   },
   popularBadge: {
     position: 'absolute',
-    top: 10,
+    top: 8,
     right: 12,
     backgroundColor: 'rgba(239, 68, 68, 0.25)',
     borderWidth: 1,
     borderColor: '#EF4444',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 10,
   },
   popularBadgeText: {
@@ -227,34 +312,60 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
+  jackpotBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  jackpotBadgeText: {
+    color: '#FDE68A',
+    fontSize: 10,
+    fontWeight: '800',
+  },
   gameVisualWrap: {
-    marginRight: 14,
+    marginRight: 12,
   },
   characterGlow: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(250, 204, 21, 0.5)',
   },
+  slotIconGlow: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(253, 230, 138, 0.6)',
+  },
   gameInfoWrap: {
     flex: 1,
     justifyContent: 'center',
   },
   gameTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   gameSub: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#CBD5E1',
-    lineHeight: 16,
-    marginBottom: 8,
+    lineHeight: 15,
+    marginBottom: 6,
   },
   multiplierRow: {
     flexDirection: 'row',
@@ -264,40 +375,50 @@ const styles = StyleSheet.create({
   },
   tagPill: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 5,
   },
   tagPillText: {
-    color: '#F1F5F9',
     fontSize: 10,
     fontWeight: '700',
+    color: '#E2E8F0',
   },
   tagPillJackpot: {
-    backgroundColor: 'rgba(234, 179, 8, 0.2)',
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
     borderWidth: 1,
-    borderColor: '#EAB308',
+    borderColor: '#F59E0B',
   },
   tagPillJackpotText: {
-    color: '#FDE047',
     fontSize: 10,
     fontWeight: '800',
+    color: '#FDE047',
+  },
+  tagPillSlotsJackpot: {
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  tagPillSlotsJackpotText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FEF08A',
   },
   playBtnWrap: {
     marginLeft: 8,
   },
   playBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
     shadowColor: '#EC4899',
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 4,
   },
   playBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
@@ -305,12 +426,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 14,
     gap: 6,
-    marginTop: 6,
   },
   footerNoteText: {
-    color: '#94A3B8',
     fontSize: 12,
+    color: '#94A3B8',
     fontWeight: '600',
   },
 });

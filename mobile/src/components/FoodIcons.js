@@ -452,3 +452,4 @@ export const ShinyCoinIcon = ({ size = 20 }) => (
     <Path d="M12 7 V17 M9.5 9.5 H14.5 C15.5 9.5 15.5 12 14.5 12 H10 C9 12 9 14.5 10 14.5 H14.5" stroke="#78350F" strokeWidth="1.8" strokeLinecap="round" />
   </Svg>
 );
+

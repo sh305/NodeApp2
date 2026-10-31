@@ -62,6 +62,7 @@ import SoundEffectsModal from '../components/SoundEffectsModal';
 import PersonalTasksModal from '../components/PersonalTasksModal';
 import GamesListModal from '../components/GamesListModal';
 import GreedyBabyGameModal from '../components/GreedyBabyGameModal';
+import SuperSlotsGameModal from '../components/SuperSlotsGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -171,6 +172,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   // PK Battle State
   const [gamesListModalVisible, setGamesListModalVisible] = useState(false);
   const [greedyBabyModalVisible, setGreedyBabyModalVisible] = useState(false);
+  const [superSlotsModalVisible, setSuperSlotsModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3046,11 +3048,29 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           setGamesListModalVisible(false);
           if (gameId === 'greedy_baby') {
             setGreedyBabyModalVisible(true);
+          } else if (gameId === 'super_slots') {
+            setSuperSlotsModalVisible(true);
           }
         }}
       />
 
       {/* ══ GREEDY BABY FLAGSHIP GAME MODAL (Screenshot 2) ══ */}
+      {/* ══ SUPER SLOTS GAME MODAL ══ */}
+      <SuperSlotsGameModal
+        visible={superSlotsModalVisible}
+        onClose={() => setSuperSlotsModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setSuperSlotsModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+
       <GreedyBabyGameModal
         visible={greedyBabyModalVisible}
         onClose={() => setGreedyBabyModalVisible(false)}

@@ -112,6 +112,26 @@ ramCache.set('hi:::Greedy Baby ate', 'ग्रीडी बेबी ने ख
 ramCache.set('hi:::Coins added to your wallet successfully!', 'सिक्के आपके वॉलेट में सफलतापूर्वक जोड़े गए!');
 ramCache.set('hi:::Greedy Baby Rules', 'ग्रीडी बेबी के नियम');
 ramCache.set('hi:::Got It!', 'समझ गया!');
+ramCache.set('hi:::Super Slots', 'सुपर स्लॉट्स');
+ramCache.set('hi:::500X JACKPOT', '500 गुना जैकपॉट');
+ramCache.set('hi:::SPIN', 'स्पिन');
+ramCache.set('hi:::SPINNING...', 'घूम रहा है...');
+ramCache.set('hi:::AUTO SPIN', 'ऑटो स्पिन');
+ramCache.set('hi:::AUTO ON', 'ऑटो चालू');
+ramCache.set('hi:::MAX BET', 'अधिकतम दांव');
+ramCache.set('hi:::Super Slots Rules', 'सुपर स्लॉट्स के नियम');
+ramCache.set('hi:::How to Play', 'कैसे खेलें');
+ramCache.set('hi:::Paytable Payouts', 'पे-टेबल भुगतान');
+ramCache.set('hi:::Two 7s', 'दो 7');
+ramCache.set('hi:::Two Cherries', 'दो चेरी');
+ramCache.set('hi:::Diamond', 'हीरा');
+ramCache.set('hi:::Watermelon', 'तरबूज');
+ramCache.set('hi:::Grapes', 'अंगूर');
+ramCache.set('hi:::Cherry', 'चेरी');
+ramCache.set('hi:::3-Reel Slots - Match 777 for 500x!', '3-रील स्लॉट - 500 गुना के लिए 777 मिलाएं!');
+ramCache.set('hi:::1. Choose your bet chip from 10 to 10,000 gold coins.', '1. 10 से 10,000 सोने के सिक्कों में से अपना दांव चिप चुनें।');
+ramCache.set('hi:::2. Tap SPIN or enable AUTO SPIN to roll the 3 reels.', '2. 3 रीलों को घुमाने के लिए स्पिन पर टैप करें या ऑटो स्पिन चालू करें।');
+ramCache.set('hi:::3. Match all 3 symbols on the payline to win huge coin rewards!', '3. बड़े सिक्के पुरस्कार जीतने के लिए पेलाइन पर सभी 3 प्रतीकों का मिलान करें!');
 
 
 
