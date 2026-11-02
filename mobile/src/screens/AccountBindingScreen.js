@@ -655,6 +655,8 @@ export default function AccountBindingScreen({ navigation, currentUser }) {
         const res = await api.post('/auth/facebook-verify-token', {
           accessToken: token,
           code,
+          appId: FB_APP_ID,
+          redirectUri: FB_REDIRECT_URI,
         });
           if (res.data?.success && res.data?.profile) {
             const profileData = res.data.profile;

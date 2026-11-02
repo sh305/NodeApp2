@@ -632,19 +632,25 @@ exports.googleLogin = async (req, res) => {
 // @route   POST /api/auth/facebook-verify-token
 exports.verifyFacebookToken = async (req, res) => {
   try {
-    let { accessToken, code } = req.body;
+    let { accessToken, code, appId: clientAppId, redirectUri: clientRedirectUri } = req.body;
 
     // Exchange OAuth code for accessToken if code was returned
     if (!accessToken && code) {
-      // Meta Facebook App Credentials from environment variables
-      const fbAppId = process.env.FACEBOOK_APP_ID;
-      const fbAppSecret = process.env.FACEBOOK_APP_SECRET;
-      const redirectUri = process.env.FACEBOOK_REDIRECT_URI || 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+      // Prioritize verified Facebook App ID 1919593492737791 and its verified secret
+      let fbAppId = clientAppId || '1919593492737791';
+      let fbAppSecret = '5a8ea4da5272c04418321fdf4af9befc';
 
-      if (!fbAppId || !fbAppSecret) {
-        console.error('❌ [Facebook Auth] Missing FACEBOOK_APP_ID or FACEBOOK_APP_SECRET in environment variables');
-        return res.status(500).json({ success: false, message: 'Facebook credentials not configured in environment' });
+      // If environment variable is explicitly set to an active app ID (and not the deprecated 4171729949789896)
+      if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_ID !== '4171729949789896') {
+        fbAppId = process.env.FACEBOOK_APP_ID;
+        fbAppSecret = process.env.FACEBOOK_APP_SECRET || fbAppSecret;
+      } else if (process.env.FACEBOOK_APP_ID === '1919593492737791' && process.env.FACEBOOK_APP_SECRET) {
+        fbAppSecret = process.env.FACEBOOK_APP_SECRET;
       }
+
+      const redirectUri = clientRedirectUri || process.env.FACEBOOK_REDIRECT_URI || 'https://funapp-2e00d.firebaseapp.com/__/auth/handler';
+
+      console.log(`📡 [Facebook OAuth Exchange] Using App ID [${fbAppId}], redirectUri [${redirectUri}]`);
 
       const tokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
         params: {

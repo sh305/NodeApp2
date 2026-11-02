@@ -1341,6 +1341,7 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
 
   const handleDirectFacebookLogin = async () => {
     // Open in-app Modal WebView directly to prevent Chrome Custom Tabs sessionStorage clearing & stretched UI
+    fbProcessingRef.current = false;
     setFbWebViewVisible(true);
   };
 
@@ -1368,6 +1369,8 @@ export default function AuthScreen({ navigation, onLoginSuccess }) {
         const verifyRes = await api.post('/auth/facebook-verify-token', {
           accessToken: token,
           code,
+          appId: FB_APP_ID,
+          redirectUri: FB_REDIRECT_URI,
         });
 
         if (verifyRes.data?.success && verifyRes.data?.profile) {
