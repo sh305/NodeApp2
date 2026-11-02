@@ -1958,15 +1958,23 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           pointerEvents="box-none"
         >
           {/* Lucky Packets (right side, like other voice chat apps) */}
-          {/* Roulette Wheel */}
-          <TouchableOpacity style={styles.widgetBtn} activeOpacity={0.8} onPress={() => {}}>
+          {/* Roulette Wheel / Greedy Baby */}
+          <TouchableOpacity
+            style={styles.widgetBtn}
+            activeOpacity={0.8}
+            onPress={() => setGreedyBabyModalVisible(true)}
+          >
             <LinearGradient colors={['#F43F5E', '#10B981']} style={styles.widgetWheelGrad}>
               <Text style={styles.widgetWheelEmoji}>🎡</Text>
             </LinearGradient>
           </TouchableOpacity>
 
           {/* YoYo Mascot Stage */}
-          <TouchableOpacity style={styles.widgetBtn} activeOpacity={0.8} onPress={() => {}}>
+          <TouchableOpacity
+            style={styles.widgetBtn}
+            activeOpacity={0.8}
+            onPress={() => setGamesListModalVisible(true)}
+          >
             <View style={styles.widgetMascotBox}>
               <Text style={styles.widgetMascotEmoji}>🤩</Text>
               <View style={styles.widgetYoYoRibbon}>
@@ -1975,8 +1983,12 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             </View>
           </TouchableOpacity>
 
-          {/* NEW Game Box */}
-          <TouchableOpacity style={styles.widgetBtn} activeOpacity={0.8} onPress={() => {}}>
+          {/* NEW Game Box / Super Slots & Games */}
+          <TouchableOpacity
+            style={styles.widgetBtn}
+            activeOpacity={0.8}
+            onPress={() => setGamesListModalVisible(true)}
+          >
             <View style={styles.widgetGameBox}>
               <View style={styles.widgetNewBadge}>
                 <Text style={styles.widgetNewText}>NEW!</Text>
@@ -2157,7 +2169,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               <TouchableOpacity
                 style={styles.bottomCircleBtn}
                 activeOpacity={0.75}
-                onPress={() => {}}
+                onPress={() => setGamesListModalVisible(true)}
               >
                 <Image
                   source={require('../../assets/icons/Game.png')}
@@ -2564,6 +2576,9 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           } else if (tool?.id === 'task') {
             setRoomToolsModalVisible(false);
             setPersonalTasksModalVisible(true);
+          } else if (tool?.id === 'games') {
+            setRoomToolsModalVisible(false);
+            setGamesListModalVisible(true);
           } else {
             console.log('Room tool selected:', tool.name, toggledState);
           }
