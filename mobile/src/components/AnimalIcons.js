@@ -352,3 +352,4 @@ export const TrophyGoldIcon = ({ size = 28 }) => (
     <Polygon points="16,11 17.5,14 21,14.5 18.5,17 19,20.5 16,19 13,20.5 13.5,17 11,14.5 14.5,14" fill="#FFFFFF" opacity="0.9" />
   </Svg>
 );
+
