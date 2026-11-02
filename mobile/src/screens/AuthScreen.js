@@ -19,7 +19,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 import Svg, { Path, Circle, Rect, G, Defs, LinearGradient, Stop } from 'react-native-svg';
-import api from '../api/client';
+import api, { BASE_URL } from '../api/client';
 import ScreenContainer from '../components/ScreenContainer';
 
 const FB_APP_ID = '1919593492737791';
