@@ -7,15 +7,103 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Dimensions,
-  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { GreedyBabyCharacter, ShinyCoinIcon } from './FoodIcons';
-import { SlotMachineIcon, SevenIcon } from './SlotIcons';
+import { SevenIcon } from './SlotIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+/**
+ * Modern Square Game Tile for Greedy Baby
+ */
+function GreedyBabyTile() {
+  return (
+    <View style={styles.tileBox}>
+      <LinearGradient
+        colors={['#4C1D95', '#831843', '#BE185D', '#3B0764']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Star Sparkles */}
+        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.5" fill="#FDE047" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#FDE047" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#FDE047" opacity={0.7} />
+          <Circle cx="82" cy="72" r="1.5" fill="#FDE047" opacity={0.8} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FEF08A" opacity={0.9} />
+        </Svg>
+
+        {/* Top-Right Coin Badge */}
+        <View style={styles.topRightCoin}>
+          <ShinyCoinIcon size={18} />
+        </View>
+
+        {/* Cute Greedy Baby Character */}
+        <View style={styles.characterContainer}>
+          <GreedyBabyCharacter size={58} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonPink}>
+          <Text style={styles.bottomRibbonText}>45X 🌟</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+/**
+ * Modern Square Game Tile for Super Slots (Crazy 777 Casino Style)
+ */
+function SuperSlotsTile() {
+  return (
+    <View style={[styles.tileBox, styles.slotsTileBorder]}>
+      <LinearGradient
+        colors={['#7F1D1D', '#B91C1C', '#EA580C', '#450A0A']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Fiery Star Sparkles */}
+        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
+          <Circle cx="82" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
+          <Circle cx="20" cy="74" r="1.5" fill="#FDE047" opacity={0.7} />
+          <Path d="M18 14 L19 17 L22 18 L19 19 L18 22 L17 19 L14 18 L17 17 Z" fill="#FEF08A" opacity={0.95} />
+          <Path d="M78 22 L79 25 L82 26 L79 27 L78 30 L77 27 L74 26 L77 25 Z" fill="#FDE047" opacity={0.8} />
+        </Svg>
+
+        {/* Lucky 7 Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <SevenIcon size={52} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonGold}>
+          <Text style={styles.bottomRibbonGoldText}>500X 👑</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
 
 export default function GamesListModal({
   visible,
@@ -23,6 +111,7 @@ export default function GamesListModal({
   onSelectGame,
 }) {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
 
   if (!visible) return null;
 
@@ -36,11 +125,8 @@ export default function GamesListModal({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop}>
           <TouchableWithoutFeedback>
-            <View style={styles.sheetContainer}>
-              {/* Top Handle */}
-              <View style={styles.handleBar} />
-
-              {/* Header Row */}
+            <View style={[styles.sheetContainer, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
+              {/* Header: Title "Games" & Close "✕" */}
               <View style={styles.headerRow}>
                 <Text style={styles.headerTitle}>
                   <T>Games</T>
@@ -55,159 +141,45 @@ export default function GamesListModal({
                 </TouchableOpacity>
               </View>
 
-              {/* Games Scrollable Grid */}
-              <ScrollView
-                style={styles.gamesScroll}
-                contentContainerStyle={styles.gamesContent}
-                showsVerticalScrollIndicator={false}
-              >
-                {/* 1. Flagship Game: GREEDY BABY */}
+              {/* Games Grid Row (Screenshot matching) */}
+              <View style={styles.gamesRow}>
+                {/* 1. Greedy Baby */}
                 <TouchableOpacity
-                  style={styles.gameCard}
-                  activeOpacity={0.85}
+                  style={styles.gameItem}
+                  activeOpacity={0.82}
                   onPress={() => {
                     onClose();
                     onSelectGame('greedy_baby');
                   }}
                 >
-                  <LinearGradient
-                    colors={['#4C1D95', '#2E1065', '#1E1B4B']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.gameCardGradient}
-                  >
-                    {/* Badge */}
-                    <View style={styles.popularBadge}>
-                      <Text style={styles.popularBadgeText}>🔥 <T>HOT GAME</T></Text>
-                    </View>
-
-                    {/* Game Visual / Character */}
-                    <View style={styles.gameVisualWrap}>
-                      <View style={styles.characterGlow}>
-                        <GreedyBabyCharacter size={72} />
-                      </View>
-                    </View>
-
-                    {/* Game Details */}
-                    <View style={styles.gameInfoWrap}>
-                      <Text style={styles.gameTitle}>
-                        <T>Greedy Baby</T>
-                      </Text>
-                      <Text style={styles.gameSub}>
-                        <T>Spin & win up to 45x gold coins!</T>
-                      </Text>
-                      <View style={styles.multiplierRow}>
-                        <View style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>5x</Text>
-                        </View>
-                        <View style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>10x</Text>
-                        </View>
-                        <View style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>15x</Text>
-                        </View>
-                        <View style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>25x</Text>
-                        </View>
-                        <View style={[styles.tagPill, styles.tagPillJackpot]}>
-                          <Text style={styles.tagPillJackpotText}>45x 🌟</Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Play Button */}
-                    <View style={styles.playBtnWrap}>
-                      <LinearGradient
-                        colors={['#EC4899', '#8B5CF6']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.playBtn}
-                      >
-                        <Text style={styles.playBtnText}>
-                          <T>PLAY</T>
-                        </Text>
-                      </LinearGradient>
-                    </View>
-                  </LinearGradient>
+                  <GreedyBabyTile />
+                  <Text style={styles.gameTitle} numberOfLines={1}>
+                    <T>Greedy Baby</T>
+                  </Text>
                 </TouchableOpacity>
 
-                {/* 2. Flagship Game: SUPER SLOTS (500x Jackpot) */}
+                {/* 2. Super Slots */}
                 <TouchableOpacity
-                  style={[styles.gameCard, styles.slotsCardSpacing]}
-                  activeOpacity={0.85}
+                  style={styles.gameItem}
+                  activeOpacity={0.82}
                   onPress={() => {
                     onClose();
                     onSelectGame('super_slots');
                   }}
                 >
-                  <LinearGradient
-                    colors={['#78350F', '#451A03', '#1C0A00']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.gameCardGradient}
-                  >
-                    {/* 500x Jackpot Badge */}
-                    <View style={styles.jackpotBadge}>
-                      <Text style={styles.jackpotBadgeText}>👑 <T>500X JACKPOT</T></Text>
-                    </View>
-
-                    {/* Game Visual / Slot Machine Icon */}
-                    <View style={styles.gameVisualWrap}>
-                      <View style={styles.slotIconGlow}>
-                        <SlotMachineIcon size={68} />
-                      </View>
-                    </View>
-
-                    {/* Game Details */}
-                    <View style={styles.gameInfoWrap}>
-                      <Text style={styles.gameTitle}>
-                        <T>Super Slots</T>
-                      </Text>
-                      <Text style={styles.gameSub}>
-                        <T>3-Reel Slots - Match 777 for 500x!</T>
-                      </Text>
-                      <View style={styles.multiplierRow}>
-                        <View style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>10x</Text>
-                        </View>
-                        <View style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>20x</Text>
-                        </View>
-                        <View style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>50x</Text>
-                        </View>
-                        <View style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>100x</Text>
-                        </View>
-                        <View style={[styles.tagPill, styles.tagPillSlotsJackpot]}>
-                          <Text style={styles.tagPillSlotsJackpotText}>500x 👑</Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Play Button */}
-                    <View style={styles.playBtnWrap}>
-                      <LinearGradient
-                        colors={['#F59E0B', '#D97706']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.playBtn}
-                      >
-                        <Text style={styles.playBtnText}>
-                          <T>PLAY</T>
-                        </Text>
-                      </LinearGradient>
-                    </View>
-                  </LinearGradient>
+                  <SuperSlotsTile />
+                  <Text style={styles.gameTitle} numberOfLines={1}>
+                    <T>Super Slots</T>
+                  </Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </View>
 
-              {/* Bottom Footer Note */}
-              <View style={styles.footerNoteRow}>
-                <ShinyCoinIcon size={16} />
-                <Text style={styles.footerNoteText}>
-                  <T>Play with your FunMaza gold coins & win big!</T>
-                </Text>
+              {/* Page Indicator Dots (Matching screenshot) */}
+              <View style={styles.dotsRow}>
+                <View style={[styles.dot, styles.dotActive]} />
+                <View style={styles.dot} />
+                <View style={styles.dot} />
+                <View style={styles.dot} />
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -220,218 +192,169 @@ export default function GamesListModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: '#131127',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 12,
-    paddingBottom: 32,
-    paddingHorizontal: 18,
-    maxHeight: '82%',
+    backgroundColor: '#110F20',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 16,
+    paddingHorizontal: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  handleBar: {
-    width: 44,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    alignSelf: 'center',
-    marginBottom: 14,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
     paddingHorizontal: 4,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#94A3B8',
     fontWeight: '700',
   },
-  gamesScroll: {
-    maxHeight: 380,
+  gamesRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    gap: 24,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
   },
-  gamesContent: {
-    paddingBottom: 10,
+  gameItem: {
+    alignItems: 'center',
+    width: 96,
   },
-  gameCard: {
+  tileBox: {
+    width: 96,
+    height: 96,
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'rgba(168, 85, 247, 0.45)',
-    shadowColor: '#8B5CF6',
+    borderColor: 'rgba(236, 72, 153, 0.55)',
+    shadowColor: '#EC4899',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
     elevation: 6,
-  },
-  slotsCardSpacing: {
-    marginTop: 14,
-    borderColor: 'rgba(245, 158, 11, 0.45)',
-    shadowColor: '#F59E0B',
-  },
-  gameCardGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
     position: 'relative',
   },
-  popularBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 12,
-    backgroundColor: 'rgba(239, 68, 68, 0.25)',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+  slotsTileBorder: {
+    borderColor: 'rgba(245, 158, 11, 0.65)',
+    shadowColor: '#F59E0B',
   },
-  popularBadgeText: {
-    color: '#FCA5A5',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  jackpotBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 12,
-    backgroundColor: 'rgba(245, 158, 11, 0.25)',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  jackpotBadgeText: {
-    color: '#FDE68A',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  gameVisualWrap: {
-    marginRight: 12,
-  },
-  characterGlow: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+  tileGradient: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(250, 204, 21, 0.5)',
+    position: 'relative',
   },
-  slotIconGlow: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+  characterContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(253, 230, 138, 0.6)',
+    marginTop: -4,
   },
-  gameInfoWrap: {
-    flex: 1,
+  topRightCoin: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    zIndex: 3,
+  },
+  slotCenterSymbol: {
+    alignItems: 'center',
     justifyContent: 'center',
+    marginTop: -4,
+  },
+  bottomRibbonPink: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(190, 24, 93, 0.88)',
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(253, 224, 71, 0.4)',
+    zIndex: 3,
+  },
+  bottomRibbonText: {
+    color: '#FEF08A',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  bottomRibbonGold: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(180, 83, 9, 0.92)',
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(254, 240, 138, 0.5)',
+    zIndex: 3,
+  },
+  bottomRibbonGoldText: {
+    color: '#FEF08A',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  glassShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   gameTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: '600',
     color: '#FFFFFF',
-    marginBottom: 2,
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
-  gameSub: {
-    fontSize: 11,
-    color: '#CBD5E1',
-    lineHeight: 15,
-    marginBottom: 6,
-  },
-  multiplierRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexWrap: 'wrap',
-  },
-  tagPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  tagPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#E2E8F0',
-  },
-  tagPillJackpot: {
-    backgroundColor: 'rgba(245, 158, 11, 0.25)',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  tagPillJackpotText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FDE047',
-  },
-  tagPillSlotsJackpot: {
-    backgroundColor: 'rgba(239, 68, 68, 0.25)',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-  },
-  tagPillSlotsJackpotText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FEF08A',
-  },
-  playBtnWrap: {
-    marginLeft: 8,
-  },
-  playBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
-    shadowColor: '#EC4899',
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  playBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  footerNoteRow: {
+  dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 14,
+    marginTop: 18,
+    marginBottom: 4,
     gap: 6,
   },
-  footerNoteText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '600',
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  dotActive: {
+    width: 14,
+    backgroundColor: '#10B981',
+    borderRadius: 3,
   },
 });
