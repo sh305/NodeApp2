@@ -1809,7 +1809,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               onPress={handleShareRoom}
             >
               <Image
-                source={require('../assets/icons/Share.png')}
+                source={require('../../assets/icons/Share.png')}
                 style={styles.headerShareIcon}
               />
             </TouchableOpacity>
