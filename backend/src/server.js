@@ -69,7 +69,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'online',
     version: 'v5-live-build',
-    appId: '1919593492737791',
+    appId: process.env.FACEBOOK_APP_ID || 'not_set', hasFbSecret: Boolean(process.env.FACEBOOK_APP_SECRET), fbRedirectUri: process.env.FACEBOOK_REDIRECT_URI || 'default',
     message: 'YoYo Voice Backend Engine is running smoothly 🚀',
     timestamp: new Date(),
   });
