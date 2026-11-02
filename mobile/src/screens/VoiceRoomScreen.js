@@ -63,6 +63,7 @@ import PersonalTasksModal from '../components/PersonalTasksModal';
 import GamesListModal from '../components/GamesListModal';
 import GreedyBabyGameModal from '../components/GreedyBabyGameModal';
 import SuperSlotsGameModal from '../components/SuperSlotsGameModal';
+import AnimalRaceGameModal from '../components/AnimalRaceGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -173,6 +174,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [gamesListModalVisible, setGamesListModalVisible] = useState(false);
   const [greedyBabyModalVisible, setGreedyBabyModalVisible] = useState(false);
   const [superSlotsModalVisible, setSuperSlotsModalVisible] = useState(false);
+  const [animalRaceModalVisible, setAnimalRaceModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3027,6 +3029,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setGreedyBabyModalVisible(true);
           } else if (gameId === 'super_slots') {
             setSuperSlotsModalVisible(true);
+          } else if (gameId === 'animal_race') {
+            setAnimalRaceModalVisible(true);
           }
         }}
       />
@@ -3059,6 +3063,22 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setGreedyBabyModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+
+      {/* ══ ANIMAL RACE (JUNGLE SAFARI) GAME MODAL ══ */}
+      <AnimalRaceGameModal
+        visible={animalRaceModalVisible}
+        onClose={() => setAnimalRaceModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setAnimalRaceModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

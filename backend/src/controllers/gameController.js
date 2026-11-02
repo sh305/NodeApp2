@@ -371,3 +371,173 @@ exports.spinSuperSlots = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ==================== ANIMAL RACE (JUNGLE SAFARI) CONTROLLER ====================
+const ANIMAL_RACERS = [
+  { id: 'lion', name: 'Lion', emoji: '🦁', title: 'King of Jungle', multiplier: 25, weight: 4, color: '#F59E0B' },
+  { id: 'tiger', name: 'Tiger', emoji: '🐯', title: 'Bengal Tiger', multiplier: 15, weight: 8, color: '#EF4444' },
+  { id: 'cheetah', name: 'Cheetah', emoji: '🐆', title: 'Speed Demon', multiplier: 10, weight: 14, color: '#F97316' },
+  { id: 'elephant', name: 'Elephant', emoji: '🐘', title: 'Mighty Jumbo', multiplier: 5, weight: 24, color: '#3B82F6' },
+  { id: 'panda', name: 'Panda', emoji: '🐼', title: 'Bamboo Master', multiplier: 3, weight: 35, color: '#10B981' },
+  { id: 'rabbit', name: 'Rabbit', emoji: '🐰', title: 'Swift Bunny', multiplier: 2, weight: 50, color: '#EC4899' },
+];
+
+let recentRaceWinners = ['rabbit', 'panda', 'elephant', 'tiger', 'rabbit', 'cheetah', 'lion', 'panda'];
+
+function pickWeightedWinner() {
+  const totalWeight = ANIMAL_RACERS.reduce((sum, a) => sum + a.weight, 0);
+  let random = Math.random() * totalWeight;
+  for (const racer of ANIMAL_RACERS) {
+    if (random < racer.weight) {
+      return racer;
+    }
+    random -= racer.weight;
+  }
+  return ANIMAL_RACERS[ANIMAL_RACERS.length - 1];
+}
+
+/**
+ * @desc    Get Animal Race game state & user info
+ * @route   GET /api/games/animal-race/state
+ */
+exports.getAnimalRaceState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let coins = 0;
+    let todayEarnings = 0;
+    let totalWinnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins animalRaceStats');
+      if (user) {
+        coins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.animalRaceStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.animalRaceStats.todayEarnings || 0;
+        }
+        totalWinnings = user.animalRaceStats?.totalWinnings || 0;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      coins,
+      todayEarnings,
+      totalWinnings,
+      animals: ANIMAL_RACERS,
+      recentWinners: recentRaceWinners.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('getAnimalRaceState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Place bet and run the Animal Race (Atomic 1-step flow)
+ * @route   POST /api/games/animal-race/run
+ */
+exports.runAnimalRace = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body; // { [animalId]: betAmount }
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    let totalBet = 0;
+    for (const [animalId, amount] of Object.entries(bets)) {
+      const num = Number(amount);
+      if (num > 0) {
+        totalBet += num;
+      }
+    }
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Bet amount must be greater than 0' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < totalBet) {
+      return res.status(400).json({
+        success: false,
+        code: 'INSUFFICIENT_COINS',
+        message: 'Insufficient coins balance. Please recharge first.',
+        currentCoins: user.coins || 0,
+        requiredCoins: totalBet,
+      });
+    }
+
+    // 1. Pick Winner
+    const winner = pickWeightedWinner();
+
+    // 2. Add winner to recent history
+    recentRaceWinners.unshift(winner.id);
+    if (recentRaceWinners.length > 20) {
+      recentRaceWinners = recentRaceWinners.slice(0, 20);
+    }
+
+    // 3. Calculate winnings
+    const betOnWinner = Number(bets[winner.id]) || 0;
+    const wonCoins = betOnWinner * winner.multiplier;
+
+    // 4. Update user balance & stats atomically
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.animalRaceStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.animalRaceStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + wonCoins;
+
+    const netCoinChange = wonCoins - totalBet;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: netCoinChange,
+          'animalRaceStats.totalWinnings': wonCoins,
+          'animalRaceStats.racesPlayed': 1,
+        },
+        $set: {
+          'animalRaceStats.todayEarnings': newTodayEarnings,
+          'animalRaceStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    // 5. Generate rankings (winner is 1st, others shuffled for visual track)
+    const otherRacers = ANIMAL_RACERS.filter((a) => a.id !== winner.id);
+    for (let i = otherRacers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [otherRacers[i], otherRacers[j]] = [otherRacers[j], otherRacers[i]];
+    }
+    const rankings = [winner.id, ...otherRacers.map((r) => r.id)];
+
+    return res.status(200).json({
+      success: true,
+      winner: winner.id,
+      winnerDetails: winner,
+      rankings,
+      betOnWinner,
+      wonCoins,
+      netProfit: wonCoins - totalBet,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      recentWinners: recentRaceWinners.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('runAnimalRace error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

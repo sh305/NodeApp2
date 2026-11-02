@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { GreedyBabyCharacter, ShinyCoinIcon } from './FoodIcons';
 import { SevenIcon } from './SlotIcons';
+import { LionIcon } from './AnimalIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -105,6 +107,46 @@ function SuperSlotsTile() {
   );
 }
 
+/**
+ * Modern Square Game Tile for Animal Race (Jungle Safari Style)
+ */
+function AnimalRaceTile() {
+  return (
+    <View style={[styles.tileBox, styles.animalTileBorder]}>
+      <LinearGradient
+        colors={['#064E3B', '#047857', '#B45309', '#78350F']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Jungle Sparkles */}
+        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#4ADE80" opacity={0.7} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
+        </Svg>
+
+        {/* Lion King of Jungle */}
+        <View style={styles.slotCenterSymbol}>
+          <LionIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonGreen}>
+          <Text style={styles.bottomRibbonGreenText}>25X 🌴</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
 export default function GamesListModal({
   visible,
   onClose,
@@ -142,7 +184,11 @@ export default function GamesListModal({
               </View>
 
               {/* Games Grid Row (Screenshot matching) */}
-              <View style={styles.gamesRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.gamesRow}
+              >
                 {/* 1. Greedy Baby */}
                 <TouchableOpacity
                   style={styles.gameItem}
@@ -172,7 +218,22 @@ export default function GamesListModal({
                     <T>Super Slots</T>
                   </Text>
                 </TouchableOpacity>
-              </View>
+
+                {/* 3. Animal Race */}
+                <TouchableOpacity
+                  style={styles.gameItem}
+                  activeOpacity={0.82}
+                  onPress={() => {
+                    onClose();
+                    onSelectGame('animal_race');
+                  }}
+                >
+                  <AnimalRaceTile />
+                  <Text style={styles.gameTitle} numberOfLines={1}>
+                    <T>Animal Race</T>
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
 
               {/* Page Indicator Dots (Matching screenshot) */}
               <View style={styles.dotsRow}>
@@ -200,7 +261,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -209,7 +270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
   headerTitle: {
     fontSize: 18,
@@ -233,8 +294,7 @@ const styles = StyleSheet.create({
   gamesRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    gap: 24,
+    gap: 18,
     paddingVertical: 4,
     paddingHorizontal: 4,
   },
@@ -259,6 +319,10 @@ const styles = StyleSheet.create({
   slotsTileBorder: {
     borderColor: 'rgba(245, 158, 11, 0.65)',
     shadowColor: '#F59E0B',
+  },
+  animalTileBorder: {
+    borderColor: 'rgba(34, 197, 94, 0.65)',
+    shadowColor: '#10B981',
   },
   tileGradient: {
     width: '100%',
@@ -316,6 +380,25 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   bottomRibbonGoldText: {
+    color: '#FEF08A',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  bottomRibbonGreen: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(6, 78, 59, 0.92)',
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(74, 222, 128, 0.5)',
+    zIndex: 3,
+  },
+  bottomRibbonGreenText: {
     color: '#FEF08A',
     fontSize: 9.5,
     fontWeight: '800',

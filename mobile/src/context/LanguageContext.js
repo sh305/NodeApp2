@@ -113,6 +113,28 @@ ramCache.set('hi:::Coins added to your wallet successfully!', 'सिक्क�
 ramCache.set('hi:::Greedy Baby Rules', 'ग्रीडी बेबी के नियम');
 ramCache.set('hi:::Got It!', 'समझ गया!');
 ramCache.set('hi:::Super Slots', 'सुपर स्लॉट्स');
+ramCache.set('hi:::Animal Race', 'एनिमल रेस');
+ramCache.set('hi:::Jungle Safari', 'जंगल सफारी');
+ramCache.set('hi:::Safari Live Track', 'सफारी लाइव ट्रैक');
+ramCache.set('hi:::RACE IN PROGRESS!', 'दौड़ जारी है!');
+ramCache.set('hi:::READY FOR RACE', 'दौड़ के लिए तैयार');
+ramCache.set('hi:::Pick Your Winning Animal', 'अपना जीतने वाला जानवर चुनें');
+ramCache.set('hi:::Tap to Bet', 'दांव लगाने के लिए टैप करें');
+ramCache.set('hi:::START RACE', 'दौड़ शुरू करें');
+ramCache.set('hi:::RACING...', 'दौड़ रहे हैं...');
+ramCache.set('hi:::PLACE BET TO RACE', 'दौड़ के लिए दांव लगाएं');
+ramCache.set('hi:::CONGRATULATIONS!', 'बधाई हो!');
+ramCache.set('hi:::RACE FINISHED', 'दौड़ समाप्त');
+ramCache.set('hi:::WON', 'जीता');
+ramCache.set('hi:::Coins Won', 'सिक्के जीते');
+ramCache.set('hi:::Lion', 'शेर');
+ramCache.set('hi:::Tiger', 'बाघ');
+ramCache.set('hi:::Cheetah', 'चीता');
+ramCache.set('hi:::Elephant', 'हाथी');
+ramCache.set('hi:::Panda', 'पांडा');
+ramCache.set('hi:::Rabbit', 'खरगोश');
+ramCache.set('hi:::Animal Race Rules', 'एनिमल रेस के नियम');
+ramCache.set('hi:::GOT IT', 'समझ गया');
 ramCache.set('hi:::500X JACKPOT', '500 गुना जैकपॉट');
 ramCache.set('hi:::SPIN', 'स्पिन');
 ramCache.set('hi:::SPINNING...', 'घूम रहा है...');
@@ -596,6 +618,27 @@ export const LanguageProvider = ({ children }) => {
       'Premium Slots',
       'Zoo Slots',
       'Super Slots',
+      'Animal Race',
+      'Jungle Safari',
+      'Safari Live Track',
+      'RACE IN PROGRESS!',
+      'READY FOR RACE',
+      'Pick Your Winning Animal',
+      'Tap to Bet',
+      'RACING...',
+      'PLACE BET TO RACE',
+      'CONGRATULATIONS!',
+      'RACE FINISHED',
+      'WON',
+      'Coins Won',
+      'Lion',
+      'Tiger',
+      'Cheetah',
+      'Elephant',
+      'Panda',
+      'Rabbit',
+      'Animal Race Rules',
+      'GOT IT',
       'Crazy Lion',
       'Bingo Slots',
       "Bull's Reign",

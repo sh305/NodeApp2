@@ -6,6 +6,8 @@ const {
   claimGreedyBabyPayout,
   getSuperSlotsState,
   spinSuperSlots,
+  getAnimalRaceState,
+  runAnimalRace,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -17,5 +19,9 @@ router.post('/greedy-baby/payout', protect, claimGreedyBabyPayout);
 // Super Slots Routes
 router.get('/super-slots/state', getSuperSlotsState);
 router.post('/super-slots/spin', protect, spinSuperSlots);
+
+// Animal Race (Jungle Safari) Routes
+router.get('/animal-race/state', getAnimalRaceState);
+router.post('/animal-race/run', protect, runAnimalRace);
 
 module.exports = router;
