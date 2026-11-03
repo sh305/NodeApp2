@@ -510,7 +510,16 @@ export default function CarRouletteGameModal({
 
                 {gamePhase === 'RESULT' && winResult && (
                   <Animated.View style={[styles.resultCenterBadge, { opacity: winnerGlowAnim }]}>
-                    <Text style={styles.winnerEmoji}>{winResult.winner?.emoji || '🏆'}</Text>
+                    {(() => {
+                      const WinnerIcon = winResult.winner?.icon;
+                      return WinnerIcon ? (
+                        <View style={styles.winnerIconWrap}>
+                          <WinnerIcon size={38} />
+                        </View>
+                      ) : (
+                        <Text style={styles.winnerEmoji}>{winResult.winner?.emoji || '🏆'}</Text>
+                      );
+                    })()}
                     <Text style={styles.winnerText}>{winResult.winner?.name} {winResult.winner?.multiplier}X</Text>
                     {winResult.won ? (
                       <Text style={styles.winPrizeText}>+🪙 {winResult.amount.toLocaleString()}</Text>
@@ -654,9 +663,29 @@ export default function CarRouletteGameModal({
                 {recentWinners.map((brandId, index) => {
                   const b = CAR_BRANDS.find((c) => c.id === brandId);
                   if (!b) return null;
+                  const BrandIcon = b.icon;
+                  const isLatest = index === 0;
                   return (
-                    <View key={`${brandId}-${index}`} style={[styles.historyBadge, { borderColor: b.color }]}>
-                      <Text style={styles.historyBadgeText}>{b.emoji} {b.multiplier}X</Text>
+                    <View
+                      key={`${brandId}-${index}`}
+                      style={[
+                        styles.historyBadge,
+                        { borderColor: b.color },
+                        isLatest && styles.historyBadgeLatest,
+                      ]}
+                    >
+                      <View style={styles.historyBadgeIconWrap}>
+                        <BrandIcon size={22} />
+                      </View>
+                      <View style={styles.historyBadgeInfo}>
+                        <Text style={styles.historyBadgeName} numberOfLines={1}>
+                          {b.name === 'Mercedes-Benz' ? 'Benz' : b.name}
+                        </Text>
+                        <Text style={[styles.historyBadgeMult, { color: b.color }]}>
+                          {b.multiplier}X
+                        </Text>
+                      </View>
+                      {isLatest && <View style={styles.latestDot} />}
                     </View>
                   );
                 })}
@@ -795,7 +824,16 @@ export default function CarRouletteGameModal({
                   style={styles.winDialogGradient}
                 >
                   <Text style={styles.winBigTitle}>🎉 <T>BIG WIN!</T> 🎉</Text>
-                  <Text style={styles.winCarEmoji}>{winResult.winner?.emoji}</Text>
+                  {(() => {
+                    const WinnerIcon = winResult.winner?.icon;
+                    return WinnerIcon ? (
+                      <View style={styles.winCarIconContainer}>
+                        <WinnerIcon size={64} />
+                      </View>
+                    ) : (
+                      <Text style={styles.winCarEmoji}>{winResult.winner?.emoji}</Text>
+                    );
+                  })()}
                   <Text style={styles.winCarName}>{winResult.winner?.name}</Text>
                   <Text style={styles.winMultiplierTag}>{winResult.winner?.multiplier}X MULTIPLIER</Text>
 
@@ -1202,25 +1240,75 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F111E',
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1E1E32',
   },
   historyLabel: {
     color: '#94A3B8',
     fontSize: 10,
     fontWeight: '800',
-    marginRight: 6,
+    marginRight: 8,
   },
   historyScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   historyBadge: {
-    backgroundColor: '#1E1E2E',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#161628',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    position: 'relative',
+  },
+  historyBadgeLatest: {
+    backgroundColor: '#2A1F45',
+  },
+  historyBadgeIconWrap: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 5,
+  },
+  historyBadgeInfo: {
+    justifyContent: 'center',
+  },
+  historyBadgeName: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  historyBadgeMult: {
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  latestDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EF4444',
+  },
+  winnerIconWrap: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  winCarIconContainer: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 6,
   },
   historyBadgeText: {
     color: '#E2E8F0',
