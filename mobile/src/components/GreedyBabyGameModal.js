@@ -61,6 +61,8 @@ export default function GreedyBabyGameModal({
   // Balance & Earnings State
   const [userCoins, setUserCoins] = useState(currentUser?.coins || 0);
   const [todayEarnings, setTodayEarnings] = useState(0);
+  const [topWinnerCoins, setTopWinnerCoins] = useState(0);
+  const [weeklyPrizeVal, setWeeklyPrizeVal] = useState(0);
 
   // Betting & Game Round State
   const [selectedChip, setSelectedChip] = useState(10);
@@ -107,6 +109,12 @@ export default function GreedyBabyGameModal({
         }
         if (Array.isArray(res.data.recentResults) && res.data.recentResults.length > 0) {
           setRecentResults(res.data.recentResults);
+        }
+        if (res.data.leaderboard?.topWinner?.coins !== undefined) {
+          setTopWinnerCoins(res.data.leaderboard.topWinner.coins);
+        }
+        if (res.data.leaderboard?.weeklyPrize !== undefined) {
+          setWeeklyPrizeVal(res.data.leaderboard.weeklyPrize);
         }
       }
     } catch (e) {
@@ -582,7 +590,7 @@ export default function GreedyBabyGameModal({
             <Text style={styles.footerPrizeTitle}>🌍 <T>Weekly Prize</T></Text>
             <View style={styles.coinValRow}>
               <ShinyCoinIcon size={12} />
-              <Text style={styles.footerPrizeVal}>300K</Text>
+              <Text style={styles.footerPrizeVal}>{weeklyPrizeVal ? Number(weeklyPrizeVal).toLocaleString() : '0'}</Text>
             </View>
           </View>
 
@@ -592,7 +600,7 @@ export default function GreedyBabyGameModal({
             <View style={styles.topBadge}><Text style={styles.topBadgeText}>TOP 1</Text></View>
             <View style={styles.coinValRow}>
               <ShinyCoinIcon size={12} />
-              <Text style={styles.footerWinnerCoins}>69,251,000</Text>
+              <Text style={styles.footerWinnerCoins}>{topWinnerCoins ? Number(topWinnerCoins).toLocaleString() : '0'}</Text>
             </View>
           </View>
 
@@ -602,7 +610,7 @@ export default function GreedyBabyGameModal({
             <Text style={styles.todayLabel}><T>Today</T></Text>
             <View style={styles.coinValRow}>
               <ShinyCoinIcon size={12} />
-              <Text style={styles.footerWinnerCoins}>4,648,800</Text>
+              <Text style={styles.footerWinnerCoins}>{Number(todayEarnings || 0).toLocaleString()}</Text>
             </View>
           </View>
         </LinearGradient>

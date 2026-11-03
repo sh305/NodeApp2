@@ -41,19 +41,37 @@ exports.getGreedyBabyState = async (req, res) => {
       }
     }
 
-    // Default mock leaderboard if none exists
+    // Real leaderboard from DB (defaults to 0 if no winners yet)
+    let topUser = null;
+    let todayUser = null;
+    try {
+      topUser = await User.findOne({ 'greedyBabyStats.totalWinnings': { $gt: 0 } })
+        .sort({ 'greedyBabyStats.totalWinnings': -1 })
+        .select('name avatar greedyBabyStats');
+
+      const todayStr = getTodayString();
+      todayUser = await User.findOne({
+        'greedyBabyStats.lastEarningsDate': todayStr,
+        'greedyBabyStats.todayEarnings': { $gt: 0 },
+      })
+        .sort({ 'greedyBabyStats.todayEarnings': -1 })
+        .select('name avatar greedyBabyStats');
+    } catch (e) {
+      // ignore
+    }
+
     const leaderboard = {
-      weeklyPrize: 300000,
-      topWinner: {
-        name: 'King_Raftar',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        coins: 69251000,
-      },
-      todayWinner: {
-        name: 'Aman_Star',
-        avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-        coins: 4648800,
-      },
+      weeklyPrize: 0,
+      topWinner: topUser ? {
+        name: topUser.name || 'User',
+        avatar: topUser.avatar || '',
+        coins: topUser.greedyBabyStats?.totalWinnings || 0,
+      } : { name: '', avatar: '', coins: 0 },
+      todayWinner: todayUser ? {
+        name: todayUser.name || 'User',
+        avatar: todayUser.avatar || '',
+        coins: todayUser.greedyBabyStats?.todayEarnings || 0,
+      } : { name: '', avatar: '', coins: 0 },
     };
 
     return res.status(200).json({

@@ -3,6 +3,7 @@ import Svg, {
   Path,
   Circle,
   Rect,
+  Ellipse,
   G,
   Defs,
   LinearGradient,
