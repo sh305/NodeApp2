@@ -753,6 +753,8 @@ function pickRandomZooSymbol() {
   return 'banana';
 }
 
+let recentZooWinners = ['wild_paw', 'lion', 'panda', 'tiger', 'monkey', 'elephant', 'banana', 'lion'];
+
 /**
  * @desc    Get Zoo Slots game state & paytable
  * @route   GET /api/games/zoo-slots/state
@@ -780,6 +782,7 @@ exports.getZooSlotsState = async (req, res) => {
       userCoins,
       todayEarnings,
       jackpotPool: 888888,
+      recentWinners: recentZooWinners.slice(0, 10),
     });
   } catch (error) {
     console.error('getZooSlotsState error:', error);
@@ -891,6 +894,30 @@ exports.spinZooSlots = async (req, res) => {
     const netCoinChange = wonCoins - bet;
     const todayStr = getTodayString();
 
+    // 3. Determine representative outcome symbol for recent history
+    let outcomeSymbol = 'banana';
+    if (multiplier > 0) {
+      if (wildCount === 3) {
+        outcomeSymbol = 'wild_paw';
+      } else {
+        const nonWilds = finalReels.filter((s) => s !== 'wild_paw');
+        outcomeSymbol = nonWilds.length > 0 ? nonWilds[0] : 'wild_paw';
+      }
+    } else {
+      if (r1 === r2 || r1 === r3) {
+        outcomeSymbol = r1;
+      } else if (r2 === r3) {
+        outcomeSymbol = r2;
+      } else {
+        outcomeSymbol = finalReels[1] || finalReels[0];
+      }
+    }
+
+    recentZooWinners.unshift(outcomeSymbol);
+    if (recentZooWinners.length > 20) {
+      recentZooWinners = recentZooWinners.slice(0, 20);
+    }
+
     let currentTodayEarnings = 0;
     if (user.zooSlotsStats?.lastEarningsDate === todayStr) {
       currentTodayEarnings = user.zooSlotsStats.todayEarnings || 0;
@@ -925,6 +952,7 @@ exports.spinZooSlots = async (req, res) => {
       spentCoins: bet,
       remainingCoins: updatedUser.coins,
       todayEarnings: newTodayEarnings,
+      recentWinners: recentZooWinners.slice(0, 10),
     });
   } catch (error) {
     console.error('spinZooSlots error:', error);

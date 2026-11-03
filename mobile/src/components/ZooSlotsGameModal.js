@@ -59,6 +59,16 @@ export default function ZooSlotsGameModal({
   // Balance & Stats
   const [userCoins, setUserCoins] = useState(currentUser?.coins || 0);
   const [todayEarnings, setTodayEarnings] = useState(0);
+  const [recentWinners, setRecentWinners] = useState([
+    'wild_paw',
+    'lion',
+    'panda',
+    'tiger',
+    'monkey',
+    'elephant',
+    'banana',
+    'lion',
+  ]);
 
   // Betting & Spin State
   const [selectedChip, setSelectedChip] = useState(10);
@@ -104,6 +114,9 @@ export default function ZooSlotsGameModal({
         }
         if (res.data.todayEarnings !== undefined) {
           setTodayEarnings(res.data.todayEarnings);
+        }
+        if (res.data.recentWinners?.length) {
+          setRecentWinners(res.data.recentWinners);
         }
       }
     } catch (err) {
@@ -172,6 +185,7 @@ export default function ZooSlotsGameModal({
         wonCoins,
         remainingCoins,
         todayEarnings: newTodayEarnings,
+        recentWinners: newHistory,
       } = res.data;
 
       // Update local balance immediately
@@ -221,11 +235,11 @@ export default function ZooSlotsGameModal({
               clearInterval(respinInterval);
               setReel3(finalReels[2]);
               setIsRespinning(false);
-              finalizeSpinResult(finalReels, multiplier, wonCoins, wildBoost);
+              finalizeSpinResult(finalReels, multiplier, wonCoins, wildBoost, newHistory);
             }
           }, 80);
         } else {
-          finalizeSpinResult(finalReels, multiplier, wonCoins, wildBoost);
+          finalizeSpinResult(finalReels, multiplier, wonCoins, wildBoost, newHistory);
         }
       }, 1500);
     } catch (err) {
@@ -237,8 +251,20 @@ export default function ZooSlotsGameModal({
   }, [isSpinning, userCoins, selectedChip, t, showToast, onCoinBalanceUpdate, soundEnabled, respinBannerAnim]);
 
   // Finalize Spin Outcome
-  const finalizeSpinResult = (finalReels, multiplier, wonCoins, wildBoost) => {
+  const finalizeSpinResult = (finalReels, multiplier, wonCoins, wildBoost, newHistory) => {
     setIsSpinning(false);
+
+    if (newHistory && newHistory.length > 0) {
+      setRecentWinners(newHistory);
+    } else {
+      let outcome = 'banana';
+      if (multiplier > 0) {
+        outcome = finalReels.find((s) => s !== 'wild_paw') || 'wild_paw';
+      } else {
+        outcome = finalReels[1] || finalReels[0];
+      }
+      setRecentWinners((prev) => [outcome, ...prev.slice(0, 9)]);
+    }
 
     if (wildBoost > 1) {
       setWildBoostActive(wildBoost);
@@ -452,6 +478,47 @@ export default function ZooSlotsGameModal({
               {/* Center Payline Indicator Laser Beam */}
               <View style={styles.paylineBeam} />
             </LinearGradient>
+          </View>
+
+          {/* ══ RECENT SPINS / WINNERS HISTORY RECORD ══ */}
+          <View style={styles.historyContainer}>
+            <Text style={styles.historyLabel}><T>Recent</T>:</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.historyScroll}
+            >
+              {recentWinners.map((item, index) => {
+                const symId = typeof item === 'object' ? item.symbolId || item.id : item;
+                const s = ZOO_SYMBOLS.find((c) => c.id === symId);
+                if (!s) return null;
+                const IconComp = s.icon;
+                const isLatest = index === 0;
+                return (
+                  <View
+                    key={`${symId}-${index}`}
+                    style={[
+                      styles.historyBadge,
+                      { borderColor: s.color },
+                      isLatest && styles.historyBadgeLatest,
+                    ]}
+                  >
+                    <View style={styles.historyBadgeIconWrap}>
+                      <IconComp size={20} />
+                    </View>
+                    <View style={styles.historyBadgeInfo}>
+                      <Text style={styles.historyBadgeName} numberOfLines={1}>
+                        {s.name.replace('Golden ', '').replace('Bamboo ', '').replace('Lucky ', '').replace('Playful ', '')}
+                      </Text>
+                      <Text style={[styles.historyBadgeMult, { color: s.color }]}>
+                        {s.multiplier}X
+                      </Text>
+                    </View>
+                    {isLatest && <View style={styles.latestDot} />}
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
 
           {/* ══ MINI QUICK PAYTABLE PREVIEW ══ */}
@@ -881,9 +948,73 @@ const styles = StyleSheet.create({
     backgroundColor: '#F59E0B66',
     zIndex: 10,
   },
+  historyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 14,
+    marginTop: 8,
+    backgroundColor: '#062E1C',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#15803D',
+  },
+  historyLabel: {
+    color: '#86EFAC',
+    fontSize: 10,
+    fontWeight: '800',
+    marginRight: 8,
+  },
+  historyScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  historyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F3822',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    position: 'relative',
+  },
+  historyBadgeLatest: {
+    backgroundColor: '#1E3A2F',
+  },
+  historyBadgeIconWrap: {
+    width: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 5,
+  },
+  historyBadgeInfo: {
+    justifyContent: 'center',
+  },
+  historyBadgeName: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  historyBadgeMult: {
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  latestDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EF4444',
+  },
   paytableStrip: {
     marginHorizontal: 14,
-    marginTop: 10,
+    marginTop: 6,
     maxHeight: 52,
   },
   paytableStripContent: {

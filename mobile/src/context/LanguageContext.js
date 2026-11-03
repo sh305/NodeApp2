@@ -151,6 +151,7 @@ ramCache.set('hi:::Volkswagen', 'फॉक्सवैगन');
 ramCache.set('hi:::SPIN NOW', 'अभी स्पिन करें');
 ramCache.set('hi:::Rebet', 'दोबारा दांव');
 ramCache.set('hi:::Please place your bet on at least one car brand!', 'कृपया कम से कम एक कार ब्रांड पर अपना दांव लगाएं!');
+ramCache.set('hi:::Recent', 'हालिया');
 ramCache.set('hi:::Zoo Slots', 'चिड़ियाघर स्लॉट्स');
 ramCache.set('hi:::Wild Animal Reels • Bamboo Respins', 'वाइल्ड एनिमल रील्स • बैम्बू री-स्पिन्स');
 ramCache.set('hi:::Zoo Slots Paytable & Rules', 'ज़ू स्लॉट्स पे-टेबल और नियम');
@@ -650,6 +651,7 @@ export const LanguageProvider = ({ children }) => {
       'Games',
       'Space Voyage',
       'Premium Slots',
+      'Recent',
       'Zoo Slots',
       'Super Slots',
       'Animal Race',
@@ -689,6 +691,7 @@ export const LanguageProvider = ({ children }) => {
       'SPIN NOW',
       'Rebet',
       'Please place your bet on at least one car brand!',
+      'Recent',
       'Zoo Slots',
       'Wild Animal Reels • Bamboo Respins',
       'Zoo Slots Paytable & Rules',
