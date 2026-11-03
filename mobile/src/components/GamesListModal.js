@@ -18,6 +18,7 @@ import { GreedyBabyCharacter, ShinyCoinIcon } from './FoodIcons';
 import { SevenIcon } from './SlotIcons';
 import { LionIcon } from './AnimalIcons';
 import { SteeringWheelIcon } from './CarIcons';
+import { GoldenPawIcon } from './ZooSlotIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -189,6 +190,47 @@ function CarRouletteTile() {
   );
 }
 
+
+/**
+ * Modern Square Game Tile for Zoo Slots (Wild Animal Jungle Style)
+ */
+function ZooSlotsTile() {
+  return (
+    <View style={[styles.tileBox, styles.zooSlotsTileBorder]}>
+      <LinearGradient
+        colors={['#064E3B', '#15803D', '#B45309', '#022C22']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Jungle Sparkles */}
+        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#4ADE80" opacity={0.7} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
+        </Svg>
+
+        {/* Golden Paw Wild Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <GoldenPawIcon size={52} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonAmber}>
+          <Text style={styles.bottomRibbonAmberText}>500X 🐾</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
 export default function GamesListModal({
   visible,
   onClose,
@@ -288,6 +330,21 @@ export default function GamesListModal({
                   <CarRouletteTile />
                   <Text style={styles.gameTitle} numberOfLines={1}>
                     <T>Car Roulette</T>
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 5. Zoo Slots */}
+                <TouchableOpacity
+                  style={styles.gameItem}
+                  activeOpacity={0.82}
+                  onPress={() => {
+                    onClose();
+                    onSelectGame('zoo_slots');
+                  }}
+                >
+                  <ZooSlotsTile />
+                  <Text style={styles.gameTitle} numberOfLines={1}>
+                    <T>Zoo Slots</T>
                   </Text>
                 </TouchableOpacity>
               </ScrollView>

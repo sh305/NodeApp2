@@ -725,3 +725,209 @@ exports.spinCarRoulette = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ═══════════════════════════════════════════════════════════════
+// 5. ZOO SLOTS / WILD ANIMAL REELS CONTROLLER
+// ═══════════════════════════════════════════════════════════════
+
+const ZOO_SLOT_SYMBOLS = [
+  { id: 'wild_paw', name: 'Golden Paw', emoji: '🐾', multiplier: 500, weight: 3, isWild: true },
+  { id: 'lion', name: 'Lion King', emoji: '🦁', multiplier: 250, weight: 4 },
+  { id: 'tiger', name: 'Tiger Cub', emoji: '🐯', multiplier: 100, weight: 7 },
+  { id: 'panda', name: 'Bamboo Panda', emoji: '🐼', multiplier: 50, weight: 12 },
+  { id: 'elephant', name: 'Lucky Elephant', emoji: '🐘', multiplier: 25, weight: 18 },
+  { id: 'monkey', name: 'Playful Monkey', emoji: '🐵', multiplier: 15, weight: 24 },
+  { id: 'banana', name: 'Golden Bananas', emoji: '🍌', multiplier: 8, weight: 32 },
+];
+
+function pickRandomZooSymbol() {
+  const totalWeight = ZOO_SLOT_SYMBOLS.reduce((sum, s) => sum + s.weight, 0);
+  let randomVal = Math.random() * totalWeight;
+  for (const s of ZOO_SLOT_SYMBOLS) {
+    if (randomVal < s.weight) {
+      return s.id;
+    }
+    randomVal -= s.weight;
+  }
+  return 'banana';
+}
+
+/**
+ * @desc    Get Zoo Slots game state & paytable
+ * @route   GET /api/games/zoo-slots/state
+ */
+exports.getZooSlotsState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins zooSlotsStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.zooSlotsStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.zooSlotsStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      paytable: ZOO_SLOT_SYMBOLS,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 888888,
+    });
+  } catch (error) {
+    console.error('getZooSlotsState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Execute a spin in Zoo Slots (with Dynamic Wild & Bamboo Respin)
+ * @route   POST /api/games/zoo-slots/spin
+ */
+exports.spinZooSlots = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { betAmount } = req.body;
+    const bet = Math.floor(Number(betAmount) || 0);
+
+    const validBets = [10, 50, 100, 1000, 10000];
+    if (!validBets.includes(bet)) {
+      return res.status(400).json({ success: false, message: 'Invalid bet amount' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < bet) {
+      return res.status(400).json({
+        success: false,
+        code: 'INSUFFICIENT_COINS',
+        message: 'Insufficient coins balance. Please recharge first.',
+        currentCoins: user.coins || 0,
+        requiredCoins: bet,
+      });
+    }
+
+    // 1. Initial 3 reels spin
+    let r1 = pickRandomZooSymbol();
+    let r2 = pickRandomZooSymbol();
+    let r3 = pickRandomZooSymbol();
+    let initialReels = [r1, r2, r3];
+
+    let respinTriggered = false;
+
+    // Dynamic Bamboo Respin: If reel 1 and 2 match or 1 is Wild, but reel 3 misses
+    if ((r1 === r2 || r1 === 'wild_paw' || r2 === 'wild_paw') && r3 !== r1 && r3 !== r2) {
+      // 30% chance for Bamboo Respin mystery trigger
+      if (Math.random() < 0.30) {
+        respinTriggered = true;
+        // Respin reel 3
+        r3 = pickRandomZooSymbol();
+      }
+    }
+
+    const finalReels = [r1, r2, r3];
+
+    // 2. Calculate Payout with Dynamic Wild Substitution
+    let multiplier = 0;
+    let winType = 'none';
+    let wildBoost = 1;
+
+    const hasWild = finalReels.includes('wild_paw');
+    const wildCount = finalReels.filter((s) => s === 'wild_paw').length;
+
+    // Check for 3 of a kind (direct or with wild)
+    if (wildCount === 3) {
+      multiplier = 500;
+      winType = 'jackpot';
+    } else {
+      // Find non-wild symbols
+      const nonWilds = finalReels.filter((s) => s !== 'wild_paw');
+      const uniqueNonWilds = [...new Set(nonWilds)];
+
+      if (uniqueNonWilds.length === 1) {
+        // All non-wilds are identical -> 3 matching line!
+        const matchedSymbolId = uniqueNonWilds[0];
+        const matchConfig = ZOO_SLOT_SYMBOLS.find((s) => s.id === matchedSymbolId);
+        multiplier = matchConfig ? matchConfig.multiplier : 8;
+
+        if (hasWild) {
+          // Dynamic Paw Roar Multiplier: 2x or 3x boost!
+          wildBoost = Math.random() < 0.4 ? 3 : 2;
+          multiplier *= wildBoost;
+        }
+
+        winType = multiplier >= 200 ? 'jackpot' : 'win';
+      } else if (wildCount === 2) {
+        multiplier = 10;
+        winType = 'small';
+      } else if (wildCount === 1) {
+        multiplier = 2;
+        winType = 'small';
+      } else {
+        // Check for any 3 animals (excluding bananas)
+        const isAllAnimals = finalReels.every((s) => s !== 'banana' && s !== 'wild_paw');
+        if (isAllAnimals) {
+          multiplier = 3;
+          winType = 'small';
+        }
+      }
+    }
+
+    const wonCoins = bet * multiplier;
+    const netCoinChange = wonCoins - bet;
+    const todayStr = getTodayString();
+
+    let currentTodayEarnings = 0;
+    if (user.zooSlotsStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.zooSlotsStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = Math.max(0, currentTodayEarnings + wonCoins);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: netCoinChange,
+          'zooSlotsStats.totalWinnings': wonCoins,
+          'zooSlotsStats.spinsPlayed': 1,
+        },
+        $set: {
+          'zooSlotsStats.todayEarnings': newTodayEarnings,
+          'zooSlotsStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      initialReels,
+      reels: finalReels,
+      respinTriggered,
+      wildBoost,
+      multiplier,
+      wonCoins,
+      winType,
+      spentCoins: bet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+    });
+  } catch (error) {
+    console.error('spinZooSlots error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

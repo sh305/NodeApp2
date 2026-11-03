@@ -65,6 +65,7 @@ import GreedyBabyGameModal from '../components/GreedyBabyGameModal';
 import SuperSlotsGameModal from '../components/SuperSlotsGameModal';
 import AnimalRaceGameModal from '../components/AnimalRaceGameModal';
 import CarRouletteGameModal from '../components/CarRouletteGameModal';
+import ZooSlotsGameModal from '../components/ZooSlotsGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -177,6 +178,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [superSlotsModalVisible, setSuperSlotsModalVisible] = useState(false);
   const [animalRaceModalVisible, setAnimalRaceModalVisible] = useState(false);
   const [carRouletteModalVisible, setCarRouletteModalVisible] = useState(false);
+  const [zooSlotsModalVisible, setZooSlotsModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3033,6 +3035,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setSuperSlotsModalVisible(true);
           } else if (gameId === 'animal_race') {
             setAnimalRaceModalVisible(true);
+          } else if (gameId === 'car_roulette') {
+            setCarRouletteModalVisible(true);
+          } else if (gameId === 'zoo_slots') {
+            setZooSlotsModalVisible(true);
           }
         }}
       />
@@ -3081,6 +3087,38 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setAnimalRaceModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+
+      {/* ══ CAR ROULETTE (LUXURY BRAND SPIN) GAME MODAL ══ */}
+      <CarRouletteGameModal
+        visible={carRouletteModalVisible}
+        onClose={() => setCarRouletteModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setCarRouletteModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+
+      {/* ══ ZOO SLOTS (WILD ANIMAL REELS) GAME MODAL ══ */}
+      <ZooSlotsGameModal
+        visible={zooSlotsModalVisible}
+        onClose={() => setZooSlotsModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setZooSlotsModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

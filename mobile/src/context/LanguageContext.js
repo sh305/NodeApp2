@@ -151,6 +151,23 @@ ramCache.set('hi:::Volkswagen', 'फॉक्सवैगन');
 ramCache.set('hi:::SPIN NOW', 'अभी स्पिन करें');
 ramCache.set('hi:::Rebet', 'दोबारा दांव');
 ramCache.set('hi:::Please place your bet on at least one car brand!', 'कृपया कम से कम एक कार ब्रांड पर अपना दांव लगाएं!');
+ramCache.set('hi:::Zoo Slots', 'चिड़ियाघर स्लॉट्स');
+ramCache.set('hi:::Wild Animal Reels • Bamboo Respins', 'वाइल्ड एनिमल रील्स • बैम्बू री-स्पिन्स');
+ramCache.set('hi:::Zoo Slots Paytable & Rules', 'ज़ू स्लॉट्स पे-टेबल और नियम');
+ramCache.set('hi:::Dynamic Special Features', 'डायनामिक स्पेशल फीचर्स');
+ramCache.set('hi:::Golden Paw', 'गोल्डन पंजा');
+ramCache.set('hi:::Golden Paw (WILD)', 'गोल्डन पंजा (वाइल्ड)');
+ramCache.set('hi:::Lion King', 'शेर राजा');
+ramCache.set('hi:::Tiger Cub', 'बाघ का बच्चा');
+ramCache.set('hi:::Bamboo Panda', 'बैम्बू पांडा');
+ramCache.set('hi:::Lucky Elephant', 'लकी हाथी');
+ramCache.set('hi:::Playful Monkey', 'नटखट बंदर');
+ramCache.set('hi:::Golden Bananas', 'सोने के केले');
+ramCache.set('hi:::Bamboo Respin', 'बैम्बू री-स्पिन');
+ramCache.set('hi:::Auto Spin Disabled', 'ऑटो स्पिन बंद');
+ramCache.set('hi:::Auto Spin Activated!', 'ऑटो स्पिन चालू!');
+ramCache.set('hi:::Max Bet Set', 'अधिकतम दांव सेट');
+ramCache.set('hi:::MEGA JUNGLE WIN!', 'मेगा जंगल जीत!');
 ramCache.set('hi:::GOT IT', 'समझ गया');
 ramCache.set('hi:::500X JACKPOT', '500 गुना जैकपॉट');
 ramCache.set('hi:::SPIN', 'स्पिन');
@@ -672,6 +689,23 @@ export const LanguageProvider = ({ children }) => {
       'SPIN NOW',
       'Rebet',
       'Please place your bet on at least one car brand!',
+      'Zoo Slots',
+      'Wild Animal Reels • Bamboo Respins',
+      'Zoo Slots Paytable & Rules',
+      'Dynamic Special Features',
+      'Golden Paw',
+      'Golden Paw (WILD)',
+      'Lion King',
+      'Tiger Cub',
+      'Bamboo Panda',
+      'Lucky Elephant',
+      'Playful Monkey',
+      'Golden Bananas',
+      'Bamboo Respin',
+      'Auto Spin Disabled',
+      'Auto Spin Activated!',
+      'Max Bet Set',
+      'MEGA JUNGLE WIN!',
       'GOT IT',
       'Crazy Lion',
       'Bingo Slots',

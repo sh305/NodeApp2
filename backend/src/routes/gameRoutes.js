@@ -10,6 +10,8 @@ const {
   runAnimalRace,
   getCarRouletteState,
   spinCarRoulette,
+  getZooSlotsState,
+  spinZooSlots,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -29,5 +31,9 @@ router.post('/animal-race/run', protect, runAnimalRace);
 // Car Roulette (Luxury Brand Spin) Routes
 router.get('/car-roulette/state', getCarRouletteState);
 router.post('/car-roulette/spin', protect, spinCarRoulette);
+
+// Zoo Slots (Wild Animal Reels) Routes
+router.get('/zoo-slots/state', getZooSlotsState);
+router.post('/zoo-slots/spin', protect, spinZooSlots);
 
 module.exports = router;
