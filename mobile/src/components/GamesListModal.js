@@ -20,12 +20,21 @@ import { LionIcon } from './AnimalIcons';
 import { SteeringWheelIcon } from './CarIcons';
 import { GoldenPawIcon } from './ZooSlotIcons';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// 3-Column Responsive Grid Calculations
+const HORIZONTAL_PADDING = 16;
+const GRID_GAP = 12;
+const NUM_COLUMNS = 3;
+const ITEM_WIDTH = Math.floor(
+  (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS
+);
 
 /**
  * Modern Square Game Tile for Greedy Baby
  */
 function GreedyBabyTile() {
+  const iconSize = Math.round(ITEM_WIDTH * 0.54);
   return (
     <View style={styles.tileBox}>
       <LinearGradient
@@ -35,7 +44,7 @@ function GreedyBabyTile() {
         style={styles.tileGradient}
       >
         {/* Star Sparkles */}
-        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
           <Circle cx="16" cy="18" r="1.5" fill="#FDE047" opacity={0.85} />
           <Circle cx="80" cy="20" r="2" fill="#FDE047" opacity={0.9} />
           <Circle cx="20" cy="74" r="1.5" fill="#FDE047" opacity={0.7} />
@@ -45,12 +54,12 @@ function GreedyBabyTile() {
 
         {/* Top-Right Coin Badge */}
         <View style={styles.topRightCoin}>
-          <ShinyCoinIcon size={18} />
+          <ShinyCoinIcon size={16} />
         </View>
 
         {/* Cute Greedy Baby Character */}
         <View style={styles.characterContainer}>
-          <GreedyBabyCharacter size={58} />
+          <GreedyBabyCharacter size={iconSize} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -72,6 +81,7 @@ function GreedyBabyTile() {
  * Modern Square Game Tile for Super Slots (Crazy 777 Casino Style)
  */
 function SuperSlotsTile() {
+  const iconSize = Math.round(ITEM_WIDTH * 0.50);
   return (
     <View style={[styles.tileBox, styles.slotsTileBorder]}>
       <LinearGradient
@@ -81,7 +91,7 @@ function SuperSlotsTile() {
         style={styles.tileGradient}
       >
         {/* Fiery Star Sparkles */}
-        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
           <Circle cx="16" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
           <Circle cx="82" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
           <Circle cx="20" cy="74" r="1.5" fill="#FDE047" opacity={0.7} />
@@ -91,7 +101,7 @@ function SuperSlotsTile() {
 
         {/* Lucky 7 Symbol */}
         <View style={styles.slotCenterSymbol}>
-          <SevenIcon size={52} />
+          <SevenIcon size={iconSize} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -113,6 +123,7 @@ function SuperSlotsTile() {
  * Modern Square Game Tile for Animal Race (Jungle Safari Style)
  */
 function AnimalRaceTile() {
+  const iconSize = Math.round(ITEM_WIDTH * 0.48);
   return (
     <View style={[styles.tileBox, styles.animalTileBorder]}>
       <LinearGradient
@@ -122,7 +133,7 @@ function AnimalRaceTile() {
         style={styles.tileGradient}
       >
         {/* Jungle Sparkles */}
-        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
           <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
           <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
           <Circle cx="20" cy="74" r="1.5" fill="#4ADE80" opacity={0.7} />
@@ -131,7 +142,7 @@ function AnimalRaceTile() {
 
         {/* Lion King of Jungle */}
         <View style={styles.slotCenterSymbol}>
-          <LionIcon size={50} />
+          <LionIcon size={iconSize} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -149,11 +160,11 @@ function AnimalRaceTile() {
   );
 }
 
-
 /**
  * Modern Square Game Tile for Car Roulette (Speed Club Style)
  */
 function CarRouletteTile() {
+  const iconSize = Math.round(ITEM_WIDTH * 0.50);
   return (
     <View style={[styles.tileBox, styles.carRouletteTileBorder]}>
       <LinearGradient
@@ -163,7 +174,7 @@ function CarRouletteTile() {
         style={styles.tileGradient}
       >
         {/* Speed Sparkles */}
-        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
           <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
           <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
           <Circle cx="20" cy="74" r="1.5" fill="#EF4444" opacity={0.7} />
@@ -172,7 +183,7 @@ function CarRouletteTile() {
 
         {/* Steering Wheel Icon */}
         <View style={styles.slotCenterSymbol}>
-          <SteeringWheelIcon size={52} />
+          <SteeringWheelIcon size={iconSize} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -190,11 +201,11 @@ function CarRouletteTile() {
   );
 }
 
-
 /**
  * Modern Square Game Tile for Zoo Slots (Wild Animal Jungle Style)
  */
 function ZooSlotsTile() {
+  const iconSize = Math.round(ITEM_WIDTH * 0.50);
   return (
     <View style={[styles.tileBox, styles.zooSlotsTileBorder]}>
       <LinearGradient
@@ -204,7 +215,7 @@ function ZooSlotsTile() {
         style={styles.tileGradient}
       >
         {/* Jungle Sparkles */}
-        <Svg width={96} height={96} viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
           <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
           <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
           <Circle cx="20" cy="74" r="1.5" fill="#4ADE80" opacity={0.7} />
@@ -213,7 +224,7 @@ function ZooSlotsTile() {
 
         {/* Golden Paw Wild Symbol */}
         <View style={styles.slotCenterSymbol}>
-          <GoldenPawIcon size={52} />
+          <GoldenPawIcon size={iconSize} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -230,6 +241,35 @@ function ZooSlotsTile() {
     </View>
   );
 }
+
+// 5 Flagship Games Configuration
+const GAMES = [
+  {
+    id: 'greedy_baby',
+    title: 'Greedy Baby',
+    TileComponent: GreedyBabyTile,
+  },
+  {
+    id: 'super_slots',
+    title: 'Super Slots',
+    TileComponent: SuperSlotsTile,
+  },
+  {
+    id: 'animal_race',
+    title: 'Animal Race',
+    TileComponent: AnimalRaceTile,
+  },
+  {
+    id: 'car_roulette',
+    title: 'Car Roulette',
+    TileComponent: CarRouletteTile,
+  },
+  {
+    id: 'zoo_slots',
+    title: 'Zoo Slots',
+    TileComponent: ZooSlotsTile,
+  },
+];
 
 export default function GamesListModal({
   visible,
@@ -251,12 +291,17 @@ export default function GamesListModal({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop}>
           <TouchableWithoutFeedback>
-            <View style={[styles.sheetContainer, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
-              {/* Header: Title "Games" & Close "✕" */}
+            <View style={[styles.sheetContainer, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
+              {/* Header: Title "Games", Game Count & Close "✕" */}
               <View style={styles.headerRow}>
-                <Text style={styles.headerTitle}>
-                  <T>Games</T>
-                </Text>
+                <View style={styles.headerLeftGroup}>
+                  <Text style={styles.headerTitle}>
+                    <T>Games</T>
+                  </Text>
+                  <View style={styles.gameCountBadge}>
+                    <Text style={styles.gameCountText}>{GAMES.length}</Text>
+                  </View>
+                </View>
                 <TouchableOpacity
                   style={styles.closeBtn}
                   activeOpacity={0.75}
@@ -267,95 +312,32 @@ export default function GamesListModal({
                 </TouchableOpacity>
               </View>
 
-              {/* Games Grid Row (Screenshot matching) */}
+              {/* Games 3-Column Grid (Row 1: 3 games, Row 2: 2 games, easily expandable to 7-8 games) */}
               <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.gamesRow}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.gamesGrid}
+                bounces={false}
               >
-                {/* 1. Greedy Baby */}
-                <TouchableOpacity
-                  style={styles.gameItem}
-                  activeOpacity={0.82}
-                  onPress={() => {
-                    onClose();
-                    onSelectGame('greedy_baby');
-                  }}
-                >
-                  <GreedyBabyTile />
-                  <Text style={styles.gameTitle} numberOfLines={1}>
-                    <T>Greedy Baby</T>
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 2. Super Slots */}
-                <TouchableOpacity
-                  style={styles.gameItem}
-                  activeOpacity={0.82}
-                  onPress={() => {
-                    onClose();
-                    onSelectGame('super_slots');
-                  }}
-                >
-                  <SuperSlotsTile />
-                  <Text style={styles.gameTitle} numberOfLines={1}>
-                    <T>Super Slots</T>
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 3. Animal Race */}
-                <TouchableOpacity
-                  style={styles.gameItem}
-                  activeOpacity={0.82}
-                  onPress={() => {
-                    onClose();
-                    onSelectGame('animal_race');
-                  }}
-                >
-                  <AnimalRaceTile />
-                  <Text style={styles.gameTitle} numberOfLines={1}>
-                    <T>Animal Race</T>
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 4. Car Roulette */}
-                <TouchableOpacity
-                  style={styles.gameItem}
-                  activeOpacity={0.82}
-                  onPress={() => {
-                    onClose();
-                    onSelectGame('car_roulette');
-                  }}
-                >
-                  <CarRouletteTile />
-                  <Text style={styles.gameTitle} numberOfLines={1}>
-                    <T>Car Roulette</T>
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 5. Zoo Slots */}
-                <TouchableOpacity
-                  style={styles.gameItem}
-                  activeOpacity={0.82}
-                  onPress={() => {
-                    onClose();
-                    onSelectGame('zoo_slots');
-                  }}
-                >
-                  <ZooSlotsTile />
-                  <Text style={styles.gameTitle} numberOfLines={1}>
-                    <T>Zoo Slots</T>
-                  </Text>
-                </TouchableOpacity>
+                {GAMES.map((game) => {
+                  const Tile = game.TileComponent;
+                  return (
+                    <TouchableOpacity
+                      key={game.id}
+                      style={styles.gameItem}
+                      activeOpacity={0.82}
+                      onPress={() => {
+                        onClose();
+                        onSelectGame(game.id);
+                      }}
+                    >
+                      <Tile />
+                      <Text style={styles.gameTitle} numberOfLines={1}>
+                        <T>{game.title}</T>
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
-
-              {/* Page Indicator Dots (Matching screenshot) */}
-              <View style={styles.dotsRow}>
-                <View style={[styles.dot, styles.dotActive]} />
-                <View style={styles.dot} />
-                <View style={styles.dot} />
-                <View style={styles.dot} />
-              </View>
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -372,10 +354,12 @@ const styles = StyleSheet.create({
   },
   sheetContainer: {
     backgroundColor: '#110F20',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 16,
-    paddingHorizontal: 16,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 18,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    minHeight: Math.min(460, Math.round(SCREEN_HEIGHT * 0.58)),
+    maxHeight: Math.min(620, Math.round(SCREEN_HEIGHT * 0.82)),
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -384,13 +368,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
+  },
+  headerLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.3,
+  },
+  gameCountBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  gameCountText: {
+    color: '#A7F3D0',
+    fontSize: 11,
+    fontWeight: '800',
   },
   closeBtn: {
     width: 28,
@@ -405,20 +407,21 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '700',
   },
-  gamesRow: {
+  gamesGrid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 18,
-    paddingVertical: 4,
-    paddingHorizontal: 4,
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
+    paddingTop: 4,
+    paddingBottom: 24,
   },
   gameItem: {
     alignItems: 'center',
-    width: 96,
+    width: ITEM_WIDTH,
+    marginBottom: 6,
   },
   tileBox: {
-    width: 96,
-    height: 96,
+    width: ITEM_WIDTH,
+    height: ITEM_WIDTH,
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1.5,
@@ -436,6 +439,14 @@ const styles = StyleSheet.create({
   },
   animalTileBorder: {
     borderColor: 'rgba(34, 197, 94, 0.65)',
+    shadowColor: '#10B981',
+  },
+  carRouletteTileBorder: {
+    borderColor: 'rgba(239, 68, 68, 0.65)',
+    shadowColor: '#EF4444',
+  },
+  zooSlotsTileBorder: {
+    borderColor: 'rgba(16, 185, 129, 0.65)',
     shadowColor: '#10B981',
   },
   tileGradient: {
@@ -518,6 +529,44 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
+  bottomRibbonRed: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(153, 27, 27, 0.92)',
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(245, 158, 11, 0.5)',
+    zIndex: 3,
+  },
+  bottomRibbonRedText: {
+    color: '#FEF08A',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  bottomRibbonAmber: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(120, 53, 15, 0.92)',
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(253, 224, 71, 0.5)',
+    zIndex: 3,
+  },
+  bottomRibbonAmberText: {
+    color: '#FEF08A',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
   glassShine: {
     position: 'absolute',
     top: 0,
@@ -529,29 +578,11 @@ const styles = StyleSheet.create({
   },
   gameTitle: {
     marginTop: 8,
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: 0.2,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 4,
-    gap: 6,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-  },
-  dotActive: {
-    width: 14,
-    backgroundColor: '#10B981',
-    borderRadius: 3,
+    width: '100%',
   },
 });
