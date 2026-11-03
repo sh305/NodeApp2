@@ -38,13 +38,13 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // 8 Luxury Car Brands Configuration
 const CAR_BRANDS = [
   { id: 'ferrari', name: 'Ferrari', multiplier: 40, tier: 'supercar', icon: FerrariIcon, color: '#EF4444', darkColor: '#7F1D1D', emoji: '🏎️' },
-  { id: 'lamborghini', name: 'Lamborghini', multiplier: 30, tier: 'supercar', icon: LamborghiniIcon, color: '#F59E0B', darkColor: '#78350F', emoji: '🐂' },
-  { id: 'maserati', name: 'Maserati', multiplier: 20, tier: 'supercar', icon: MaseratiIcon, color: '#3B82F6', darkColor: '#1E3A8A', emoji: '🔱' },
-  { id: 'porsche', name: 'Porsche', multiplier: 10, tier: 'supercar', icon: PorscheIcon, color: '#EAB308', darkColor: '#713F12', emoji: '🐎' },
-  { id: 'mercedes', name: 'Mercedes-Benz', multiplier: 5, tier: 'luxury', icon: MercedesIcon, color: '#94A3B8', darkColor: '#334155', emoji: '⭐' },
-  { id: 'bmw', name: 'BMW', multiplier: 5, tier: 'luxury', icon: BmwIcon, color: '#0EA5E9', darkColor: '#0369A1', emoji: '⚡' },
-  { id: 'audi', name: 'Audi', multiplier: 5, tier: 'luxury', icon: AudiIcon, color: '#CBD5E1', darkColor: '#475569', emoji: '⭕' },
-  { id: 'volkswagen', name: 'Volkswagen', multiplier: 5, tier: 'luxury', icon: VolkswagenIcon, color: '#6366F1', darkColor: '#3730A3', emoji: '🚙' },
+  { id: 'lamborghini', name: 'Lamborghini', multiplier: 30, tier: 'supercar', icon: LamborghiniIcon, color: '#F59E0B', darkColor: '#78350F', emoji: '🏎️' },
+  { id: 'maserati', name: 'Maserati', multiplier: 20, tier: 'supercar', icon: MaseratiIcon, color: '#3B82F6', darkColor: '#1E3A8A', emoji: '🏎️' },
+  { id: 'porsche', name: 'Porsche', multiplier: 10, tier: 'supercar', icon: PorscheIcon, color: '#EAB308', darkColor: '#713F12', emoji: '🏎️' },
+  { id: 'mercedes', name: 'Mercedes-Benz', multiplier: 5, tier: 'luxury', icon: MercedesIcon, color: '#94A3B8', darkColor: '#334155', emoji: '🚗' },
+  { id: 'bmw', name: 'BMW', multiplier: 5, tier: 'luxury', icon: BmwIcon, color: '#0EA5E9', darkColor: '#0369A1', emoji: '🚗' },
+  { id: 'audi', name: 'Audi', multiplier: 5, tier: 'luxury', icon: AudiIcon, color: '#CBD5E1', darkColor: '#475569', emoji: '🚗' },
+  { id: 'volkswagen', name: 'Volkswagen', multiplier: 5, tier: 'luxury', icon: VolkswagenIcon, color: '#6366F1', darkColor: '#3730A3', emoji: '🚗' },
 ];
 
 const CHIP_VALUES = [10, 50, 100, 1000, 10000];

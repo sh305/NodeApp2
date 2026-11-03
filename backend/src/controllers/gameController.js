@@ -567,13 +567,13 @@ exports.runAnimalRace = async (req, res) => {
 
 const CAR_BRANDS = [
   { id: 'ferrari', name: 'Ferrari', multiplier: 40, weight: 3, tier: 'supercar', color: '#EF4444', emoji: '🏎️' },
-  { id: 'lamborghini', name: 'Lamborghini', multiplier: 30, weight: 5, tier: 'supercar', color: '#F59E0B', emoji: '🐂' },
-  { id: 'maserati', name: 'Maserati', multiplier: 20, weight: 8, tier: 'supercar', color: '#3B82F6', emoji: '🔱' },
-  { id: 'porsche', name: 'Porsche', multiplier: 10, weight: 12, tier: 'supercar', color: '#EAB308', emoji: '🐎' },
-  { id: 'mercedes', name: 'Mercedes-Benz', multiplier: 5, weight: 18, tier: 'luxury', color: '#94A3B8', emoji: '⭐' },
-  { id: 'bmw', name: 'BMW', multiplier: 5, weight: 18, tier: 'luxury', color: '#0EA5E9', emoji: '⚡' },
-  { id: 'audi', name: 'Audi', multiplier: 5, weight: 18, tier: 'luxury', color: '#CBD5E1', emoji: '⭕' },
-  { id: 'volkswagen', name: 'Volkswagen', multiplier: 5, weight: 18, tier: 'luxury', color: '#6366F1', emoji: '🚙' },
+  { id: 'lamborghini', name: 'Lamborghini', multiplier: 30, weight: 5, tier: 'supercar', color: '#F59E0B', emoji: '🏎️' },
+  { id: 'maserati', name: 'Maserati', multiplier: 20, weight: 8, tier: 'supercar', color: '#3B82F6', emoji: '🏎️' },
+  { id: 'porsche', name: 'Porsche', multiplier: 10, weight: 12, tier: 'supercar', color: '#EAB308', emoji: '🏎️' },
+  { id: 'mercedes', name: 'Mercedes-Benz', multiplier: 5, weight: 18, tier: 'luxury', color: '#94A3B8', emoji: '🚗' },
+  { id: 'bmw', name: 'BMW', multiplier: 5, weight: 18, tier: 'luxury', color: '#0EA5E9', emoji: '🚗' },
+  { id: 'audi', name: 'Audi', multiplier: 5, weight: 18, tier: 'luxury', color: '#CBD5E1', emoji: '🚗' },
+  { id: 'volkswagen', name: 'Volkswagen', multiplier: 5, weight: 18, tier: 'luxury', color: '#6366F1', emoji: '🚗' },
 ];
 
 let recentCarWinners = ['mercedes', 'bmw', 'audi', 'porsche', 'volkswagen', 'maserati'];
