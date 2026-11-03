@@ -64,6 +64,7 @@ import GamesListModal from '../components/GamesListModal';
 import GreedyBabyGameModal from '../components/GreedyBabyGameModal';
 import SuperSlotsGameModal from '../components/SuperSlotsGameModal';
 import AnimalRaceGameModal from '../components/AnimalRaceGameModal';
+import CarRouletteGameModal from '../components/CarRouletteGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -175,6 +176,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [greedyBabyModalVisible, setGreedyBabyModalVisible] = useState(false);
   const [superSlotsModalVisible, setSuperSlotsModalVisible] = useState(false);
   const [animalRaceModalVisible, setAnimalRaceModalVisible] = useState(false);
+  const [carRouletteModalVisible, setCarRouletteModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);

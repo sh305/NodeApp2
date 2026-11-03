@@ -134,6 +134,23 @@ ramCache.set('hi:::Elephant', 'हाथी');
 ramCache.set('hi:::Panda', 'पांडा');
 ramCache.set('hi:::Rabbit', 'खरगोश');
 ramCache.set('hi:::Animal Race Rules', 'एनिमल रेस के नियम');
+ramCache.set('hi:::Car Roulette', 'कार रूले');
+ramCache.set('hi:::Speed Club', 'स्पीड क्लब');
+ramCache.set('hi:::Luxury Brand Spin • 40X Supercars', 'लक्ज़री ब्रांड स्पिन • 40 गुना सुपरकार्स');
+ramCache.set('hi:::Supercars (High Multipliers)', 'सुपरकार्स (हाई मल्टीप्लायर)');
+ramCache.set('hi:::Luxury Cars (Safe 5X Multipliers)', 'लक्ज़री कार्स (सुरक्षित 5 गुना मल्टीप्लायर)');
+ramCache.set('hi:::Car Roulette Rules', 'कार रूले के नियम');
+ramCache.set('hi:::Ferrari', 'फेरारी');
+ramCache.set('hi:::Lamborghini', 'लेम्बोर्गिनी');
+ramCache.set('hi:::Maserati', 'मसेराती');
+ramCache.set('hi:::Porsche', 'पोर्श');
+ramCache.set('hi:::Mercedes-Benz', 'मर्सिडीज-बेंज');
+ramCache.set('hi:::BMW', 'बीएमडब्ल्यू');
+ramCache.set('hi:::Audi', 'ऑडी');
+ramCache.set('hi:::Volkswagen', 'फॉक्सवैगन');
+ramCache.set('hi:::SPIN NOW', 'अभी स्पिन करें');
+ramCache.set('hi:::Rebet', 'दोबारा दांव');
+ramCache.set('hi:::Please place your bet on at least one car brand!', 'कृपया कम से कम एक कार ब्रांड पर अपना दांव लगाएं!');
 ramCache.set('hi:::GOT IT', 'समझ गया');
 ramCache.set('hi:::500X JACKPOT', '500 गुना जैकपॉट');
 ramCache.set('hi:::SPIN', 'स्पिन');
@@ -638,6 +655,23 @@ export const LanguageProvider = ({ children }) => {
       'Panda',
       'Rabbit',
       'Animal Race Rules',
+      'Car Roulette',
+      'Speed Club',
+      'Luxury Brand Spin • 40X Supercars',
+      'Supercars (High Multipliers)',
+      'Luxury Cars (Safe 5X Multipliers)',
+      'Car Roulette Rules',
+      'Ferrari',
+      'Lamborghini',
+      'Maserati',
+      'Porsche',
+      'Mercedes-Benz',
+      'BMW',
+      'Audi',
+      'Volkswagen',
+      'SPIN NOW',
+      'Rebet',
+      'Please place your bet on at least one car brand!',
       'GOT IT',
       'Crazy Lion',
       'Bingo Slots',

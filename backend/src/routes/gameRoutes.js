@@ -8,6 +8,8 @@ const {
   spinSuperSlots,
   getAnimalRaceState,
   runAnimalRace,
+  getCarRouletteState,
+  spinCarRoulette,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -23,5 +25,9 @@ router.post('/super-slots/spin', protect, spinSuperSlots);
 // Animal Race (Jungle Safari) Routes
 router.get('/animal-race/state', getAnimalRaceState);
 router.post('/animal-race/run', protect, runAnimalRace);
+
+// Car Roulette (Luxury Brand Spin) Routes
+router.get('/car-roulette/state', getCarRouletteState);
+router.post('/car-roulette/spin', protect, spinCarRoulette);
 
 module.exports = router;

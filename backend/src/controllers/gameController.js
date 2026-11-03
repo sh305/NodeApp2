@@ -559,3 +559,169 @@ exports.runAnimalRace = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ═══════════════════════════════════════════════════════════════
+// 4. CAR ROULETTE / LUXURY BRAND SPIN (Speed Club)
+// ═══════════════════════════════════════════════════════════════
+
+const CAR_BRANDS = [
+  { id: 'ferrari', name: 'Ferrari', multiplier: 40, weight: 3, tier: 'supercar', color: '#EF4444', emoji: '🏎️' },
+  { id: 'lamborghini', name: 'Lamborghini', multiplier: 30, weight: 5, tier: 'supercar', color: '#F59E0B', emoji: '🐂' },
+  { id: 'maserati', name: 'Maserati', multiplier: 20, weight: 8, tier: 'supercar', color: '#3B82F6', emoji: '🔱' },
+  { id: 'porsche', name: 'Porsche', multiplier: 10, weight: 12, tier: 'supercar', color: '#EAB308', emoji: '🐎' },
+  { id: 'mercedes', name: 'Mercedes-Benz', multiplier: 5, weight: 18, tier: 'luxury', color: '#94A3B8', emoji: '⭐' },
+  { id: 'bmw', name: 'BMW', multiplier: 5, weight: 18, tier: 'luxury', color: '#0EA5E9', emoji: '⚡' },
+  { id: 'audi', name: 'Audi', multiplier: 5, weight: 18, tier: 'luxury', color: '#CBD5E1', emoji: '⭕' },
+  { id: 'volkswagen', name: 'Volkswagen', multiplier: 5, weight: 18, tier: 'luxury', color: '#6366F1', emoji: '🚙' },
+];
+
+let recentCarWinners = ['mercedes', 'bmw', 'audi', 'porsche', 'volkswagen', 'maserati'];
+
+function pickWeightedCarWinner() {
+  const totalWeight = CAR_BRANDS.reduce((sum, item) => sum + item.weight, 0);
+  let randomVal = Math.random() * totalWeight;
+  for (const car of CAR_BRANDS) {
+    if (randomVal < car.weight) {
+      return car;
+    }
+    randomVal -= car.weight;
+  }
+  return CAR_BRANDS[CAR_BRANDS.length - 1];
+}
+
+/**
+ * @desc    Get Car Roulette game state & user info
+ * @route   GET /api/games/car-roulette/state
+ */
+exports.getCarRouletteState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let coins = 0;
+    let todayEarnings = 0;
+    let totalWinnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins carRouletteStats');
+      if (user) {
+        coins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.carRouletteStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.carRouletteStats.todayEarnings || 0;
+        }
+        totalWinnings = user.carRouletteStats?.totalWinnings || 0;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      coins,
+      todayEarnings,
+      totalWinnings,
+      brands: CAR_BRANDS,
+      recentWinners: recentCarWinners.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('getCarRouletteState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Place bet and spin the Car Roulette
+ * @route   POST /api/games/car-roulette/spin
+ */
+exports.spinCarRoulette = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body; // { [brandId]: betAmount }
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    let totalBet = 0;
+    for (const [brandId, amount] of Object.entries(bets)) {
+      const num = Number(amount);
+      if (num > 0) {
+        totalBet += num;
+      }
+    }
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Bet amount must be greater than 0' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < totalBet) {
+      return res.status(400).json({
+        success: false,
+        code: 'INSUFFICIENT_COINS',
+        message: 'Insufficient coins balance. Please recharge first.',
+        currentCoins: user.coins || 0,
+        requiredCoins: totalBet,
+      });
+    }
+
+    // 1. Pick Winner with weighted probability
+    const winner = pickWeightedCarWinner();
+
+    // 2. Add winner to recent history
+    recentCarWinners.unshift(winner.id);
+    if (recentCarWinners.length > 20) {
+      recentCarWinners = recentCarWinners.slice(0, 20);
+    }
+
+    // 3. Calculate winnings
+    const betOnWinner = Number(bets[winner.id]) || 0;
+    const wonCoins = betOnWinner * winner.multiplier;
+
+    // 4. Update user balance & stats atomically
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.carRouletteStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.carRouletteStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + wonCoins;
+    const netCoinChange = wonCoins - totalBet;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: netCoinChange,
+          'carRouletteStats.totalWinnings': wonCoins,
+          'carRouletteStats.roundsPlayed': 1,
+        },
+        $set: {
+          'carRouletteStats.todayEarnings': newTodayEarnings,
+          'carRouletteStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      winner: winner.id,
+      winnerDetails: winner,
+      betOnWinner,
+      wonCoins,
+      netProfit: wonCoins - totalBet,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      recentWinners: recentCarWinners.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('spinCarRoulette error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
