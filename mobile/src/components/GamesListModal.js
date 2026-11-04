@@ -22,6 +22,7 @@ import { GoldenPawIcon } from './ZooSlotIcons';
 import { GoldenDragonIcon } from './OceanKingIcons';
 import { FruitCocktailIcon } from './FruitPartyIcons';
 import { DragonTigerTileIcon } from './DragonTigerIcons';
+import { ColorPredictionTileIcon } from './ColorPredictionIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -350,7 +351,48 @@ function DragonTigerTile() {
   );
 }
 
-// 8 Flagship Games Configuration
+
+/**
+ * Modern Square Game Tile for Color Prediction (Color Clash / Fast Parity)
+ */
+function ColorPredictionTile() {
+  return (
+    <View style={[styles.tileBox, styles.colorPredictionTileBorder]}>
+      <LinearGradient
+        colors={['#1E1138', '#3B0764', '#7E22CE', '#100520']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Mystic Aura Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.8" fill="#A855F7" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#34D399" opacity={0.7} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
+        </Svg>
+
+        {/* Color Prediction Triple-Sphere Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <ColorPredictionTileIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonPurple}>
+          <Text style={styles.bottomRibbonPurpleText}>4.5X VIOLET 🔮</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 9 Flagship Games Configuration (Perfect 3x3 Grid!)
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -391,6 +433,11 @@ const GAMES = [
     id: 'dragon_tiger',
     title: 'Dragon vs Tiger',
     TileComponent: DragonTigerTile,
+  },
+  {
+    id: 'color_prediction',
+    title: 'Color Prediction',
+    TileComponent: ColorPredictionTile,
   },
 ];
 
@@ -813,6 +860,29 @@ const styles = StyleSheet.create({
   },
   bottomRibbonCrimsonText: {
     color: '#FEF08A',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  colorPredictionTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#A855F7',
+  },
+  bottomRibbonPurple: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(88, 28, 135, 0.95)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(192, 132, 252, 0.6)',
+    zIndex: 3,
+  },
+  bottomRibbonPurpleText: {
+    color: '#FDE047',
     fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 0.3,

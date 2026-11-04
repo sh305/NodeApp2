@@ -1554,3 +1554,255 @@ exports.playDragonTiger = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ==========================================
+// 9. COLOR PREDICTION (FAST PARITY / COLOR CLASH)
+// ==========================================
+
+const recentColorPredictionHistory = [
+  { roundId: 'CP8091', number: 7, color: 'green', hasViolet: false, timestamp: Date.now() - 140000 },
+  { roundId: 'CP8092', number: 2, color: 'red', hasViolet: false, timestamp: Date.now() - 120000 },
+  { roundId: 'CP8093', number: 5, color: 'green', hasViolet: true, timestamp: Date.now() - 100000 },
+  { roundId: 'CP8094', number: 9, color: 'green', hasViolet: false, timestamp: Date.now() - 80000 },
+  { roundId: 'CP8095', number: 0, color: 'red', hasViolet: true, timestamp: Date.now() - 60000 },
+  { roundId: 'CP8096', number: 4, color: 'red', hasViolet: false, timestamp: Date.now() - 40000 },
+  { roundId: 'CP8097', number: 1, color: 'green', hasViolet: false, timestamp: Date.now() - 20000 },
+  { roundId: 'CP8098', number: 8, color: 'red', hasViolet: false, timestamp: Date.now() - 5000 },
+];
+
+const recentColorPredictionWinners = [
+  { name: 'Aarav 👑', amount: 90000, color: 'violet', number: 0, time: '1m ago' },
+  { name: 'Simran ✨', amount: 45000, color: 'green', number: 7, time: '2m ago' },
+  { name: 'Rocky 🦁', amount: 180000, color: 'number_9', number: 9, time: '4m ago' },
+  { name: 'Pooja 💎', amount: 30000, color: 'red', number: 4, time: '5m ago' },
+  { name: 'Vikram ⚡', amount: 90000, color: 'violet', number: 5, time: '7m ago' },
+];
+
+/**
+ * @desc    Get Color Prediction Game State
+ * @route   GET /api/games/color-prediction/state
+ */
+exports.getColorPredictionState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins colorPredictionStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.colorPredictionStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.colorPredictionStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 888888,
+      history: recentColorPredictionHistory.slice(0, 15),
+      recentWinners: recentColorPredictionWinners.slice(0, 12),
+      multipliers: {
+        green: 2,
+        red: 2,
+        violet: 4.5,
+        number: 9,
+      },
+    });
+  } catch (error) {
+    console.error('getColorPredictionState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Play Color Prediction Round
+ * @route   POST /api/games/color-prediction/play
+ */
+exports.playColorPrediction = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body;
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    let totalBet = 0;
+    const cleanBets = {
+      green: 0,
+      red: 0,
+      violet: 0,
+      numbers: {},
+    };
+
+    if (typeof bets.green === 'number' && bets.green > 0) {
+      cleanBets.green = Math.floor(bets.green);
+      totalBet += cleanBets.green;
+    }
+    if (typeof bets.red === 'number' && bets.red > 0) {
+      cleanBets.red = Math.floor(bets.red);
+      totalBet += cleanBets.red;
+    }
+    if (typeof bets.violet === 'number' && bets.violet > 0) {
+      cleanBets.violet = Math.floor(bets.violet);
+      totalBet += cleanBets.violet;
+    }
+
+    if (bets.numbers && typeof bets.numbers === 'object') {
+      for (let i = 0; i <= 9; i++) {
+        const val = bets.numbers[String(i)] || bets.numbers[i];
+        if (typeof val === 'number' && val > 0) {
+          cleanBets.numbers[i] = Math.floor(val);
+          totalBet += cleanBets.numbers[i];
+        }
+      }
+    } else {
+      for (let i = 0; i <= 9; i++) {
+        const flatKey = 'num_' + i;
+        const val = bets[flatKey] || bets[String(i)];
+        if (typeof val === 'number' && val > 0) {
+          cleanBets.numbers[i] = Math.floor(val);
+          totalBet += cleanBets.numbers[i];
+        }
+      }
+    }
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Please place at least one bet on a color or number' });
+    }
+
+    const user = await User.findById(userId).select('coins colorPredictionStats name');
+    if (!user || (user.coins || 0) < totalBet) {
+      return res.status(400).json({ success: false, message: 'Insufficient coins balance' });
+    }
+
+    // Determine outcome (number from 0 to 9)
+    const winningNumber = Math.floor(Math.random() * 10);
+    let winningColor = 'red';
+    let hasViolet = false;
+
+    if (winningNumber === 0) {
+      winningColor = 'red';
+      hasViolet = true;
+    } else if (winningNumber === 5) {
+      winningColor = 'green';
+      hasViolet = true;
+    } else if ([1, 3, 7, 9].includes(winningNumber)) {
+      winningColor = 'green';
+      hasViolet = false;
+    } else {
+      winningColor = 'red';
+      hasViolet = false;
+    }
+
+    // Calculate payouts
+    let wonCoins = 0;
+
+    // Green bet
+    if (cleanBets.green > 0) {
+      if ([1, 3, 7, 9].includes(winningNumber)) {
+        wonCoins += cleanBets.green * 2;
+      } else if (winningNumber === 5) {
+        wonCoins += Math.floor(cleanBets.green * 1.5);
+      }
+    }
+
+    // Red bet
+    if (cleanBets.red > 0) {
+      if ([2, 4, 6, 8].includes(winningNumber)) {
+        wonCoins += cleanBets.red * 2;
+      } else if (winningNumber === 0) {
+        wonCoins += Math.floor(cleanBets.red * 1.5);
+      }
+    }
+
+    // Violet bet
+    if (cleanBets.violet > 0) {
+      if (winningNumber === 0 || winningNumber === 5) {
+        wonCoins += Math.floor(cleanBets.violet * 4.5);
+      }
+    }
+
+    // Number bets (9X multiplier)
+    const numberBet = cleanBets.numbers[winningNumber] || 0;
+    if (numberBet > 0) {
+      wonCoins += numberBet * 9;
+    }
+
+    const coinDelta = wonCoins - totalBet;
+
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.colorPredictionStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.colorPredictionStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + Math.max(0, coinDelta);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: coinDelta,
+          'colorPredictionStats.roundsPlayed': 1,
+          'colorPredictionStats.totalWinnings': wonCoins,
+        },
+        $set: {
+          'colorPredictionStats.todayEarnings': newTodayEarnings,
+          'colorPredictionStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    const roundNumber = Math.floor(1000 + Math.random() * 9000);
+    const newRound = {
+      roundId: 'CP' + roundNumber,
+      number: winningNumber,
+      color: winningColor,
+      hasViolet,
+      timestamp: Date.now(),
+    };
+    recentColorPredictionHistory.unshift(newRound);
+    if (recentColorPredictionHistory.length > 30) {
+      recentColorPredictionHistory.pop();
+    }
+
+    if (wonCoins >= 10000) {
+      recentColorPredictionWinners.unshift({
+        name: (user.name || 'Lucky Player').slice(0, 10),
+        amount: wonCoins,
+        color: winningColor,
+        number: winningNumber,
+        time: 'Just now',
+      });
+      if (recentColorPredictionWinners.length > 20) {
+        recentColorPredictionWinners.pop();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      winningNumber,
+      winningColor,
+      hasViolet,
+      wonCoins,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      history: recentColorPredictionHistory.slice(0, 15),
+      recentWinners: recentColorPredictionWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('playColorPrediction error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

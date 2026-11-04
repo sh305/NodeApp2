@@ -18,6 +18,8 @@ const {
   playFruitParty,
   getDragonTigerState,
   playDragonTiger,
+  getColorPredictionState,
+  playColorPrediction,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -53,5 +55,10 @@ router.post('/fruit-party/play', protect, playFruitParty);
 // Dragon vs Tiger Routes
 router.get('/dragon-tiger/state', getDragonTigerState);
 router.post('/dragon-tiger/play', protect, playDragonTiger);
+
+
+// Color Prediction Routes
+router.get('/color-prediction/state', getColorPredictionState);
+router.post('/color-prediction/play', protect, playColorPrediction);
 
 module.exports = router;

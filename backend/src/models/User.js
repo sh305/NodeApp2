@@ -126,6 +126,12 @@ const userSchema = new mongoose.Schema(
       totalWinnings: { type: Number, default: 0 },
       roundsPlayed: { type: Number, default: 0 },
     },
+    colorPredictionStats: {
+      todayEarnings: { type: Number, default: 0 },
+      lastEarningsDate: { type: String, default: null },
+      totalWinnings: { type: Number, default: 0 },
+      roundsPlayed: { type: Number, default: 0 },
+    },
     gameCoins: {
       type: Number,
       default: 0, // Initial game coins (0 as requested, claim from silver chest)
