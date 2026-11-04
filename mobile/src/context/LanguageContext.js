@@ -152,6 +152,25 @@ ramCache.set('hi:::SPIN NOW', 'अभी स्पिन करें');
 ramCache.set('hi:::Rebet', 'दोबारा दांव');
 ramCache.set('hi:::Please place your bet on at least one car brand!', 'कृपया कम से कम एक कार ब्रांड पर अपना दांव लगाएं!');
 ramCache.set('hi:::Recent', 'हालिया');
+ramCache.set('hi:::Fruit Party', 'फ्रूट पार्टी');
+ramCache.set('hi:::Lucky Fruit Wheel • Arcade Fever', 'लकी फ्रूट व्हील • आर्केड फीवर');
+ramCache.set('hi:::Fruit Party Paytable & Rules', 'फ्रूट पार्टी पे-टेबल और नियम');
+ramCache.set('hi:::Cherry', 'चेरी');
+ramCache.set('hi:::Orange', 'संतरा');
+ramCache.set('hi:::Lemon', 'नींबू');
+ramCache.set('hi:::Grapes', 'अंगूर');
+ramCache.set('hi:::Watermelon', 'तरबूज');
+ramCache.set('hi:::Bell', 'घंटी');
+ramCache.set('hi:::Star', 'तारा');
+ramCache.set('hi:::BAR', 'बार');
+ramCache.set('hi:::PLACE YOUR FRUIT BETS', 'फलों पर अपना दांव लगाएं');
+ramCache.set('hi:::ARCADE WHEEL SPINNING!', 'आर्केड व्हील घूम रहा है!');
+ramCache.set('hi:::PARTY FEVER: 2X/3X MULTIPLIER BOOST!', 'पार्टी फीवर: 2X/3X मल्टीप्लायर बूस्ट!');
+ramCache.set('hi:::PARTY FEVER MEGA SURGE!', 'पार्टी फीवर मेगा सर्ज!');
+ramCache.set('hi:::FRUIT PARTY WINNER!', 'फ्रूट पार्टी विजेता!');
+ramCache.set('hi:::BETTER LUCK NEXT SPIN', 'अगले स्पिन पर शुभकामनाएं');
+ramCache.set('hi:::Spin again to win big!', 'बड़ा जीतने के लिए दोबारा स्पिन करें!');
+ramCache.set('hi:::Fruit Multipliers', 'फ्रूट मल्टीप्लायर्स');
 ramCache.set('hi:::Ocean King', 'ओशन किंग');
 ramCache.set('hi:::Fishing Frenzy • Deep Sea Harpoon', 'फिशिंग फ्रेंजी • डीप सी हारपून');
 ramCache.set('hi:::Ocean King Paytable & Rules', 'ओशन किंग पे-टेबल और नियम');
@@ -673,6 +692,25 @@ export const LanguageProvider = ({ children }) => {
       'Space Voyage',
       'Premium Slots',
       'Recent',
+      'Fruit Party',
+      'Lucky Fruit Wheel • Arcade Fever',
+      'Fruit Party Paytable & Rules',
+      'Cherry',
+      'Orange',
+      'Lemon',
+      'Grapes',
+      'Watermelon',
+      'Bell',
+      'Star',
+      'BAR',
+      'PLACE YOUR FRUIT BETS',
+      'ARCADE WHEEL SPINNING!',
+      'PARTY FEVER: 2X/3X MULTIPLIER BOOST!',
+      'PARTY FEVER MEGA SURGE!',
+      'FRUIT PARTY WINNER!',
+      'BETTER LUCK NEXT SPIN',
+      'Spin again to win big!',
+      'Fruit Multipliers',
       'Ocean King',
       'Fishing Frenzy • Deep Sea Harpoon',
       'Ocean King Paytable & Rules',

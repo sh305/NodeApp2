@@ -20,6 +20,7 @@ import { LionIcon } from './AnimalIcons';
 import { SteeringWheelIcon } from './CarIcons';
 import { GoldenPawIcon } from './ZooSlotIcons';
 import { GoldenDragonIcon } from './OceanKingIcons';
+import { FruitCocktailIcon } from './FruitPartyIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -268,7 +269,47 @@ function OceanKingTile() {
   );
 }
 
-// 6 Flagship Games Configuration
+/**
+ * Modern Square Game Tile for Fruit Party (Lucky Fruit Wheel)
+ */
+function FruitPartyTile() {
+  return (
+    <View style={[styles.tileBox, styles.fruitPartyTileBorder]}>
+      <LinearGradient
+        colors={['#4C0519', '#831843', '#BE185D', '#3B0764']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Party Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#FFE4E6" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#F43F5E" opacity={0.7} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FFE600" opacity={0.9} />
+        </Svg>
+
+        {/* Tropical Fruit Cocktail Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <FruitCocktailIcon size={46} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonMagenta}>
+          <Text style={styles.bottomRibbonMagentaText}>100X 🍉</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 7 Flagship Games Configuration
 // Row 1: Greedy Baby, Super Slots, Animal Race
 // Row 2: Car Roulette, Zoo Slots, Ocean King (Complete 3x2 Grid!)
 const GAMES = [
@@ -301,6 +342,11 @@ const GAMES = [
     id: 'ocean_king',
     title: 'Ocean King',
     TileComponent: OceanKingTile,
+  },
+  {
+    id: 'fruit_party',
+    title: 'Fruit Party',
+    TileComponent: FruitPartyTile,
   },
 ];
 
@@ -349,8 +395,8 @@ export default function GamesListModal({
                 styles.sheetContainer,
                 {
                   paddingHorizontal: horizontalPadding,
-                  minHeight: Math.min(460, Math.round(windowHeight * 0.60)),
-                  maxHeight: Math.min(640, Math.round(windowHeight * 0.85)),
+                  minHeight: Math.min(520, Math.round(windowHeight * 0.70)),
+                  maxHeight: Math.min(680, Math.round(windowHeight * 0.88)),
                   paddingBottom: Math.max(20, insets.bottom + 12),
                 },
               ]}
@@ -683,5 +729,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.2,
     width: '100%',
+  },
+  fruitPartyTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#EC4899',
+  },
+  bottomRibbonMagenta: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(190, 24, 93, 0.92)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomRibbonMagentaText: {
+    color: '#FFE600',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });

@@ -67,6 +67,7 @@ import AnimalRaceGameModal from '../components/AnimalRaceGameModal';
 import CarRouletteGameModal from '../components/CarRouletteGameModal';
 import ZooSlotsGameModal from '../components/ZooSlotsGameModal';
 import OceanKingGameModal from '../components/OceanKingGameModal';
+import FruitPartyGameModal from '../components/FruitPartyGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -181,6 +182,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [carRouletteModalVisible, setCarRouletteModalVisible] = useState(false);
   const [zooSlotsModalVisible, setZooSlotsModalVisible] = useState(false);
   const [oceanKingModalVisible, setOceanKingModalVisible] = useState(false);
+  const [fruitPartyModalVisible, setFruitPartyModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3043,6 +3045,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setZooSlotsModalVisible(true);
           } else if (gameId === 'ocean_king') {
             setOceanKingModalVisible(true);
+          } else if (gameId === 'fruit_party') {
+            setFruitPartyModalVisible(true);
           }
         }}
       />
@@ -3139,6 +3143,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setOceanKingModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+      {/* ══ FRUIT PARTY (LUCKY FRUIT) GAME MODAL ══ */}
+      <FruitPartyGameModal
+        visible={fruitPartyModalVisible}
+        onClose={() => setFruitPartyModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setFruitPartyModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

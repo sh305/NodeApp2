@@ -1137,3 +1137,181 @@ exports.playOceanKing = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 7. FRUIT PARTY / LUCKY FRUIT CONTROLLER
+// ══════════════════════════════════════════════════════════════════════════════════
+
+const FRUIT_ITEMS = [
+  { id: 'cherry', name: 'Lucky Cherry', multiplier: 2, weight: 34, color: '#EF4444', emoji: '🍒', tier: 'safe' },
+  { id: 'orange', name: 'Juicy Orange', multiplier: 3, weight: 24, color: '#F97316', emoji: '🍊', tier: 'safe' },
+  { id: 'lemon', name: 'Golden Lemon', multiplier: 5, weight: 16, color: '#EAB308', emoji: '🍋', tier: 'safe' },
+  { id: 'grapes', name: 'Royal Grapes', multiplier: 10, weight: 11, color: '#A855F7', emoji: '🍇', tier: 'mid' },
+  { id: 'watermelon', name: 'Sweet Melon', multiplier: 15, weight: 7.5, color: '#10B981', emoji: '🍉', tier: 'mid' },
+  { id: 'bell', name: 'Golden Bell', multiplier: 25, weight: 4.5, color: '#F59E0B', emoji: '🔔', tier: 'high' },
+  { id: 'star', name: 'Diamond Star', multiplier: 50, weight: 2.2, color: '#38BDF8', emoji: '⭐', tier: 'high' },
+  { id: 'bar', name: 'Lucky BAR Crown', multiplier: 100, weight: 0.8, color: '#EC4899', emoji: '👑', tier: 'jackpot' },
+];
+
+let recentFruitWinners = ['cherry', 'watermelon', 'orange', 'grapes', 'bar', 'lemon', 'bell', 'cherry'];
+
+function pickRandomFruitItem() {
+  const totalWeight = FRUIT_ITEMS.reduce((sum, f) => sum + f.weight, 0);
+  let randomVal = Math.random() * totalWeight;
+  for (const f of FRUIT_ITEMS) {
+    if (randomVal < f.weight) {
+      return f;
+    }
+    randomVal -= f.weight;
+  }
+  return FRUIT_ITEMS[0];
+}
+
+/**
+ * @desc    Get Fruit Party game state & paytable
+ * @route   GET /api/games/fruit-party/state
+ */
+exports.getFruitPartyState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins fruitPartyStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.fruitPartyStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.fruitPartyStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      fruits: FRUIT_ITEMS,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 888888,
+      recentWinners: recentFruitWinners.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('getFruitPartyState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Play Fruit Party round (with Party Fever Multiplier Surge)
+ * @route   POST /api/games/fruit-party/play
+ */
+exports.playFruitParty = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body;
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    let totalBet = 0;
+    const fruitIds = FRUIT_ITEMS.map((f) => f.id);
+
+    for (const [key, val] of Object.entries(bets)) {
+      if (!fruitIds.includes(key)) {
+        return res.status(400).json({ success: false, message: 'Invalid fruit symbol: ' + key });
+      }
+      const amount = Math.floor(Number(val) || 0);
+      if (amount < 0) {
+        return res.status(400).json({ success: false, message: 'Bet amounts cannot be negative' });
+      }
+      totalBet += amount;
+    }
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Please place a bet on at least one fruit' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < totalBet) {
+      return res.status(400).json({
+        success: false,
+        code: 'INSUFFICIENT_COINS',
+        message: 'Insufficient coins balance. Please recharge first.',
+        currentCoins: user.coins || 0,
+        requiredCoins: totalBet,
+      });
+    }
+
+    // 1. Pick winning fruit
+    const winningFruit = pickRandomFruitItem();
+
+    // 2. Dynamic Party Fever Multiplier Surge (20% chance to boost multiplier by 2X or 3X!)
+    let partyFever = false;
+    let feverMultiplier = 1;
+    if (Math.random() < 0.20) {
+      partyFever = true;
+      feverMultiplier = Math.random() < 0.35 ? 3 : 2;
+    }
+
+    // 3. Prepend to recent history (max 20)
+    recentFruitWinners.unshift(winningFruit.id);
+    if (recentFruitWinners.length > 20) {
+      recentFruitWinners = recentFruitWinners.slice(0, 20);
+    }
+
+    // 4. Calculate winnings
+    const betOnWinner = Math.floor(Number(bets[winningFruit.id]) || 0);
+    const effectiveMultiplier = winningFruit.multiplier * feverMultiplier;
+    const wonCoins = betOnWinner * effectiveMultiplier;
+    const netCoinChange = wonCoins - totalBet;
+
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.fruitPartyStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.fruitPartyStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = Math.max(0, currentTodayEarnings + wonCoins);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: netCoinChange,
+          'fruitPartyStats.totalWinnings': wonCoins,
+          'fruitPartyStats.roundsPlayed': 1,
+        },
+        $set: {
+          'fruitPartyStats.todayEarnings': newTodayEarnings,
+          'fruitPartyStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      winningFruit,
+      partyFever,
+      feverMultiplier,
+      effectiveMultiplier,
+      wonCoins,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      recentWinners: recentFruitWinners.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('playFruitParty error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

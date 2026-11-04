@@ -14,6 +14,8 @@ const {
   spinZooSlots,
   getOceanKingState,
   playOceanKing,
+  getFruitPartyState,
+  playFruitParty,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -41,5 +43,9 @@ router.post('/zoo-slots/spin', protect, spinZooSlots);
 // Ocean King (Fishing Frenzy) Routes
 router.get('/ocean-king/state', getOceanKingState);
 router.post('/ocean-king/play', protect, playOceanKing);
+
+// Fruit Party / Lucky Fruit Routes
+router.get('/fruit-party/state', getFruitPartyState);
+router.post('/fruit-party/play', protect, playFruitParty);
 
 module.exports = router;
