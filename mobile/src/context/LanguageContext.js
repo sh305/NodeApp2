@@ -152,6 +152,27 @@ ramCache.set('hi:::SPIN NOW', 'अभी स्पिन करें');
 ramCache.set('hi:::Rebet', 'दोबारा दांव');
 ramCache.set('hi:::Please place your bet on at least one car brand!', 'कृपया कम से कम एक कार ब्रांड पर अपना दांव लगाएं!');
 ramCache.set('hi:::Recent', 'हालिया');
+ramCache.set('hi:::Ocean King', 'ओशन किंग');
+ramCache.set('hi:::Fishing Frenzy • Deep Sea Harpoon', 'फिशिंग फ्रेंजी • डीप सी हारपून');
+ramCache.set('hi:::Ocean King Paytable & Rules', 'ओशन किंग पे-टेबल और नियम');
+ramCache.set('hi:::Clownfish', 'क्लाउनफिश');
+ramCache.set('hi:::Pufferfish', 'पफरफिश');
+ramCache.set('hi:::Electric Octopus', 'इलेक्ट्रिक ऑक्टोपस');
+ramCache.set('hi:::Sea Turtle', 'समुद्री कछुआ');
+ramCache.set('hi:::Hammerhead', 'हैमरहेड शार्क');
+ramCache.set('hi:::Deep Mermaid', 'जलपरी');
+ramCache.set('hi:::Mega Kraken', 'मेगा क्रैकन');
+ramCache.set('hi:::Dragon King', 'गोल्डन ड्रैगन किंग');
+ramCache.set('hi:::FIRE NET CANNON', 'नेट तोप चलाएं');
+ramCache.set('hi:::CATCH NOW', 'अभी पकड़ें');
+ramCache.set('hi:::LOCKING TARGET...', 'निशाना लॉक हो रहा है...');
+ramCache.set('hi:::TRIDENT MEGA SURGE!', 'त्रिशूल मेगा सर्ज!');
+ramCache.set('hi:::CREATURE CAUGHT!', 'समुद्री जीव पकड़ा गया!');
+ramCache.set('hi:::TARGET ESCAPED', 'शिकार बच निकला');
+ramCache.set('hi:::Better luck on the next cast!', 'अगले शिकार पर शुभकामनाएं!');
+ramCache.set('hi:::Bets cleared! Coins refunded.', 'दांव हटा दिए गए! कॉइन्स वापस मिले।');
+ramCache.set('hi:::Previous bets placed!', 'पुराने दांव लग गए!');
+ramCache.set('hi:::Max Chip Set', 'अधिकतम चिप सेट');
 ramCache.set('hi:::Zoo Slots', 'चिड़ियाघर स्लॉट्स');
 ramCache.set('hi:::Wild Animal Reels • Bamboo Respins', 'वाइल्ड एनिमल रील्स • बैम्बू री-स्पिन्स');
 ramCache.set('hi:::Zoo Slots Paytable & Rules', 'ज़ू स्लॉट्स पे-टेबल और नियम');
@@ -652,6 +673,27 @@ export const LanguageProvider = ({ children }) => {
       'Space Voyage',
       'Premium Slots',
       'Recent',
+      'Ocean King',
+      'Fishing Frenzy • Deep Sea Harpoon',
+      'Ocean King Paytable & Rules',
+      'Clownfish',
+      'Pufferfish',
+      'Electric Octopus',
+      'Sea Turtle',
+      'Hammerhead',
+      'Deep Mermaid',
+      'Mega Kraken',
+      'Dragon King',
+      'FIRE NET CANNON',
+      'CATCH NOW',
+      'LOCKING TARGET...',
+      'TRIDENT MEGA SURGE!',
+      'CREATURE CAUGHT!',
+      'TARGET ESCAPED',
+      'Better luck on the next cast!',
+      'Bets cleared! Coins refunded.',
+      'Previous bets placed!',
+      'Max Chip Set',
       'Zoo Slots',
       'Super Slots',
       'Animal Race',
@@ -692,6 +734,27 @@ export const LanguageProvider = ({ children }) => {
       'Rebet',
       'Please place your bet on at least one car brand!',
       'Recent',
+      'Ocean King',
+      'Fishing Frenzy • Deep Sea Harpoon',
+      'Ocean King Paytable & Rules',
+      'Clownfish',
+      'Pufferfish',
+      'Electric Octopus',
+      'Sea Turtle',
+      'Hammerhead',
+      'Deep Mermaid',
+      'Mega Kraken',
+      'Dragon King',
+      'FIRE NET CANNON',
+      'CATCH NOW',
+      'LOCKING TARGET...',
+      'TRIDENT MEGA SURGE!',
+      'CREATURE CAUGHT!',
+      'TARGET ESCAPED',
+      'Better luck on the next cast!',
+      'Bets cleared! Coins refunded.',
+      'Previous bets placed!',
+      'Max Chip Set',
       'Zoo Slots',
       'Wild Animal Reels • Bamboo Respins',
       'Zoo Slots Paytable & Rules',

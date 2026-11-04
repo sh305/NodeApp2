@@ -12,6 +12,8 @@ const {
   spinCarRoulette,
   getZooSlotsState,
   spinZooSlots,
+  getOceanKingState,
+  playOceanKing,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -35,5 +37,9 @@ router.post('/car-roulette/spin', protect, spinCarRoulette);
 // Zoo Slots (Wild Animal Reels) Routes
 router.get('/zoo-slots/state', getZooSlotsState);
 router.post('/zoo-slots/spin', protect, spinZooSlots);
+
+// Ocean King (Fishing Frenzy) Routes
+router.get('/ocean-king/state', getOceanKingState);
+router.post('/ocean-king/play', protect, playOceanKing);
 
 module.exports = router;

@@ -959,3 +959,181 @@ exports.spinZooSlots = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 6. OCEAN KING / FISHING FRENZY CONTROLLER
+// ══════════════════════════════════════════════════════════════════════════════════
+
+const OCEAN_CREATURES = [
+  { id: 'clownfish', name: 'Clownfish', multiplier: 2, weight: 35, color: '#FB923C', emoji: '🐠', tier: 'safe' },
+  { id: 'pufferfish', name: 'Pufferfish', multiplier: 4, weight: 22, color: '#FACC15', emoji: '🐡', tier: 'safe' },
+  { id: 'octopus', name: 'Electric Octopus', multiplier: 8, weight: 14, color: '#A855F7', emoji: '🐙', tier: 'safe' },
+  { id: 'turtle', name: 'Golden Sea Turtle', multiplier: 15, weight: 10, color: '#10B981', emoji: '🐢', tier: 'mid' },
+  { id: 'shark', name: 'Hammerhead Shark', multiplier: 30, weight: 7, color: '#0EA5E9', emoji: '🦈', tier: 'mid' },
+  { id: 'mermaid', name: 'Deep Sea Mermaid', multiplier: 60, weight: 4.5, color: '#EC4899', emoji: '🧜‍♀️', tier: 'high' },
+  { id: 'kraken', name: 'Mega Kraken', multiplier: 120, weight: 2.5, color: '#8B5CF6', emoji: '🦑', tier: 'high' },
+  { id: 'dragon_king', name: 'Golden Dragon King', multiplier: 300, weight: 1.2, color: '#F59E0B', emoji: '🐉', tier: 'jackpot' },
+];
+
+let recentOceanWinners = ['clownfish', 'shark', 'turtle', 'pufferfish', 'dragon_king', 'mermaid', 'octopus', 'clownfish'];
+
+function pickRandomOceanCreature() {
+  const totalWeight = OCEAN_CREATURES.reduce((sum, c) => sum + c.weight, 0);
+  let randomVal = Math.random() * totalWeight;
+  for (const c of OCEAN_CREATURES) {
+    if (randomVal < c.weight) {
+      return c;
+    }
+    randomVal -= c.weight;
+  }
+  return OCEAN_CREATURES[0];
+}
+
+/**
+ * @desc    Get Ocean King game state & paytable
+ * @route   GET /api/games/ocean-king/state
+ */
+exports.getOceanKingState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins oceanKingStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.oceanKingStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.oceanKingStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      creatures: OCEAN_CREATURES,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 999999,
+      recentWinners: recentOceanWinners.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('getOceanKingState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Play Ocean King round (with Poseidon\'s Trident Surge & dynamic catch)
+ * @route   POST /api/games/ocean-king/play
+ */
+exports.playOceanKing = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body;
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    let totalBet = 0;
+    const creatureIds = OCEAN_CREATURES.map((c) => c.id);
+
+    for (const [key, val] of Object.entries(bets)) {
+      if (!creatureIds.includes(key)) {
+        return res.status(400).json({ success: false, message: 'Invalid sea creature: ' + key });
+      }
+      const amount = Math.floor(Number(val) || 0);
+      if (amount < 0) {
+        return res.status(400).json({ success: false, message: 'Bet amounts cannot be negative' });
+      }
+      totalBet += amount;
+    }
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Please place a bet on at least one sea creature' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < totalBet) {
+      return res.status(400).json({
+        success: false,
+        code: 'INSUFFICIENT_COINS',
+        message: 'Insufficient coins balance. Please recharge first.',
+        currentCoins: user.coins || 0,
+        requiredCoins: totalBet,
+      });
+    }
+
+    // 1. Pick winning creature
+    const winningCreature = pickRandomOceanCreature();
+
+    // 2. Dynamic Poseidon\'s Trident Surge (20% chance to trigger 2X or 3X multiplier boost!)
+    let tridentSurge = false;
+    let surgeMultiplier = 1;
+    if (Math.random() < 0.20) {
+      tridentSurge = true;
+      surgeMultiplier = Math.random() < 0.35 ? 3 : 2;
+    }
+
+    // 3. Prepend to recent history (max 20)
+    recentOceanWinners.unshift(winningCreature.id);
+    if (recentOceanWinners.length > 20) {
+      recentOceanWinners = recentOceanWinners.slice(0, 20);
+    }
+
+    // 4. Calculate winnings
+    const betOnWinner = Math.floor(Number(bets[winningCreature.id]) || 0);
+    const effectiveMultiplier = winningCreature.multiplier * surgeMultiplier;
+    const wonCoins = betOnWinner * effectiveMultiplier;
+    const netCoinChange = wonCoins - totalBet;
+
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.oceanKingStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.oceanKingStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = Math.max(0, currentTodayEarnings + wonCoins);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: netCoinChange,
+          'oceanKingStats.totalWinnings': wonCoins,
+          'oceanKingStats.roundsPlayed': 1,
+        },
+        $set: {
+          'oceanKingStats.todayEarnings': newTodayEarnings,
+          'oceanKingStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      winningCreature,
+      tridentSurge,
+      surgeMultiplier,
+      effectiveMultiplier,
+      wonCoins,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      recentWinners: recentOceanWinners.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('playOceanKing error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

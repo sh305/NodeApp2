@@ -66,6 +66,7 @@ import SuperSlotsGameModal from '../components/SuperSlotsGameModal';
 import AnimalRaceGameModal from '../components/AnimalRaceGameModal';
 import CarRouletteGameModal from '../components/CarRouletteGameModal';
 import ZooSlotsGameModal from '../components/ZooSlotsGameModal';
+import OceanKingGameModal from '../components/OceanKingGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -179,6 +180,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [animalRaceModalVisible, setAnimalRaceModalVisible] = useState(false);
   const [carRouletteModalVisible, setCarRouletteModalVisible] = useState(false);
   const [zooSlotsModalVisible, setZooSlotsModalVisible] = useState(false);
+  const [oceanKingModalVisible, setOceanKingModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3039,6 +3041,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setCarRouletteModalVisible(true);
           } else if (gameId === 'zoo_slots') {
             setZooSlotsModalVisible(true);
+          } else if (gameId === 'ocean_king') {
+            setOceanKingModalVisible(true);
           }
         }}
       />
@@ -3119,6 +3123,22 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setZooSlotsModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+
+      {/* ══ OCEAN KING (FISHING FRENZY) GAME MODAL ══ */}
+      <OceanKingGameModal
+        visible={oceanKingModalVisible}
+        onClose={() => setOceanKingModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setOceanKingModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

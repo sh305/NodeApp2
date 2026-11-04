@@ -19,6 +19,7 @@ import { SevenIcon } from './SlotIcons';
 import { LionIcon } from './AnimalIcons';
 import { SteeringWheelIcon } from './CarIcons';
 import { GoldenPawIcon } from './ZooSlotIcons';
+import { GoldenDragonIcon } from './OceanKingIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -227,9 +228,49 @@ function ZooSlotsTile() {
   );
 }
 
-// 5 Flagship Games Configuration
+/**
+ * Modern Square Game Tile for Ocean King (Deep Sea Fishing Frenzy)
+ */
+function OceanKingTile() {
+  return (
+    <View style={[styles.tileBox, styles.oceanKingTileBorder]}>
+      <LinearGradient
+        colors={['#04101E', '#06283D', '#0077B6', '#00F5D4']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Ocean Sparkles & Bubbles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.8" fill="#00F5D4" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#38BDF8" opacity={0.7} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#00F5D4" opacity={0.9} />
+        </Svg>
+
+        {/* Golden Dragon King Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <GoldenDragonIcon size={46} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonCyan}>
+          <Text style={styles.bottomRibbonCyanText}>300X 🐉</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 6 Flagship Games Configuration
 // Row 1: Greedy Baby, Super Slots, Animal Race
-// Row 2: Car Roulette, Zoo Slots (future games automatically fill row 2 col 3, row 3, etc.)
+// Row 2: Car Roulette, Zoo Slots, Ocean King (Complete 3x2 Grid!)
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -255,6 +296,11 @@ const GAMES = [
     id: 'zoo_slots',
     title: 'Zoo Slots',
     TileComponent: ZooSlotsTile,
+  },
+  {
+    id: 'ocean_king',
+    title: 'Ocean King',
+    TileComponent: OceanKingTile,
   },
 ];
 
@@ -479,6 +525,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.65)',
     shadowColor: '#10B981',
   },
+  oceanKingTileBorder: {
+    borderColor: 'rgba(0, 245, 212, 0.65)',
+    shadowColor: '#00F5D4',
+  },
   tileGradient: {
     width: '100%',
     height: '100%',
@@ -593,6 +643,25 @@ const styles = StyleSheet.create({
   },
   bottomRibbonAmberText: {
     color: '#FEF08A',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  bottomRibbonCyan: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(3, 105, 161, 0.92)',
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 245, 212, 0.5)',
+    zIndex: 3,
+  },
+  bottomRibbonCyanText: {
+    color: '#00F5D4',
     fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 0.3,
