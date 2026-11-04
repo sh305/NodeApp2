@@ -6,8 +6,8 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  Dimensions,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,21 +20,10 @@ import { LionIcon } from './AnimalIcons';
 import { SteeringWheelIcon } from './CarIcons';
 import { GoldenPawIcon } from './ZooSlotIcons';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// 3-Column Responsive Grid Calculations
-const HORIZONTAL_PADDING = 16;
-const GRID_GAP = 12;
-const NUM_COLUMNS = 3;
-const ITEM_WIDTH = Math.floor(
-  (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS
-);
-
 /**
  * Modern Square Game Tile for Greedy Baby
  */
 function GreedyBabyTile() {
-  const iconSize = Math.round(ITEM_WIDTH * 0.54);
   return (
     <View style={styles.tileBox}>
       <LinearGradient
@@ -59,7 +48,7 @@ function GreedyBabyTile() {
 
         {/* Cute Greedy Baby Character */}
         <View style={styles.characterContainer}>
-          <GreedyBabyCharacter size={iconSize} />
+          <GreedyBabyCharacter size={52} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -81,7 +70,6 @@ function GreedyBabyTile() {
  * Modern Square Game Tile for Super Slots (Crazy 777 Casino Style)
  */
 function SuperSlotsTile() {
-  const iconSize = Math.round(ITEM_WIDTH * 0.50);
   return (
     <View style={[styles.tileBox, styles.slotsTileBorder]}>
       <LinearGradient
@@ -101,7 +89,7 @@ function SuperSlotsTile() {
 
         {/* Lucky 7 Symbol */}
         <View style={styles.slotCenterSymbol}>
-          <SevenIcon size={iconSize} />
+          <SevenIcon size={46} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -123,7 +111,6 @@ function SuperSlotsTile() {
  * Modern Square Game Tile for Animal Race (Jungle Safari Style)
  */
 function AnimalRaceTile() {
-  const iconSize = Math.round(ITEM_WIDTH * 0.48);
   return (
     <View style={[styles.tileBox, styles.animalTileBorder]}>
       <LinearGradient
@@ -142,7 +129,7 @@ function AnimalRaceTile() {
 
         {/* Lion King of Jungle */}
         <View style={styles.slotCenterSymbol}>
-          <LionIcon size={iconSize} />
+          <LionIcon size={46} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -164,7 +151,6 @@ function AnimalRaceTile() {
  * Modern Square Game Tile for Car Roulette (Speed Club Style)
  */
 function CarRouletteTile() {
-  const iconSize = Math.round(ITEM_WIDTH * 0.50);
   return (
     <View style={[styles.tileBox, styles.carRouletteTileBorder]}>
       <LinearGradient
@@ -183,7 +169,7 @@ function CarRouletteTile() {
 
         {/* Steering Wheel Icon */}
         <View style={styles.slotCenterSymbol}>
-          <SteeringWheelIcon size={iconSize} />
+          <SteeringWheelIcon size={46} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -205,7 +191,6 @@ function CarRouletteTile() {
  * Modern Square Game Tile for Zoo Slots (Wild Animal Jungle Style)
  */
 function ZooSlotsTile() {
-  const iconSize = Math.round(ITEM_WIDTH * 0.50);
   return (
     <View style={[styles.tileBox, styles.zooSlotsTileBorder]}>
       <LinearGradient
@@ -224,7 +209,7 @@ function ZooSlotsTile() {
 
         {/* Golden Paw Wild Symbol */}
         <View style={styles.slotCenterSymbol}>
-          <GoldenPawIcon size={iconSize} />
+          <GoldenPawIcon size={46} />
         </View>
 
         {/* Bottom Multiplier Ribbon */}
@@ -243,6 +228,8 @@ function ZooSlotsTile() {
 }
 
 // 5 Flagship Games Configuration
+// Row 1: Greedy Baby, Super Slots, Animal Race
+// Row 2: Car Roulette, Zoo Slots (future games automatically fill row 2 col 3, row 3, etc.)
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -271,6 +258,15 @@ const GAMES = [
   },
 ];
 
+// Helper to chunk games into exact rows of 3
+function chunkIntoRows(items, cols = 3) {
+  const rows = [];
+  for (let i = 0; i < items.length; i += cols) {
+    rows.push(items.slice(i, i + cols));
+  }
+  return rows;
+}
+
 export default function GamesListModal({
   visible,
   onClose,
@@ -278,8 +274,19 @@ export default function GamesListModal({
 }) {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   if (!visible) return null;
+
+  // Exact 3-column measurements guaranteed not to wrap
+  const horizontalPadding = 14;
+  const gridGap = 10;
+  const numColumns = 3;
+  const itemWidth = Math.floor(
+    (windowWidth - horizontalPadding * 2 - gridGap * (numColumns - 1)) / numColumns
+  );
+
+  const gameRows = chunkIntoRows(GAMES, numColumns);
 
   return (
     <Modal
@@ -291,8 +298,18 @@ export default function GamesListModal({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop}>
           <TouchableWithoutFeedback>
-            <View style={[styles.sheetContainer, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
-              {/* Header: Title "Games", Game Count & Close "✕" */}
+            <View
+              style={[
+                styles.sheetContainer,
+                {
+                  paddingHorizontal: horizontalPadding,
+                  minHeight: Math.min(460, Math.round(windowHeight * 0.60)),
+                  maxHeight: Math.min(640, Math.round(windowHeight * 0.85)),
+                  paddingBottom: Math.max(20, insets.bottom + 12),
+                },
+              ]}
+            >
+              {/* Header: Title "Games", Count Badge & Close "✕" */}
               <View style={styles.headerRow}>
                 <View style={styles.headerLeftGroup}>
                   <Text style={styles.headerTitle}>
@@ -312,31 +329,46 @@ export default function GamesListModal({
                 </TouchableOpacity>
               </View>
 
-              {/* Games 3-Column Grid (Row 1: 3 games, Row 2: 2 games, easily expandable to 7-8 games) */}
+              {/* Exact 3-Games-per-Row Grid Container */}
               <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.gamesGrid}
+                contentContainerStyle={styles.scrollContent}
                 bounces={false}
               >
-                {GAMES.map((game) => {
-                  const Tile = game.TileComponent;
-                  return (
-                    <TouchableOpacity
-                      key={game.id}
-                      style={styles.gameItem}
-                      activeOpacity={0.82}
-                      onPress={() => {
-                        onClose();
-                        onSelectGame(game.id);
-                      }}
-                    >
-                      <Tile />
-                      <Text style={styles.gameTitle} numberOfLines={1}>
-                        <T>{game.title}</T>
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                {gameRows.map((row, rowIndex) => (
+                  <View
+                    key={`row-${rowIndex}`}
+                    style={[
+                      styles.gamesRow,
+                      { gap: gridGap },
+                    ]}
+                  >
+                    {row.map((game) => {
+                      const Tile = game.TileComponent;
+                      return (
+                        <TouchableOpacity
+                          key={game.id}
+                          style={[styles.gameItem, { width: itemWidth }]}
+                          activeOpacity={0.82}
+                          onPress={() => {
+                            onClose();
+                            onSelectGame(game.id);
+                          }}
+                        >
+                          <Tile />
+                          <Text style={styles.gameTitle} numberOfLines={1}>
+                            <T>{game.title}</T>
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    {/* Invisible Spacers for row 2 to preserve exact column alignment */}
+                    {Array.from({ length: numColumns - row.length }).map((_, idx) => (
+                      <View key={`spacer-${rowIndex}-${idx}`} style={{ width: itemWidth }} />
+                    ))}
+                  </View>
+                ))}
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
@@ -357,9 +389,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     paddingTop: 18,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    minHeight: Math.min(460, Math.round(SCREEN_HEIGHT * 0.58)),
-    maxHeight: Math.min(620, Math.round(SCREEN_HEIGHT * 0.82)),
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -407,21 +436,22 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '700',
   },
-  gamesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: GRID_GAP,
+  scrollContent: {
     paddingTop: 4,
-    paddingBottom: 24,
+    paddingBottom: 20,
+  },
+  gamesRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    width: '100%',
   },
   gameItem: {
     alignItems: 'center',
-    width: ITEM_WIDTH,
-    marginBottom: 6,
   },
   tileBox: {
-    width: ITEM_WIDTH,
-    height: ITEM_WIDTH,
+    width: '100%',
+    aspectRatio: 1,
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1.5,
@@ -459,7 +489,7 @@ const styles = StyleSheet.create({
   characterContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -4,
+    marginTop: -3,
   },
   topRightCoin: {
     position: 'absolute',
@@ -470,7 +500,7 @@ const styles = StyleSheet.create({
   slotCenterSymbol: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -4,
+    marginTop: -3,
   },
   bottomRibbonPink: {
     position: 'absolute',
@@ -578,8 +608,8 @@ const styles = StyleSheet.create({
   },
   gameTitle: {
     marginTop: 8,
-    fontSize: 12.5,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: 0.2,
