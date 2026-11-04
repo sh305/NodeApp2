@@ -161,20 +161,18 @@ export default function OceanKingGameModal({
     return () => sweepLoop.stop();
   }, [radarSweepAnim]);
 
-  // Total bet calculation
+  // Total bet calculation & real-time display coins
   const totalBetAmount = Object.values(bets).reduce((sum, val) => sum + (Number(val) || 0), 0);
+  const displayCoins = Math.max(0, userCoins - totalBetAmount);
 
   // Place bet on a sea creature
   const handlePlaceBet = (creatureId) => {
     if (gamePhase !== 'BETTING' || isFiring) return;
 
-    if (userCoins < selectedChip) {
+    if (totalBetAmount + selectedChip > userCoins) {
       showToast(t('Insufficient coins balance. Please recharge first.'), 'error');
       return;
     }
-
-    setUserCoins((prev) => prev - selectedChip);
-    onCoinBalanceUpdate?.(userCoins - selectedChip);
 
     setBets((prev) => ({
       ...prev,
@@ -189,10 +187,8 @@ export default function OceanKingGameModal({
   // Clear current round bets
   const handleClearBets = () => {
     if (gamePhase !== 'BETTING' || isFiring || totalBetAmount === 0) return;
-    setUserCoins((prev) => prev + totalBetAmount);
-    onCoinBalanceUpdate?.(userCoins + totalBetAmount);
     setBets({});
-    showToast(t('Bets cleared! Coins refunded.'), 'info');
+    showToast(t('Bets cleared!'), 'info');
   };
 
   // Rebet previous bets
@@ -202,13 +198,11 @@ export default function OceanKingGameModal({
     const rebetTotal = Object.values(lastBets).reduce((sum, v) => sum + (Number(v) || 0), 0);
     if (rebetTotal === 0) return;
 
-    if (userCoins < rebetTotal) {
+    if (totalBetAmount + rebetTotal > userCoins) {
       showToast(t('Insufficient coins for Rebet'), 'error');
       return;
     }
 
-    setUserCoins((prev) => prev - rebetTotal);
-    onCoinBalanceUpdate?.(userCoins - rebetTotal);
     setBets({ ...lastBets });
     showToast(t('Previous bets placed!'), 'success');
   };
@@ -343,8 +337,11 @@ export default function OceanKingGameModal({
           surgeMultiplier,
         });
 
-        if (userWon && soundEnabled && Platform.OS === 'android') {
-          Vibration.vibrate([0, 100, 50, 200]);
+        if (userWon) {
+          showToast(`🎉 ${t('Congratulations! You won')} ${wonCoins.toLocaleString()} ${t('Gold Coins')}!`, 'success');
+          if (soundEnabled && Platform.OS === 'android') {
+            Vibration.vibrate([0, 100, 50, 200]);
+          }
         }
 
         setTimeout(() => {
@@ -352,6 +349,7 @@ export default function OceanKingGameModal({
           setIsFiring(false);
           setGamePhase('BETTING');
           setBets({});
+          setWinResult(null);
           setTridentSurgeActive(1);
         }, userWon ? 3800 : 2500);
       });
@@ -456,7 +454,7 @@ export default function OceanKingGameModal({
           <View style={styles.statsBar}>
             <View style={styles.coinBalanceBox}>
               <ShinyCoinIcon size={20} />
-              <Text style={styles.coinBalanceText}>{userCoins.toLocaleString()}</Text>
+              <Text style={styles.coinBalanceText}>{displayCoins.toLocaleString()}</Text>
               <TouchableOpacity
                 style={styles.rechargeBtn}
                 activeOpacity={0.8}
@@ -465,6 +463,14 @@ export default function OceanKingGameModal({
                 <Text style={styles.rechargeBtnText}>+ <T>Recharge</T></Text>
               </TouchableOpacity>
             </View>
+
+            {totalBetAmount > 0 && (
+              <View style={styles.totalBetPill}>
+                <Text style={styles.totalBetText}>
+                  <T>Bet</T>: {totalBetAmount.toLocaleString()} 🪙
+                </Text>
+              </View>
+            )}
 
             <View style={styles.todayEarningsBox}>
               <Text style={styles.earningsLabel}><T>Today Won</T>:</Text>
@@ -707,36 +713,6 @@ export default function OceanKingGameModal({
                 <Text style={styles.utilityBtnText}>⚡</Text>
               </TouchableOpacity>
             </View>
-
-            {/* Launch / Fire Cannon Action Button */}
-            <TouchableOpacity
-              style={[
-                styles.fireCannonBtn,
-                (isFiring || gamePhase !== 'BETTING') && styles.fireCannonBtnDisabled,
-              ]}
-              activeOpacity={0.85}
-              onPress={handleFireCannon}
-              disabled={isFiring || gamePhase !== 'BETTING'}
-            >
-              <LinearGradient
-                colors={
-                  isFiring
-                    ? ['#475569', '#334155']
-                    : ['#0077B6', '#0096C7', '#00B4D8', '#48CAE4']
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.fireGradient}
-              >
-                <Text style={styles.fireBtnText}>
-                  {isFiring
-                    ? `⚡ ${t('LOCKING TARGET...')}`
-                    : totalBetAmount > 0
-                    ? `🔱 ${t('FIRE NET CANNON')} (${totalBetAmount.toLocaleString()} 🪙)`
-                    : `🔱 ${t('CATCH NOW')} (15s)`}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -1248,20 +1224,32 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#EF4444',
   },
+  totalBetPill: {
+    backgroundColor: 'rgba(0, 245, 212, 0.15)',
+    borderWidth: 1,
+    borderColor: '#00F5D4',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  totalBetText: {
+    color: '#00F5D4',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
   footerControls: {
     backgroundColor: '#031422',
     borderTopWidth: 1,
     borderTopColor: '#0A2540',
     paddingHorizontal: 14,
     paddingTop: 8,
-    paddingBottom: 4,
+    paddingBottom: 6,
     marginTop: 'auto',
   },
   chipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
   },
   chipBtn: {
     flexDirection: 'row',
@@ -1299,24 +1287,6 @@ const styles = StyleSheet.create({
   },
   utilityBtnText: {
     fontSize: 12,
-  },
-  fireCannonBtn: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  fireCannonBtnDisabled: {
-    opacity: 0.6,
-  },
-  fireGradient: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fireBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.5,
   },
   winModalBackdrop: {
     flex: 1,
@@ -1473,3 +1443,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
