@@ -68,6 +68,7 @@ import CarRouletteGameModal from '../components/CarRouletteGameModal';
 import ZooSlotsGameModal from '../components/ZooSlotsGameModal';
 import OceanKingGameModal from '../components/OceanKingGameModal';
 import FruitPartyGameModal from '../components/FruitPartyGameModal';
+import DragonTigerGameModal from '../components/DragonTigerGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -183,6 +184,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [zooSlotsModalVisible, setZooSlotsModalVisible] = useState(false);
   const [oceanKingModalVisible, setOceanKingModalVisible] = useState(false);
   const [fruitPartyModalVisible, setFruitPartyModalVisible] = useState(false);
+  const [dragonTigerModalVisible, setDragonTigerModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3047,6 +3049,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setOceanKingModalVisible(true);
           } else if (gameId === 'fruit_party') {
             setFruitPartyModalVisible(true);
+          } else if (gameId === 'dragon_tiger') {
+            setDragonTigerModalVisible(true);
           }
         }}
       />
@@ -3158,6 +3162,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setFruitPartyModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+      {/* ══ DRAGON VS TIGER GAME MODAL ══ */}
+      <DragonTigerGameModal
+        visible={dragonTigerModalVisible}
+        onClose={() => setDragonTigerModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setDragonTigerModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

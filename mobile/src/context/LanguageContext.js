@@ -192,6 +192,38 @@ ramCache.set('hi:::Better luck on the next cast!', 'अगले शिकार
 ramCache.set('hi:::Bets cleared! Coins refunded.', 'दांव हटा दिए गए! कॉइन्स वापस मिले।');
 ramCache.set('hi:::Previous bets placed!', 'पुराने दांव लग गए!');
 ramCache.set('hi:::Max Chip Set', 'अधिकतम चिप सेट');
+ramCache.set('hi:::Dragon vs Tiger', 'ड्रैगन वर्सेस टाइगर');
+ramCache.set('hi:::Legendary 2-Card Duel • Highest Card Wins', 'शानदार 2-कार्ड मुकाबला • बड़ा कार्ड जीतेगा');
+ramCache.set('hi:::Dragon vs Tiger Rules', 'ड्रैगन वर्सेस टाइगर नियम');
+ramCache.set('hi:::DRAGON', 'ड्रैगन');
+ramCache.set('hi:::TIGER', 'टाइगर');
+ramCache.set('hi:::TIE', 'टाई');
+ramCache.set('hi:::TIE 9X', 'टाई 9X');
+ramCache.set('hi:::Roadmap', 'रोडमैप');
+ramCache.set('hi:::DEALING DESTINY CARDS...', 'भाग्य के कार्ड बांटे जा रहे हैं...');
+ramCache.set('hi:::PLACE YOUR BET: DRAGON OR TIGER', 'दांव लगाएं: ड्रैगन या टाइगर');
+ramCache.set('hi:::VICTORY!', 'जीत!');
+ramCache.set('hi:::WINS', 'जीता');
+ramCache.set('hi:::WON THIS ROUND', 'इस राउंड में जीता');
+ramCache.set('hi:::Better luck on the next deal!', 'अगले दांव पर शुभकामनाएं!');
+ramCache.set('hi:::Gameplay & Payouts', 'गेमप्ले और पेआउट्स');
+ramCache.set('hi:::Card Ranking Hierarchy', 'कार्ड रैंकिंग क्रम');
+ramCache.set('hi:::King (K) is Highest, Ace (A) is Lowest:', 'किंग (K) सबसे बड़ा है, इक्का (A) सबसे छोटा:');
+ramCache.set('hi:::Dragon (2X)', 'ड्रैगन (2X)');
+ramCache.set('hi:::Tiger (2X)', 'टाइगर (2X)');
+ramCache.set('hi:::Tie (9X)', 'टाई (9X)');
+ramCache.set('hi:::Bets on Dragon win if the Dragon card is higher than the Tiger card.', 'ड्रैगन पर दांव तब जीतता है जब ड्रैगन कार्ड टाइगर से बड़ा हो।');
+ramCache.set('hi:::Bets on Tiger win if the Tiger card is higher than the Dragon card.', 'टाइगर पर दांव तब जीतता है जब टाइगर कार्ड ड्रैगन से बड़ा हो।');
+ramCache.set('hi:::If both cards have the exact same rank, Tie pays 9X, and 50% of Dragon & Tiger bets are refunded!', 'यदि दोनों कार्ड समान रैंक के हों, तो टाई 9X देता है और ड्रैगन व टाइगर का 50% रिफंड होता है!');
+ramCache.set('hi:::DRAGON WINS!', 'ड्रैगन की जीत!');
+ramCache.set('hi:::TIGER WINS!', 'टाइगर की जीत!');
+ramCache.set('hi:::TIE GAME (9X PAYOUT)!', 'टाई गेम (9X पेआउट)!');
+ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
+ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
+ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
+ramCache.set('hi:::Failed to start card duel', 'कार्ड मुकाबला शुरू करने में विफल');
+ramCache.set('hi:::Congratulations! You won', 'बधाई! आप जीते');
+ramCache.set('hi:::Today Won', 'आज की जीत');
 ramCache.set('hi:::Zoo Slots', 'चिड़ियाघर स्लॉट्स');
 ramCache.set('hi:::Wild Animal Reels • Bamboo Respins', 'वाइल्ड एनिमल रील्स • बैम्बू री-स्पिन्स');
 ramCache.set('hi:::Zoo Slots Paytable & Rules', 'ज़ू स्लॉट्स पे-टेबल और नियम');
@@ -732,6 +764,38 @@ export const LanguageProvider = ({ children }) => {
       'Bets cleared! Coins refunded.',
       'Previous bets placed!',
       'Max Chip Set',
+      'Dragon vs Tiger',
+      'Legendary 2-Card Duel • Highest Card Wins',
+      'Dragon vs Tiger Rules',
+      'DRAGON',
+      'TIGER',
+      'TIE',
+      'TIE 9X',
+      'Roadmap',
+      'DEALING DESTINY CARDS...',
+      'PLACE YOUR BET: DRAGON OR TIGER',
+      'VICTORY!',
+      'WINS',
+      'WON THIS ROUND',
+      'Better luck on the next deal!',
+      'Gameplay & Payouts',
+      'Card Ranking Hierarchy',
+      'King (K) is Highest, Ace (A) is Lowest:',
+      'Dragon (2X)',
+      'Tiger (2X)',
+      'Tie (9X)',
+      'Bets on Dragon win if the Dragon card is higher than the Tiger card.',
+      'Bets on Tiger win if the Tiger card is higher than the Dragon card.',
+      'If both cards have the exact same rank, Tie pays 9X, and 50% of Dragon & Tiger bets are refunded!',
+      'DRAGON WINS!',
+      'TIGER WINS!',
+      'TIE GAME (9X PAYOUT)!',
+      'Insufficient coins balance. Please recharge first.',
+      'Bets cleared!',
+      'Insufficient coins for Rebet',
+      'Failed to start card duel',
+      'Congratulations! You won',
+      'Today Won',
       'Zoo Slots',
       'Super Slots',
       'Animal Race',
@@ -793,6 +857,38 @@ export const LanguageProvider = ({ children }) => {
       'Bets cleared! Coins refunded.',
       'Previous bets placed!',
       'Max Chip Set',
+      'Dragon vs Tiger',
+      'Legendary 2-Card Duel • Highest Card Wins',
+      'Dragon vs Tiger Rules',
+      'DRAGON',
+      'TIGER',
+      'TIE',
+      'TIE 9X',
+      'Roadmap',
+      'DEALING DESTINY CARDS...',
+      'PLACE YOUR BET: DRAGON OR TIGER',
+      'VICTORY!',
+      'WINS',
+      'WON THIS ROUND',
+      'Better luck on the next deal!',
+      'Gameplay & Payouts',
+      'Card Ranking Hierarchy',
+      'King (K) is Highest, Ace (A) is Lowest:',
+      'Dragon (2X)',
+      'Tiger (2X)',
+      'Tie (9X)',
+      'Bets on Dragon win if the Dragon card is higher than the Tiger card.',
+      'Bets on Tiger win if the Tiger card is higher than the Dragon card.',
+      'If both cards have the exact same rank, Tie pays 9X, and 50% of Dragon & Tiger bets are refunded!',
+      'DRAGON WINS!',
+      'TIGER WINS!',
+      'TIE GAME (9X PAYOUT)!',
+      'Insufficient coins balance. Please recharge first.',
+      'Bets cleared!',
+      'Insufficient coins for Rebet',
+      'Failed to start card duel',
+      'Congratulations! You won',
+      'Today Won',
       'Zoo Slots',
       'Wild Animal Reels • Bamboo Respins',
       'Zoo Slots Paytable & Rules',

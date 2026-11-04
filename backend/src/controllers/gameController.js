@@ -1315,3 +1315,242 @@ exports.playFruitParty = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 8. DRAGON VS TIGER (LEGENDARY 2-CARD SHOWDOWN) CONTROLLER
+// ══════════════════════════════════════════════════════════════════════════════════
+
+const SUITS = [
+  { id: 'spades', symbol: '♠', color: '#1E293B', isRed: false },
+  { id: 'hearts', symbol: '♥', color: '#EF4444', isRed: true },
+  { id: 'clubs', symbol: '♣', color: '#1E293B', isRed: false },
+  { id: 'diamonds', symbol: '♦', color: '#EF4444', isRed: true },
+];
+
+const RANKS = [
+  { rank: 'A', value: 1, name: 'Ace' },
+  { rank: '2', value: 2, name: '2' },
+  { rank: '3', value: 3, name: '3' },
+  { rank: '4', value: 4, name: '4' },
+  { rank: '5', value: 5, name: '5' },
+  { rank: '6', value: 6, name: '6' },
+  { rank: '7', value: 7, name: '7' },
+  { rank: '8', value: 8, name: '8' },
+  { rank: '9', value: 9, name: '9' },
+  { rank: '10', value: 10, name: '10' },
+  { rank: 'J', value: 11, name: 'Jack' },
+  { rank: 'Q', value: 12, name: 'Queen' },
+  { rank: 'K', value: 13, name: 'King' },
+];
+
+let recentDragonTigerWinners = ['dragon', 'tiger', 'dragon', 'dragon', 'tiger', 'tie', 'tiger', 'dragon'];
+
+function drawTwoCards() {
+  const deck = [];
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      deck.push({
+        rank: rank.rank,
+        value: rank.value,
+        name: rank.name,
+        suit: suit.id,
+        suitSymbol: suit.symbol,
+        isRed: suit.isRed,
+      });
+    }
+  }
+
+  // Shuffle deck
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+
+  const dragonCard = deck[0];
+  const tigerCard = deck[1];
+
+  let winner = 'tie';
+  if (dragonCard.value > tigerCard.value) {
+    winner = 'dragon';
+  } else if (tigerCard.value > dragonCard.value) {
+    winner = 'tiger';
+  }
+
+  const isSuitedTie = winner === 'tie' && dragonCard.suit === tigerCard.suit;
+
+  return { dragonCard, tigerCard, winner, isSuitedTie };
+}
+
+/**
+ * @desc    Get Dragon vs Tiger state
+ * @route   GET /api/games/dragon-tiger/state
+ */
+exports.getDragonTigerState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins dragonTigerStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.dragonTigerStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.dragonTigerStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 777777,
+      recentWinners: recentDragonTigerWinners.slice(0, 12),
+      multipliers: {
+        dragon: 2,
+        tiger: 2,
+        tie: 9,
+        suitedTie: 25,
+      },
+    });
+  } catch (error) {
+    console.error('getDragonTigerState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Play Dragon vs Tiger round
+ * @route   POST /api/games/dragon-tiger/play
+ */
+exports.playDragonTiger = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body;
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    const validSides = ['dragon', 'tiger', 'tie'];
+    let totalBet = 0;
+
+    for (const [side, val] of Object.entries(bets)) {
+      if (!validSides.includes(side)) {
+        return res.status(400).json({ success: false, message: 'Invalid betting side: ' + side });
+      }
+      const amount = Math.floor(Number(val) || 0);
+      if (amount < 0) {
+        return res.status(400).json({ success: false, message: 'Bet amounts cannot be negative' });
+      }
+      totalBet += amount;
+    }
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Please place a bet on Dragon, Tiger, or Tie' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < totalBet) {
+      return res.status(400).json({
+        success: false,
+        code: 'INSUFFICIENT_COINS',
+        message: 'Insufficient coins balance. Please recharge first.',
+        currentCoins: user.coins || 0,
+        requiredCoins: totalBet,
+      });
+    }
+
+    // 1. Draw 2 cards and determine outcome
+    const { dragonCard, tigerCard, winner, isSuitedTie } = drawTwoCards();
+
+    // 2. Prepend to history (max 20)
+    recentDragonTigerWinners.unshift(winner);
+    if (recentDragonTigerWinners.length > 20) {
+      recentDragonTigerWinners = recentDragonTigerWinners.slice(0, 20);
+    }
+
+    // 3. Dynamic Imperial Dragon/Tiger Roar (15% chance to boost winner multiplier to 3X)
+    let imperialBoost = false;
+    let boostMultiplier = 1;
+    if (winner !== 'tie' && Math.random() < 0.15) {
+      imperialBoost = true;
+      boostMultiplier = 1.5; // 2X * 1.5 = 3X total payout!
+    }
+
+    // 4. Calculate winnings
+    let wonCoins = 0;
+    const betDragon = Math.floor(Number(bets.dragon) || 0);
+    const betTiger = Math.floor(Number(bets.tiger) || 0);
+    const betTie = Math.floor(Number(bets.tie) || 0);
+
+    let effectiveMultiplier = 2;
+
+    if (winner === 'dragon') {
+      effectiveMultiplier = Math.round(2 * boostMultiplier);
+      wonCoins = betDragon * effectiveMultiplier;
+    } else if (winner === 'tiger') {
+      effectiveMultiplier = Math.round(2 * boostMultiplier);
+      wonCoins = betTiger * effectiveMultiplier;
+    } else if (winner === 'tie') {
+      effectiveMultiplier = isSuitedTie ? 25 : 9;
+      // Tie bet wins 9X (or 25X for suited tie)
+      wonCoins = betTie * effectiveMultiplier;
+      // Standard casino rule: on Tie, 50% of Dragon & Tiger bets are refunded!
+      wonCoins += Math.floor((betDragon + betTiger) * 0.5);
+    }
+
+    const netCoinChange = wonCoins - totalBet;
+
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.dragonTigerStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.dragonTigerStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = Math.max(0, currentTodayEarnings + wonCoins);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: netCoinChange,
+          'dragonTigerStats.totalWinnings': wonCoins,
+          'dragonTigerStats.roundsPlayed': 1,
+        },
+        $set: {
+          'dragonTigerStats.todayEarnings': newTodayEarnings,
+          'dragonTigerStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      winner,
+      dragonCard,
+      tigerCard,
+      isSuitedTie,
+      imperialBoost,
+      effectiveMultiplier,
+      wonCoins,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      recentWinners: recentDragonTigerWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('playDragonTiger error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

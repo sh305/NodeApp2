@@ -16,6 +16,8 @@ const {
   playOceanKing,
   getFruitPartyState,
   playFruitParty,
+  getDragonTigerState,
+  playDragonTiger,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -47,5 +49,9 @@ router.post('/ocean-king/play', protect, playOceanKing);
 // Fruit Party / Lucky Fruit Routes
 router.get('/fruit-party/state', getFruitPartyState);
 router.post('/fruit-party/play', protect, playFruitParty);
+
+// Dragon vs Tiger Routes
+router.get('/dragon-tiger/state', getDragonTigerState);
+router.post('/dragon-tiger/play', protect, playDragonTiger);
 
 module.exports = router;

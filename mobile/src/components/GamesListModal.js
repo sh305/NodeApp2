@@ -21,6 +21,7 @@ import { SteeringWheelIcon } from './CarIcons';
 import { GoldenPawIcon } from './ZooSlotIcons';
 import { GoldenDragonIcon } from './OceanKingIcons';
 import { FruitCocktailIcon } from './FruitPartyIcons';
+import { DragonTigerTileIcon } from './DragonTigerIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -309,9 +310,47 @@ function FruitPartyTile() {
   );
 }
 
-// 7 Flagship Games Configuration
-// Row 1: Greedy Baby, Super Slots, Animal Race
-// Row 2: Car Roulette, Zoo Slots, Ocean King (Complete 3x2 Grid!)
+/**
+ * Modern Square Game Tile for Dragon vs Tiger (2-Card High-Stakes Showdown)
+ */
+function DragonTigerTile() {
+  return (
+    <View style={[styles.tileBox, styles.dragonTigerTileBorder]}>
+      <LinearGradient
+        colors={['#7F1D1D', '#991B1B', '#B45309', '#1E1B4B']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Duel Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.8" fill="#F87171" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#FDE047" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#F59E0B" opacity={0.7} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
+        </Svg>
+
+        {/* Dragon vs Tiger Clash Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <DragonTigerTileIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonCrimson}>
+          <Text style={styles.bottomRibbonCrimsonText}>9X TIE ⚔️</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 8 Flagship Games Configuration
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -347,6 +386,11 @@ const GAMES = [
     id: 'fruit_party',
     title: 'Fruit Party',
     TileComponent: FruitPartyTile,
+  },
+  {
+    id: 'dragon_tiger',
+    title: 'Dragon vs Tiger',
+    TileComponent: DragonTigerTile,
   },
 ];
 
@@ -746,6 +790,29 @@ const styles = StyleSheet.create({
   },
   bottomRibbonMagentaText: {
     color: '#FFE600',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  dragonTigerTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+  },
+  bottomRibbonCrimson: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(153, 27, 27, 0.95)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(245, 158, 11, 0.6)',
+    zIndex: 3,
+  },
+  bottomRibbonCrimsonText: {
+    color: '#FEF08A',
     fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 0.3,
