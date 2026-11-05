@@ -24,6 +24,7 @@ import { FruitCocktailIcon } from './FruitPartyIcons';
 import { DragonTigerTileIcon } from './DragonTigerIcons';
 import { ColorPredictionTileIcon } from './ColorPredictionIcons';
 import { BullseyeDartsTileIcon } from './BullseyeDartsIcons';
+import { MatkaCrackTileIcon } from './MatkaCrackIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -434,7 +435,48 @@ function BullseyeDartsTile() {
   );
 }
 
-// 10 Flagship Games Configuration
+
+/**
+ * Modern Square Game Tile for Matka Crack (Treasure Pot Smash)
+ */
+function MatkaCrackTile() {
+  return (
+    <View style={[styles.tileBox, styles.matkaCrackTileBorder]}>
+      <LinearGradient
+        colors={['#78350F', '#B45309', '#D97706', '#2A1308']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Pot Treasure Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.8" fill="#FEF08A" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#38BDF8" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#F59E0B" opacity={0.7} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FEF08A" opacity={0.9} />
+        </Svg>
+
+        {/* Matka Crack Emblem Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <MatkaCrackTileIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonAmberDark}>
+          <Text style={styles.bottomRibbonAmberDarkText}>5X POT 🏺</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 11 Flagship Games Configuration
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -485,6 +527,11 @@ const GAMES = [
     id: 'bullseye_darts',
     title: 'Bullseye Darts',
     TileComponent: BullseyeDartsTile,
+  },
+  {
+    id: 'matka_crack',
+    title: 'Matka Crack',
+    TileComponent: MatkaCrackTile,
   },
 ];
 
@@ -952,6 +999,29 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   bottomRibbonGoldDarkText: {
+    color: '#FEF08A',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  matkaCrackTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#D97706',
+  },
+  bottomRibbonAmberDark: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(180, 83, 9, 0.95)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(253, 224, 71, 0.6)',
+    zIndex: 3,
+  },
+  bottomRibbonAmberDarkText: {
     color: '#FEF08A',
     fontSize: 9,
     fontWeight: '900',

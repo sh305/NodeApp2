@@ -2071,3 +2071,218 @@ exports.playBullseyeDarts = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ==========================================
+// 11. MATKA CRACK (THE ROYAL TREASURE POT SMASH)
+// ==========================================
+
+const recentMatkaCrackHistory = [
+  { roundId: 'MC9101', diamondPot: 'pot2', goldPot: 'pot1', emptyPot: 'pot3', timestamp: Date.now() - 140000 },
+  { roundId: 'MC9102', diamondPot: 'pot3', goldPot: 'pot2', emptyPot: 'pot1', timestamp: Date.now() - 120000 },
+  { roundId: 'MC9103', diamondPot: 'pot1', goldPot: 'pot3', emptyPot: 'pot2', timestamp: Date.now() - 100000 },
+  { roundId: 'MC9104', diamondPot: 'pot2', goldPot: 'pot3', emptyPot: 'pot1', timestamp: Date.now() - 80000 },
+  { roundId: 'MC9105', diamondPot: 'pot3', goldPot: 'pot1', emptyPot: 'pot2', timestamp: Date.now() - 60000 },
+  { roundId: 'MC9106', diamondPot: 'pot1', goldPot: 'pot2', emptyPot: 'pot3', timestamp: Date.now() - 40000 },
+  { roundId: 'MC9107', diamondPot: 'pot2', goldPot: 'pot1', emptyPot: 'pot3', timestamp: Date.now() - 20000 },
+  { roundId: 'MC9108', diamondPot: 'pot1', goldPot: 'pot3', emptyPot: 'pot2', timestamp: Date.now() - 5000 },
+];
+
+const recentMatkaCrackWinners = [
+  { name: 'Sameer 🏺', amount: 150000, prize: 'diamond', pot: 'pot2', time: '1m ago' },
+  { name: 'Kavita 💎', amount: 50000, prize: 'diamond', pot: 'pot1', time: '2m ago' },
+  { name: 'Arjun 🪙', amount: 25000, prize: 'gold', pot: 'pot3', time: '4m ago' },
+  { name: 'Neha ✨', amount: 100000, prize: 'diamond', pot: 'pot3', time: '5m ago' },
+  { name: 'Raj 👑', amount: 50000, prize: 'gold', pot: 'pot1', time: '7m ago' },
+];
+
+/**
+ * @desc    Get Matka Crack Game State
+ * @route   GET /api/games/matka-crack/state
+ */
+exports.getMatkaCrackState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins matkaCrackStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.matkaCrackStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.matkaCrackStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 777777,
+      history: recentMatkaCrackHistory.slice(0, 15),
+      recentWinners: recentMatkaCrackWinners.slice(0, 12),
+      multipliers: {
+        diamond: 5,
+        gold: 2.5,
+        empty: 0,
+      },
+    });
+  } catch (error) {
+    console.error('getMatkaCrackState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Play Matka Crack Round
+ * @route   POST /api/games/matka-crack/play
+ */
+exports.playMatkaCrack = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body;
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    const validPots = ['pot1', 'pot2', 'pot3'];
+    let totalBet = 0;
+    const cleanBets = {};
+
+    for (const pot of validPots) {
+      const val = bets[pot];
+      if (typeof val === 'number' && val > 0) {
+        cleanBets[pot] = Math.floor(val);
+        totalBet += cleanBets[pot];
+      } else {
+        cleanBets[pot] = 0;
+      }
+    }
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Please place at least one bet on Pot 1, Pot 2, or Pot 3' });
+    }
+
+    const user = await User.findById(userId).select('coins matkaCrackStats name');
+    if (!user || (user.coins || 0) < totalBet) {
+      return res.status(400).json({ success: false, message: 'Insufficient coins balance' });
+    }
+
+    // Shuffle 3 prizes across the 3 pots
+    const prizeTypes = [
+      { type: 'diamond', multiplier: 5, label: 'Diamond Vault' },
+      { type: 'gold', multiplier: 2.5, label: 'Gold Overflow' },
+      { type: 'empty', multiplier: 0, label: 'Empty Pot' },
+    ];
+
+    for (let i = prizeTypes.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [prizeTypes[i], prizeTypes[j]] = [prizeTypes[j], prizeTypes[i]];
+    }
+
+    const potResults = {
+      pot1: prizeTypes[0],
+      pot2: prizeTypes[1],
+      pot3: prizeTypes[2],
+    };
+
+    let diamondPot = 'pot1';
+    let goldPot = 'pot2';
+    let emptyPot = 'pot3';
+
+    for (const [potKey, info] of Object.entries(potResults)) {
+      if (info.type === 'diamond') diamondPot = potKey;
+      else if (info.type === 'gold') goldPot = potKey;
+      else if (info.type === 'empty') emptyPot = potKey;
+    }
+
+    // Calculate user winnings across all placed bets
+    let wonCoins = 0;
+    for (const pot of validPots) {
+      const potBet = cleanBets[pot];
+      if (potBet > 0) {
+        const resultInfo = potResults[pot];
+        if (resultInfo.type === 'diamond') {
+          wonCoins += potBet * 5;
+        } else if (resultInfo.type === 'gold') {
+          wonCoins += Math.floor(potBet * 2.5);
+        }
+      }
+    }
+
+    const coinDelta = wonCoins - totalBet;
+
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.matkaCrackStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.matkaCrackStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + Math.max(0, coinDelta);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: coinDelta,
+          'matkaCrackStats.roundsPlayed': 1,
+          'matkaCrackStats.totalWinnings': wonCoins,
+        },
+        $set: {
+          'matkaCrackStats.todayEarnings': newTodayEarnings,
+          'matkaCrackStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    const roundNumber = Math.floor(1000 + Math.random() * 9000);
+    const newRound = {
+      roundId: 'MC' + roundNumber,
+      diamondPot,
+      goldPot,
+      emptyPot,
+      timestamp: Date.now(),
+    };
+    recentMatkaCrackHistory.unshift(newRound);
+    if (recentMatkaCrackHistory.length > 30) {
+      recentMatkaCrackHistory.pop();
+    }
+
+    if (wonCoins >= 10000) {
+      recentMatkaCrackWinners.unshift({
+        name: (user.name || 'Pot Master').slice(0, 10),
+        amount: wonCoins,
+        prize: wonCoins >= totalBet * 4 ? 'diamond' : 'gold',
+        pot: diamondPot,
+        time: 'Just now',
+      });
+      if (recentMatkaCrackWinners.length > 20) {
+        recentMatkaCrackWinners.pop();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      potResults,
+      diamondPot,
+      goldPot,
+      emptyPot,
+      wonCoins,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      history: recentMatkaCrackHistory.slice(0, 15),
+      recentWinners: recentMatkaCrackWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('playMatkaCrack error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

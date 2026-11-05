@@ -66,4 +66,9 @@ router.post('/color-prediction/play', protect, playColorPrediction);
 router.get('/bullseye-darts/state', getBullseyeDartsState);
 router.post('/bullseye-darts/play', protect, playBullseyeDarts);
 
+
+// Matka Crack Routes
+router.get('/matka-crack/state', getMatkaCrackState);
+router.post('/matka-crack/play', protect, playMatkaCrack);
+
 module.exports = router;

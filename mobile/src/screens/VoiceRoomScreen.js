@@ -71,6 +71,7 @@ import FruitPartyGameModal from '../components/FruitPartyGameModal';
 import DragonTigerGameModal from '../components/DragonTigerGameModal';
 import ColorPredictionGameModal from '../components/ColorPredictionGameModal';
 import BullseyeDartsGameModal from '../components/BullseyeDartsGameModal';
+import MatkaCrackGameModal from '../components/MatkaCrackGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -189,6 +190,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [dragonTigerModalVisible, setDragonTigerModalVisible] = useState(false);
   const [colorPredictionModalVisible, setColorPredictionModalVisible] = useState(false);
   const [bullseyeDartsModalVisible, setBullseyeDartsModalVisible] = useState(false);
+  const [matkaCrackModalVisible, setMatkaCrackModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3053,8 +3055,14 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setOceanKingModalVisible(true);
           } else if (gameId === 'fruit_party') {
             setFruitPartyModalVisible(true);
-          } else if (gameId === 'dragon_tiger') {
+                    } else if (gameId === 'dragon_tiger') {
             setDragonTigerModalVisible(true);
+          } else if (gameId === 'color_prediction') {
+            setColorPredictionModalVisible(true);
+          } else if (gameId === 'bullseye_darts') {
+            setBullseyeDartsModalVisible(true);
+          } else if (gameId === 'matka_crack') {
+            setMatkaCrackModalVisible(true);
           }
         }}
       />
@@ -3211,6 +3219,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setDragonTigerModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+      {/* ══ MATKA CRACK (TREASURE POT SMASH) GAME MODAL ══ */}
+      <MatkaCrackGameModal
+        visible={matkaCrackModalVisible}
+        onClose={() => setMatkaCrackModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setMatkaCrackModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />
