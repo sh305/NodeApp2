@@ -70,6 +70,7 @@ import OceanKingGameModal from '../components/OceanKingGameModal';
 import FruitPartyGameModal from '../components/FruitPartyGameModal';
 import DragonTigerGameModal from '../components/DragonTigerGameModal';
 import ColorPredictionGameModal from '../components/ColorPredictionGameModal';
+import BullseyeDartsGameModal from '../components/BullseyeDartsGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -187,6 +188,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [fruitPartyModalVisible, setFruitPartyModalVisible] = useState(false);
   const [dragonTigerModalVisible, setDragonTigerModalVisible] = useState(false);
   const [colorPredictionModalVisible, setColorPredictionModalVisible] = useState(false);
+  const [bullseyeDartsModalVisible, setBullseyeDartsModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3164,6 +3166,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setFruitPartyModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+      {/* ══ BULLSEYE DARTS (1-SHOT TARGET) GAME MODAL ══ */}
+      <BullseyeDartsGameModal
+        visible={bullseyeDartsModalVisible}
+        onClose={() => setBullseyeDartsModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setBullseyeDartsModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

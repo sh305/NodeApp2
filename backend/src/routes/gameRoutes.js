@@ -61,4 +61,9 @@ router.post('/dragon-tiger/play', protect, playDragonTiger);
 router.get('/color-prediction/state', getColorPredictionState);
 router.post('/color-prediction/play', protect, playColorPrediction);
 
+
+// Bullseye Darts Routes
+router.get('/bullseye-darts/state', getBullseyeDartsState);
+router.post('/bullseye-darts/play', protect, playBullseyeDarts);
+
 module.exports = router;

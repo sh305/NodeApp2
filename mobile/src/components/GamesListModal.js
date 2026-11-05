@@ -23,6 +23,7 @@ import { GoldenDragonIcon } from './OceanKingIcons';
 import { FruitCocktailIcon } from './FruitPartyIcons';
 import { DragonTigerTileIcon } from './DragonTigerIcons';
 import { ColorPredictionTileIcon } from './ColorPredictionIcons';
+import { BullseyeDartsTileIcon } from './BullseyeDartsIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -392,7 +393,48 @@ function ColorPredictionTile() {
   );
 }
 
-// 9 Flagship Games Configuration (Perfect 3x3 Grid!)
+
+/**
+ * Modern Square Game Tile for Bullseye Darts (1-Shot Target Precision)
+ */
+function BullseyeDartsTile() {
+  return (
+    <View style={[styles.tileBox, styles.bullseyeDartsTileBorder]}>
+      <LinearGradient
+        colors={['#78350F', '#B45309', '#BE123C', '#1E1B4B']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Darts Target Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
+          <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
+          <Circle cx="20" cy="74" r="1.5" fill="#EF4444" opacity={0.7} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
+        </Svg>
+
+        {/* Bullseye Darts Clash Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <BullseyeDartsTileIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonGoldDark}>
+          <Text style={styles.bottomRibbonGoldDarkText}>25X BULLSEYE 🎯</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 10 Flagship Games Configuration
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -438,6 +480,11 @@ const GAMES = [
     id: 'color_prediction',
     title: 'Color Prediction',
     TileComponent: ColorPredictionTile,
+  },
+  {
+    id: 'bullseye_darts',
+    title: 'Bullseye Darts',
+    TileComponent: BullseyeDartsTile,
   },
 ];
 
@@ -885,6 +932,29 @@ const styles = StyleSheet.create({
     color: '#FDE047',
     fontSize: 9.5,
     fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  bullseyeDartsTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+  },
+  bottomRibbonGoldDark: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(180, 83, 9, 0.95)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(253, 224, 71, 0.6)',
+    zIndex: 3,
+  },
+  bottomRibbonGoldDarkText: {
+    color: '#FEF08A',
+    fontSize: 9,
+    fontWeight: '900',
     letterSpacing: 0.3,
   },
 });

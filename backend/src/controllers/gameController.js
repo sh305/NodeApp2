@@ -1806,3 +1806,268 @@ exports.playColorPrediction = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ==========================================
+// 10. BULLSEYE DARTS (1-SHOT TARGET SHOOTING)
+// ==========================================
+
+const DARTS_NUMBERS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+const RED_DARTS_NUMBERS = [20, 18, 13, 10, 2, 3, 7, 8, 14, 12];
+
+const recentBullseyeDartsHistory = [
+  { roundId: 'BD5021', zone: 'bullseye', multiplier: 10, number: 20, color: 'red', hitX: 5, hitY: -8, timestamp: Date.now() - 150000 },
+  { roundId: 'BD5022', zone: 'precision', multiplier: 3, number: 18, color: 'red', hitX: 25, hitY: -20, timestamp: Date.now() - 130000 },
+  { roundId: 'BD5023', zone: 'outer', multiplier: 1.5, number: 4, color: 'black', hitX: 45, hitY: -35, timestamp: Date.now() - 110000 },
+  { roundId: 'BD5024', zone: 'goldenEye', multiplier: 25, number: 20, color: 'red', hitX: 1, hitY: 2, timestamp: Date.now() - 90000 },
+  { roundId: 'BD5025', zone: 'precision', multiplier: 3, number: 13, color: 'red', hitX: 30, hitY: 10, timestamp: Date.now() - 70000 },
+  { roundId: 'BD5026', zone: 'outer', multiplier: 1.5, number: 6, color: 'black', hitX: 60, hitY: 5, timestamp: Date.now() - 50000 },
+  { roundId: 'BD5027', zone: 'bullseye', multiplier: 10, number: 10, color: 'red', hitX: -7, hitY: 8, timestamp: Date.now() - 30000 },
+  { roundId: 'BD5028', zone: 'precision', multiplier: 3, number: 15, color: 'black', hitX: -28, hitY: 22, timestamp: Date.now() - 10000 },
+];
+
+const recentBullseyeDartsWinners = [
+  { name: 'Karan 🎯', amount: 125000, zone: 'goldenEye', time: '1m ago' },
+  { name: 'Priya ✨', amount: 50000, zone: 'bullseye', time: '3m ago' },
+  { name: 'Dev 🏹', amount: 30000, zone: 'precision', time: '4m ago' },
+  { name: 'Rohit 👑', amount: 75000, zone: 'bullseye', time: '6m ago' },
+  { name: 'Ananya 💎', amount: 250000, zone: 'goldenEye', time: '8m ago' },
+];
+
+/**
+ * @desc    Get Bullseye Darts Game State
+ * @route   GET /api/games/bullseye-darts/state
+ */
+exports.getBullseyeDartsState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins bullseyeDartsStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.bullseyeDartsStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.bullseyeDartsStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 999999,
+      history: recentBullseyeDartsHistory.slice(0, 15),
+      recentWinners: recentBullseyeDartsWinners.slice(0, 12),
+      multipliers: {
+        goldenEye: 25,
+        bullseye: 10,
+        precision: 3,
+        outer: 1.5,
+        red: 2,
+        black: 2,
+      },
+    });
+  } catch (error) {
+    console.error('getBullseyeDartsState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Play Bullseye Darts Round
+ * @route   POST /api/games/bullseye-darts/play
+ */
+exports.playBullseyeDarts = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body;
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    const validZones = ['goldenEye', 'bullseye', 'precision', 'outer', 'red', 'black'];
+    let totalBet = 0;
+    const cleanBets = {};
+
+    for (const zone of validZones) {
+      const val = bets[zone];
+      if (typeof val === 'number' && val > 0) {
+        cleanBets[zone] = Math.floor(val);
+        totalBet += cleanBets[zone];
+      } else {
+        cleanBets[zone] = 0;
+      }
+    }
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Please place at least one bet on a target zone or color' });
+    }
+
+    const user = await User.findById(userId).select('coins bullseyeDartsStats name');
+    if (!user || (user.coins || 0) < totalBet) {
+      return res.status(400).json({ success: false, message: 'Insufficient coins balance' });
+    }
+
+    // Physics Simulation: Calculate landed coordinates and zone
+    // Distribution:
+    // ~5% Golden Eye, ~15% Bullseye, ~35% Precision, ~45% Outer
+    const roll = Math.random() * 100;
+    let r = 0; // radius percentage from center (0 to 90)
+
+    if (roll < 5) {
+      // Golden Eye (Super Bullseye)
+      r = Math.random() * 7;
+    } else if (roll < 20) {
+      // Bullseye
+      r = 8 + Math.random() * 11;
+    } else if (roll < 55) {
+      // Precision Ring (Double/Triple band)
+      r = 20 + Math.random() * 34;
+    } else {
+      // Outer Board
+      r = 55 + Math.random() * 35;
+    }
+
+    // Angle theta (0 to 360 deg)
+    const theta = Math.random() * 2 * Math.PI;
+    const hitX = Math.round(r * Math.cos(theta));
+    const hitY = Math.round(r * Math.sin(theta));
+
+    // Determine segment number and color
+    const angleDeg = (theta * 180 / Math.PI + 360) % 360;
+    const segmentIndex = Math.floor(((angleDeg + 9) % 360) / 18);
+    const segmentNumber = DARTS_NUMBERS[segmentIndex] || 20;
+    const segmentColor = RED_DARTS_NUMBERS.includes(segmentNumber) ? 'red' : 'black';
+
+    // Determine target zone
+    let zone = 'outer';
+    let zoneMultiplier = 1.5;
+
+    if (r < 8) {
+      zone = 'goldenEye';
+      zoneMultiplier = 25;
+    } else if (r < 20) {
+      zone = 'bullseye';
+      zoneMultiplier = 10;
+    } else if (r < 55) {
+      zone = 'precision';
+      zoneMultiplier = 3;
+    } else {
+      zone = 'outer';
+      zoneMultiplier = 1.5;
+    }
+
+    // Calculate payouts
+    let wonCoins = 0;
+
+    // 1. Golden Eye (25X)
+    if (cleanBets.goldenEye > 0 && zone === 'goldenEye') {
+      wonCoins += cleanBets.goldenEye * 25;
+    }
+
+    // 2. Bullseye (10X) - Golden Eye also counts as Bullseye!
+    if (cleanBets.bullseye > 0 && (zone === 'bullseye' || zone === 'goldenEye')) {
+      wonCoins += cleanBets.bullseye * 10;
+    }
+
+    // 3. Precision (3X)
+    if (cleanBets.precision > 0 && zone === 'precision') {
+      wonCoins += cleanBets.precision * 3;
+    }
+
+    // 4. Outer (1.5X)
+    if (cleanBets.outer > 0 && zone === 'outer') {
+      wonCoins += Math.floor(cleanBets.outer * 1.5);
+    }
+
+    // 5. Red Segment (2X)
+    if (cleanBets.red > 0 && segmentColor === 'red') {
+      wonCoins += cleanBets.red * 2;
+    }
+
+    // 6. Black Segment (2X)
+    if (cleanBets.black > 0 && segmentColor === 'black') {
+      wonCoins += cleanBets.black * 2;
+    }
+
+    const coinDelta = wonCoins - totalBet;
+
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.bullseyeDartsStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.bullseyeDartsStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + Math.max(0, coinDelta);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: coinDelta,
+          'bullseyeDartsStats.roundsPlayed': 1,
+          'bullseyeDartsStats.totalWinnings': wonCoins,
+        },
+        $set: {
+          'bullseyeDartsStats.todayEarnings': newTodayEarnings,
+          'bullseyeDartsStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    );
+
+    const roundNumber = Math.floor(1000 + Math.random() * 9000);
+    const newRound = {
+      roundId: 'BD' + roundNumber,
+      zone,
+      multiplier: zoneMultiplier,
+      number: segmentNumber,
+      color: segmentColor,
+      hitX,
+      hitY,
+      timestamp: Date.now(),
+    };
+    recentBullseyeDartsHistory.unshift(newRound);
+    if (recentBullseyeDartsHistory.length > 30) {
+      recentBullseyeDartsHistory.pop();
+    }
+
+    if (wonCoins >= 10000) {
+      recentBullseyeDartsWinners.unshift({
+        name: (user.name || 'Master Archer').slice(0, 10),
+        amount: wonCoins,
+        zone,
+        time: 'Just now',
+      });
+      if (recentBullseyeDartsWinners.length > 20) {
+        recentBullseyeDartsWinners.pop();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      zone,
+      zoneMultiplier,
+      segmentNumber,
+      segmentColor,
+      hitX,
+      hitY,
+      wonCoins,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      history: recentBullseyeDartsHistory.slice(0, 15),
+      recentWinners: recentBullseyeDartsWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('playBullseyeDarts error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
