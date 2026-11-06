@@ -368,7 +368,15 @@ export default function PlinkoGameModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.container, { paddingBottom: Math.max(16, insets.bottom) }]}>
+        <View
+          style={[
+            styles.container,
+            {
+              height: Math.min(780, Math.floor(windowHeight * 0.88)),
+              paddingBottom: Math.max(16, insets.bottom),
+            },
+          ]}
+        >
           {/* Header Bar */}
           <LinearGradient
             colors={['#1E1B4B', '#0F0F1A']}

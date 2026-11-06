@@ -433,7 +433,7 @@ export default function ColorPredictionGameModal({
           style={[
             styles.modalContent,
             {
-              maxHeight: Math.min(780, windowHeight * 0.94),
+              height: Math.min(780, Math.floor(windowHeight * 0.88)),
               paddingBottom: Math.max(16, insets.bottom + 8),
             },
           ]}
