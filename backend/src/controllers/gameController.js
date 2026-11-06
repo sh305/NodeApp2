@@ -2286,3 +2286,205 @@ exports.playMatkaCrack = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ==========================================
+// 12. GOLI SODA POP (AUTHENTIC MARBLE FIZZ 1-SHOT)
+// ==========================================
+
+const recentGoliSodaHistory = [
+  { roundId: 'GS8001', megaBottle: 'bottle1', superBottle: 'bottle3', flatBottle: 'bottle2', timestamp: Date.now() - 140000 },
+  { roundId: 'GS8002', megaBottle: 'bottle3', superBottle: 'bottle2', flatBottle: 'bottle1', timestamp: Date.now() - 120000 },
+  { roundId: 'GS8003', megaBottle: 'bottle2', superBottle: 'bottle1', flatBottle: 'bottle3', timestamp: Date.now() - 100000 },
+  { roundId: 'GS8004', megaBottle: 'bottle1', superBottle: 'bottle2', flatBottle: 'bottle3', timestamp: Date.now() - 80000 },
+  { roundId: 'GS8005', megaBottle: 'bottle2', superBottle: 'bottle3', flatBottle: 'bottle1', timestamp: Date.now() - 60000 },
+  { roundId: 'GS8006', megaBottle: 'bottle3', superBottle: 'bottle1', flatBottle: 'bottle2', timestamp: Date.now() - 40000 },
+  { roundId: 'GS8007', megaBottle: 'bottle1', superBottle: 'bottle3', flatBottle: 'bottle2', timestamp: Date.now() - 20000 },
+  { roundId: 'GS8008', megaBottle: 'bottle2', superBottle: 'bottle1', flatBottle: 'bottle3', timestamp: Date.now() - 5000 },
+];
+
+const recentGoliSodaWinners = [
+  { name: 'Rohit 🍾', amount: 125000, prize: 'mega', bottle: 'bottle1', time: '1m ago' },
+  { name: 'Priya 🍋', amount: 62500, prize: 'mega', bottle: 'bottle2', time: '2m ago' },
+  { name: 'Aman 🌿', amount: 25000, prize: 'super', bottle: 'bottle3', time: '3m ago' },
+  { name: 'Sneha 🍇', amount: 50000, prize: 'mega', bottle: 'bottle3', time: '5m ago' },
+  { name: 'Vikram 💥', amount: 25000, prize: 'super', bottle: 'bottle1', time: '7m ago' },
+];
+
+/**
+ * @desc    Get Goli Soda Game State
+ * @route   GET /api/games/goli-soda/state
+ */
+exports.getGoliSodaState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins goliSodaStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.goliSodaStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.goliSodaStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 888888,
+      history: recentGoliSodaHistory.slice(0, 15),
+      recentWinners: recentGoliSodaWinners.slice(0, 12),
+      multipliers: {
+        mega: 5,
+        super: 2.5,
+        flat: 0,
+      },
+    });
+  } catch (error) {
+    console.error('getGoliSodaState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Play Goli Soda Round
+ * @route   POST /api/games/goli-soda/play
+ */
+exports.playGoliSoda = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body;
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets format' });
+    }
+
+    const betBottle1 = Math.max(0, parseInt(bets.bottle1 || 0, 10));
+    const betBottle2 = Math.max(0, parseInt(bets.bottle2 || 0, 10));
+    const betBottle3 = Math.max(0, parseInt(bets.bottle3 || 0, 10));
+    const totalBet = betBottle1 + betBottle2 + betBottle3;
+
+    if (totalBet <= 0) {
+      return res.status(400).json({ success: false, message: 'Please place at least one bet on Bottle 1, Bottle 2, or Bottle 3' });
+    }
+
+    const user = await User.findById(userId).select('coins goliSodaStats name');
+    if (!user || (user.coins || 0) < totalBet) {
+      return res.status(400).json({ success: false, message: 'Insufficient coins balance' });
+    }
+
+    // Shuffle 3 prize fizz outcomes randomly across the 3 bottles
+    // 1 Mega Fizz (5X), 1 Super Fizz (2.5X), 1 Flat Soda (0X)
+    const bottleKeys = ['bottle1', 'bottle2', 'bottle3'];
+    const shuffledPrizes = ['mega', 'super', 'flat'];
+    for (let i = shuffledPrizes.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledPrizes[i], shuffledPrizes[j]] = [shuffledPrizes[j], shuffledPrizes[i]];
+    }
+
+    const bottleResults = {
+      bottle1: shuffledPrizes[0],
+      bottle2: shuffledPrizes[1],
+      bottle3: shuffledPrizes[2],
+    };
+
+    let megaBottle = 'bottle1';
+    let superBottle = 'bottle2';
+    let flatBottle = 'bottle3';
+
+    bottleKeys.forEach((key) => {
+      if (bottleResults[key] === 'mega') megaBottle = key;
+      else if (bottleResults[key] === 'super') superBottle = key;
+      else if (bottleResults[key] === 'flat') flatBottle = key;
+    });
+
+    const multipliers = {
+      mega: 5,
+      super: 2.5,
+      flat: 0,
+    };
+
+    let wonCoins = 0;
+    if (betBottle1 > 0) wonCoins += Math.floor(betBottle1 * multipliers[bottleResults.bottle1]);
+    if (betBottle2 > 0) wonCoins += Math.floor(betBottle2 * multipliers[bottleResults.bottle2]);
+    if (betBottle3 > 0) wonCoins += Math.floor(betBottle3 * multipliers[bottleResults.bottle3]);
+
+    const coinDelta = wonCoins - totalBet;
+
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.goliSodaStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.goliSodaStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + Math.max(0, coinDelta);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: coinDelta,
+          'goliSodaStats.roundsPlayed': 1,
+          'goliSodaStats.totalWinnings': wonCoins,
+        },
+        $set: {
+          'goliSodaStats.todayEarnings': newTodayEarnings,
+          'goliSodaStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    ).select('coins');
+
+    const roundId = 'GS' + Math.floor(1000 + Math.random() * 9000);
+    const newRound = {
+      roundId,
+      bottleResults,
+      megaBottle,
+      superBottle,
+      flatBottle,
+      timestamp: Date.now(),
+    };
+    recentGoliSodaHistory.unshift(newRound);
+    if (recentGoliSodaHistory.length > 30) {
+      recentGoliSodaHistory.pop();
+    }
+
+    if (wonCoins >= 10000) {
+      recentGoliSodaWinners.unshift({
+        name: (user.name || 'Soda Master').slice(0, 10),
+        amount: wonCoins,
+        prize: wonCoins >= totalBet * 4 ? 'mega' : 'super',
+        bottle: megaBottle,
+        time: 'Just now',
+      });
+      if (recentGoliSodaWinners.length > 20) {
+        recentGoliSodaWinners.pop();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      roundId,
+      bottleResults,
+      megaBottle,
+      superBottle,
+      flatBottle,
+      wonCoins,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      history: recentGoliSodaHistory.slice(0, 15),
+      recentWinners: recentGoliSodaWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('playGoliSoda error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

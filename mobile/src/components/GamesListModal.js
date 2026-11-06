@@ -25,6 +25,7 @@ import { DragonTigerTileIcon } from './DragonTigerIcons';
 import { ColorPredictionTileIcon } from './ColorPredictionIcons';
 import { BullseyeDartsTileIcon } from './BullseyeDartsIcons';
 import { MatkaCrackTileIcon } from './MatkaCrackIcons';
+import { GoliSodaTileIcon } from './GoliSodaIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -476,7 +477,48 @@ function MatkaCrackTile() {
   );
 }
 
-// 11 Flagship Games Configuration
+
+/**
+ * Modern Square Game Tile for Goli Soda Pop (Marble Fizz 1-Shot)
+ */
+function GoliSodaTile() {
+  return (
+    <View style={[styles.tileBox, styles.goliSodaTileBorder]}>
+      <LinearGradient
+        colors={['#064E3B', '#047857', '#059669', '#022C22']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Soda Fizz Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="18" cy="20" r="2" fill="#FEF08A" opacity={0.85} />
+          <Circle cx="78" cy="22" r="1.8" fill="#38BDF8" opacity={0.9} />
+          <Circle cx="22" cy="72" r="1.5" fill="#34D399" opacity={0.8} />
+          <Path d="M76 14 L77 17 L80 18 L77 19 L76 22 L75 19 L72 18 L75 17 Z" fill="#FEF08A" opacity={0.9} />
+        </Svg>
+
+        {/* Goli Soda Emblem Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <GoliSodaTileIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonEmeraldDark}>
+          <Text style={styles.bottomRibbonEmeraldDarkText}>5X FIZZ 🍾</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 12 Flagship Games Configuration
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -532,6 +574,11 @@ const GAMES = [
     id: 'matka_crack',
     title: 'Matka Crack',
     TileComponent: MatkaCrackTile,
+  },
+  {
+    id: 'goli_soda',
+    title: 'Goli Soda Pop',
+    TileComponent: GoliSodaTile,
   },
 ];
 
@@ -1022,6 +1069,29 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   bottomRibbonAmberDarkText: {
+    color: '#FEF08A',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  goliSodaTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+  },
+  bottomRibbonEmeraldDark: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(5, 150, 105, 0.95)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(110, 231, 183, 0.6)',
+    zIndex: 3,
+  },
+  bottomRibbonEmeraldDarkText: {
     color: '#FEF08A',
     fontSize: 9,
     fontWeight: '900',
