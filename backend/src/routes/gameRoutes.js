@@ -28,6 +28,8 @@ const {
   playGoliSoda,
   getCandyBonanzaState,
   spinCandyBonanza,
+  getPlinkoState,
+  dropPlinkoBall,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -86,5 +88,9 @@ router.post('/goli-soda/play', protect, playGoliSoda);
 // Candy Bonanza Routes
 router.get('/candy-bonanza/state', getCandyBonanzaState);
 router.post('/candy-bonanza/spin', protect, spinCandyBonanza);
+
+// Plinko Drop Routes
+router.get('/plinko/state', getPlinkoState);
+router.post('/plinko/drop', protect, dropPlinkoBall);
 
 module.exports = router;

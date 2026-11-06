@@ -2687,3 +2687,201 @@ exports.spinCandyBonanza = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ==========================================
+// 14. PLINKO DROP (LUCKY PEGBOARD & 25X GOLDEN BALL)
+// ==========================================
+
+const PLINKO_BUCKETS = [
+  { index: 0, multiplier: 25, label: '25X', weight: 3, color: '#EF4444' },
+  { index: 1, multiplier: 10, label: '10X', weight: 15, color: '#F97316' },
+  { index: 2, multiplier: 4, label: '4X', weight: 60, color: '#F59E0B' },
+  { index: 3, multiplier: 1.5, label: '1.5X', weight: 180, color: '#10B981' },
+  { index: 4, multiplier: 0.5, label: '0.5X', weight: 484, color: '#6366F1' },
+  { index: 5, multiplier: 1.5, label: '1.5X', weight: 180, color: '#10B981' },
+  { index: 6, multiplier: 4, label: '4X', weight: 60, color: '#F59E0B' },
+  { index: 7, multiplier: 10, label: '10X', weight: 15, color: '#F97316' },
+  { index: 8, multiplier: 25, label: '25X', weight: 3, color: '#EF4444' },
+];
+
+const recentPlinkoHistory = [
+  { roundId: 'PK901', bucketIndex: 1, multiplier: 10, won: true, timestamp: Date.now() - 150000 },
+  { roundId: 'PK902', bucketIndex: 3, multiplier: 1.5, won: true, timestamp: Date.now() - 120000 },
+  { roundId: 'PK903', bucketIndex: 4, multiplier: 0.5, won: true, timestamp: Date.now() - 95000 },
+  { roundId: 'PK904', bucketIndex: 0, multiplier: 25, won: true, timestamp: Date.now() - 70000 },
+  { roundId: 'PK905', bucketIndex: 2, multiplier: 4, won: true, timestamp: Date.now() - 50000 },
+  { roundId: 'PK906', bucketIndex: 5, multiplier: 1.5, won: true, timestamp: Date.now() - 30000 },
+  { roundId: 'PK907', bucketIndex: 4, multiplier: 0.5, won: true, timestamp: Date.now() - 10000 },
+];
+
+const recentPlinkoWinners = [
+  { name: 'Aditya 🟡', amount: 250000, multiplier: 25, bucket: 0, time: '1m ago' },
+  { name: 'Simran ⚡', amount: 100000, multiplier: 10, bucket: 7, time: '2m ago' },
+  { name: 'Kabir 🎯', amount: 40000, multiplier: 4, bucket: 2, time: '4m ago' },
+  { name: 'Pooja 💫', amount: 15000, multiplier: 1.5, bucket: 3, time: '6m ago' },
+  { name: 'Arjun 🌟', amount: 250000, multiplier: 25, bucket: 8, time: '9m ago' },
+];
+
+function getRandomPlinkoBucket() {
+  const totalWeight = PLINKO_BUCKETS.reduce((sum, b) => sum + b.weight, 0);
+  let rand = Math.random() * totalWeight;
+  for (const b of PLINKO_BUCKETS) {
+    if (rand < b.weight) return b;
+    rand -= b.weight;
+  }
+  return PLINKO_BUCKETS[4];
+}
+
+function generatePlinkoPath(bucketIndex) {
+  const steps = 8;
+  const path = [];
+  for (let i = 0; i < bucketIndex; i++) path.push(1);
+  for (let i = 0; i < steps - bucketIndex; i++) path.push(0);
+
+  // Fisher-Yates shuffle
+  for (let i = path.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = path[i];
+    path[i] = path[j];
+    path[j] = temp;
+  }
+  return path;
+}
+
+/**
+ * @desc    Get Plinko State
+ * @route   GET /api/games/plinko/state
+ */
+exports.getPlinkoState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins plinkoStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.plinkoStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.plinkoStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 888888,
+      buckets: PLINKO_BUCKETS,
+      history: recentPlinkoHistory.slice(0, 15),
+      recentWinners: recentPlinkoWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('getPlinkoState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Drop Plinko Ball
+ * @route   POST /api/games/plinko/drop
+ */
+exports.dropPlinkoBall = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { betAmount } = req.body;
+    const bet = parseInt(betAmount, 10);
+    if (isNaN(bet) || bet < 100) {
+      return res.status(400).json({ success: false, message: 'Minimum bet is 100 coins' });
+    }
+
+    const user = await User.findById(userId).select('coins plinkoStats name');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < bet) {
+      return res.status(400).json({ success: false, message: 'Insufficient coins' });
+    }
+
+    // Pick bucket based on weights
+    const bucket = getRandomPlinkoBucket();
+    const path = generatePlinkoPath(bucket.index);
+    const wonCoins = Math.floor(bet * bucket.multiplier);
+    const coinDelta = wonCoins - bet;
+
+    // Daily earnings calculation
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.plinkoStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.plinkoStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + Math.max(0, coinDelta);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: coinDelta,
+          'plinkoStats.roundsPlayed': 1,
+          'plinkoStats.totalWinnings': wonCoins,
+        },
+        $set: {
+          'plinkoStats.todayEarnings': newTodayEarnings,
+          'plinkoStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    ).select('coins');
+
+    const roundId = 'PK' + Math.floor(100 + Math.random() * 900);
+    const newRound = {
+      roundId,
+      bucketIndex: bucket.index,
+      multiplier: bucket.multiplier,
+      won: wonCoins > 0,
+      timestamp: Date.now(),
+    };
+    recentPlinkoHistory.unshift(newRound);
+    if (recentPlinkoHistory.length > 30) {
+      recentPlinkoHistory.pop();
+    }
+
+    if (wonCoins >= 10000) {
+      recentPlinkoWinners.unshift({
+        name: (user.name || 'Plinko Star').slice(0, 10),
+        amount: wonCoins,
+        multiplier: bucket.multiplier,
+        bucket: bucket.index,
+        time: 'Just now',
+      });
+      if (recentPlinkoWinners.length > 20) {
+        recentPlinkoWinners.pop();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      roundId,
+      bucketIndex: bucket.index,
+      multiplier: bucket.multiplier,
+      path,
+      wonCoins,
+      spentCoins: bet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      history: recentPlinkoHistory.slice(0, 15),
+      recentWinners: recentPlinkoWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('dropPlinkoBall error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

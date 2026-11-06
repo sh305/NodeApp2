@@ -74,6 +74,7 @@ import BullseyeDartsGameModal from '../components/BullseyeDartsGameModal';
 import MatkaCrackGameModal from '../components/MatkaCrackGameModal';
 import GoliSodaGameModal from '../components/GoliSodaGameModal';
 import CandyBonanzaGameModal from '../components/CandyBonanzaGameModal';
+import PlinkoGameModal from '../components/PlinkoGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -195,6 +196,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [matkaCrackModalVisible, setMatkaCrackModalVisible] = useState(false);
   const [goliSodaModalVisible, setGoliSodaModalVisible] = useState(false);
   const [candyBonanzaModalVisible, setCandyBonanzaModalVisible] = useState(false);
+  const [plinkoModalVisible, setPlinkoModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3071,6 +3073,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setGoliSodaModalVisible(true);
           } else if (gameId === 'candy_bonanza') {
             setCandyBonanzaModalVisible(true);
+          } else if (gameId === 'plinko') {
+            setPlinkoModalVisible(true);
           }
         }}
       />
@@ -3272,6 +3276,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setCandyBonanzaModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+      {/* ══ PLINKO DROP (LUCKY PEGBOARD & 25X GOLDEN BALL) GAME MODAL ══ */}
+      <PlinkoGameModal
+        visible={plinkoModalVisible}
+        onClose={() => setPlinkoModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setPlinkoModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />
