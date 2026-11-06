@@ -26,6 +26,8 @@ const {
   playMatkaCrack,
   getGoliSodaState,
   playGoliSoda,
+  getCandyBonanzaState,
+  spinCandyBonanza,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -80,5 +82,9 @@ router.post('/matka-crack/play', protect, playMatkaCrack);
 // Goli Soda Pop Routes
 router.get('/goli-soda/state', getGoliSodaState);
 router.post('/goli-soda/play', protect, playGoliSoda);
+
+// Candy Bonanza Routes
+router.get('/candy-bonanza/state', getCandyBonanzaState);
+router.post('/candy-bonanza/spin', protect, spinCandyBonanza);
 
 module.exports = router;

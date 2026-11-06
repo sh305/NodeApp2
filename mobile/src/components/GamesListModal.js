@@ -26,6 +26,7 @@ import { ColorPredictionTileIcon } from './ColorPredictionIcons';
 import { BullseyeDartsTileIcon } from './BullseyeDartsIcons';
 import { MatkaCrackTileIcon } from './MatkaCrackIcons';
 import { GoliSodaTileIcon } from './GoliSodaIcons';
+import { CandyBonanzaTileIcon } from './CandyBonanzaIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -518,7 +519,48 @@ function GoliSodaTile() {
   );
 }
 
-// 12 Flagship Games Configuration
+
+/**
+ * Modern Square Game Tile for Candy Bonanza (Sweet Gems & 30X Sugar Bomb Slot)
+ */
+function CandyBonanzaTile() {
+  return (
+    <View style={[styles.tileBox, styles.candyBonanzaTileBorder]}>
+      <LinearGradient
+        colors={['#831843', '#BE185D', '#9333EA', '#180620']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Sweet Sugar Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="2" fill="#FEF08A" opacity={0.9} />
+          <Circle cx="80" cy="20" r="2" fill="#F472B6" opacity={0.85} />
+          <Circle cx="20" cy="74" r="1.6" fill="#38BDF8" opacity={0.8} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FEF08A" opacity={0.95} />
+        </Svg>
+
+        {/* Candy Bonanza Emblem Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <CandyBonanzaTileIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonPinkDark}>
+          <Text style={styles.bottomRibbonPinkDarkText}>30X BOMB 🍭</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 13 Flagship Games Configuration
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -579,6 +621,11 @@ const GAMES = [
     id: 'goli_soda',
     title: 'Goli Soda Pop',
     TileComponent: GoliSodaTile,
+  },
+  {
+    id: 'candy_bonanza',
+    title: 'Candy Bonanza',
+    TileComponent: CandyBonanzaTile,
   },
 ];
 
@@ -1092,6 +1139,29 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   bottomRibbonEmeraldDarkText: {
+    color: '#FEF08A',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  candyBonanzaTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#EC4899',
+  },
+  bottomRibbonPinkDark: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(190, 24, 93, 0.95)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(244, 114, 182, 0.6)',
+    zIndex: 3,
+  },
+  bottomRibbonPinkDarkText: {
     color: '#FEF08A',
     fontSize: 9,
     fontWeight: '900',

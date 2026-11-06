@@ -73,6 +73,7 @@ import ColorPredictionGameModal from '../components/ColorPredictionGameModal';
 import BullseyeDartsGameModal from '../components/BullseyeDartsGameModal';
 import MatkaCrackGameModal from '../components/MatkaCrackGameModal';
 import GoliSodaGameModal from '../components/GoliSodaGameModal';
+import CandyBonanzaGameModal from '../components/CandyBonanzaGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -193,6 +194,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [bullseyeDartsModalVisible, setBullseyeDartsModalVisible] = useState(false);
   const [matkaCrackModalVisible, setMatkaCrackModalVisible] = useState(false);
   const [goliSodaModalVisible, setGoliSodaModalVisible] = useState(false);
+  const [candyBonanzaModalVisible, setCandyBonanzaModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3065,8 +3067,10 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setBullseyeDartsModalVisible(true);
           } else if (gameId === 'matka_crack') {
             setMatkaCrackModalVisible(true);
-          } else if (gameId === 'goli_soda') {
+                    } else if (gameId === 'goli_soda') {
             setGoliSodaModalVisible(true);
+          } else if (gameId === 'candy_bonanza') {
+            setCandyBonanzaModalVisible(true);
           }
         }}
       />
@@ -3253,6 +3257,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setGoliSodaModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+      {/* ══ CANDY BONANZA (SWEET GEMS & BOMB 3-REEL SLOT) GAME MODAL ══ */}
+      <CandyBonanzaGameModal
+        visible={candyBonanzaModalVisible}
+        onClose={() => setCandyBonanzaModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setCandyBonanzaModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

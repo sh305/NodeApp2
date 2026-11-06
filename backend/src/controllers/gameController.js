@@ -2488,3 +2488,202 @@ exports.playGoliSoda = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ==========================================
+// 13. CANDY BONANZA (SWEET GEMS & BOMB 3-REEL SLOT)
+// ==========================================
+
+const CANDY_SYMBOLS = [
+  { id: 'jelly_bean', name: 'Jelly Bean', multiplier: 2, weight: 35, emoji: '🍬' },
+  { id: 'gummy_bear', name: 'Gummy Bear', multiplier: 3, weight: 26, emoji: '🐻' },
+  { id: 'grape_gummy', name: 'Grape Gem', multiplier: 5, weight: 18, emoji: '🍇' },
+  { id: 'donut', name: 'Donut Sprinkles', multiplier: 8, weight: 12, emoji: '🍩' },
+  { id: 'lollipop', name: 'Swirl Lollipop', multiplier: 15, weight: 6, emoji: '🍭' },
+  { id: 'bomb', name: 'Golden Sugar Bomb', multiplier: 30, weight: 3, emoji: '💣' },
+];
+
+const recentCandyBonanzaHistory = [
+  { roundId: 'CB701', reels: ['lollipop', 'lollipop', 'lollipop'], multiplier: 15, won: true, timestamp: Date.now() - 140000 },
+  { roundId: 'CB702', reels: ['donut', 'donut', 'donut'], multiplier: 8, won: true, timestamp: Date.now() - 110000 },
+  { roundId: 'CB703', reels: ['grape_gummy', 'grape_gummy', 'jelly_bean'], multiplier: 1.2, won: true, timestamp: Date.now() - 90000 },
+  { roundId: 'CB704', reels: ['bomb', 'bomb', 'bomb'], multiplier: 30, won: true, timestamp: Date.now() - 60000 },
+  { roundId: 'CB705', reels: ['gummy_bear', 'gummy_bear', 'gummy_bear'], multiplier: 3, won: true, timestamp: Date.now() - 40000 },
+  { roundId: 'CB706', reels: ['jelly_bean', 'jelly_bean', 'jelly_bean'], multiplier: 2, won: true, timestamp: Date.now() - 20000 },
+  { roundId: 'CB707', reels: ['donut', 'donut', 'lollipop'], multiplier: 1.2, won: true, timestamp: Date.now() - 8000 },
+];
+
+const recentCandyBonanzaWinners = [
+  { name: 'Karan 🍭', amount: 300000, multiplier: 30, symbol: 'bomb', time: '1m ago' },
+  { name: 'Megha 🍬', amount: 150000, multiplier: 15, symbol: 'lollipop', time: '2m ago' },
+  { name: 'Rohan 🍩', amount: 80000, multiplier: 8, symbol: 'donut', time: '3m ago' },
+  { name: 'Ananya 🐻', amount: 30000, multiplier: 3, symbol: 'gummy_bear', time: '5m ago' },
+  { name: 'Vikram 🍇', amount: 50000, multiplier: 5, symbol: 'grape_gummy', time: '7m ago' },
+];
+
+function getRandomCandySymbol() {
+  const totalWeight = CANDY_SYMBOLS.reduce((sum, s) => sum + s.weight, 0);
+  let random = Math.random() * totalWeight;
+  for (const s of CANDY_SYMBOLS) {
+    if (random < s.weight) return s.id;
+    random -= s.weight;
+  }
+  return CANDY_SYMBOLS[0].id;
+}
+
+/**
+ * @desc    Get Candy Bonanza State
+ * @route   GET /api/games/candy-bonanza/state
+ */
+exports.getCandyBonanzaState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins candyBonanzaStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.candyBonanzaStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.candyBonanzaStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 999999,
+      history: recentCandyBonanzaHistory.slice(0, 15),
+      recentWinners: recentCandyBonanzaWinners.slice(0, 12),
+      symbols: CANDY_SYMBOLS,
+    });
+  } catch (error) {
+    console.error('getCandyBonanzaState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Spin Candy Bonanza 3-Reel Slot
+ * @route   POST /api/games/candy-bonanza/spin
+ */
+exports.spinCandyBonanza = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { betAmount } = req.body;
+    const bet = parseInt(betAmount, 10);
+    if (!bet || bet < 10) {
+      return res.status(400).json({ success: false, message: 'Minimum bet is 10 coins' });
+    }
+
+    const user = await User.findById(userId).select('coins candyBonanzaStats name');
+    if (!user || (user.coins || 0) < bet) {
+      return res.status(400).json({ success: false, message: 'Insufficient coins balance' });
+    }
+
+    // Determine the 3 reel symbols
+    const reel1 = getRandomCandySymbol();
+    const reel2 = getRandomCandySymbol();
+    const reel3 = getRandomCandySymbol();
+    const reels = [reel1, reel2, reel3];
+
+    let multiplier = 0;
+    let winType = 'none'; // 'jackpot', 'match3', 'match2', 'none'
+    let winningSymbol = null;
+
+    if (reel1 === reel2 && reel2 === reel3) {
+      // 3 of a kind!
+      const symObj = CANDY_SYMBOLS.find((s) => s.id === reel1);
+      multiplier = symObj ? symObj.multiplier : 2;
+      winType = reel1 === 'bomb' ? 'jackpot' : 'match3';
+      winningSymbol = reel1;
+    } else if (reel1 === reel2 || reel2 === reel3 || reel1 === reel3) {
+      // 2 matching symbols
+      multiplier = 1.2;
+      winType = 'match2';
+      winningSymbol = reel1 === reel2 ? reel1 : (reel2 === reel3 ? reel2 : reel1);
+    } else {
+      multiplier = 0;
+      winType = 'none';
+    }
+
+    const wonCoins = Math.floor(bet * multiplier);
+    const coinDelta = wonCoins - bet;
+
+    // Daily earnings calculation
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.candyBonanzaStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.candyBonanzaStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + Math.max(0, coinDelta);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: coinDelta,
+          'candyBonanzaStats.roundsPlayed': 1,
+          'candyBonanzaStats.totalWinnings': wonCoins,
+        },
+        $set: {
+          'candyBonanzaStats.todayEarnings': newTodayEarnings,
+          'candyBonanzaStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    ).select('coins');
+
+    const roundId = 'CB' + Math.floor(100 + Math.random() * 900);
+    const newRound = {
+      roundId,
+      reels,
+      multiplier,
+      won: wonCoins > 0,
+      timestamp: Date.now(),
+    };
+    recentCandyBonanzaHistory.unshift(newRound);
+    if (recentCandyBonanzaHistory.length > 30) {
+      recentCandyBonanzaHistory.pop();
+    }
+
+    if (wonCoins >= 10000) {
+      recentCandyBonanzaWinners.unshift({
+        name: (user.name || 'Sweet King').slice(0, 10),
+        amount: wonCoins,
+        multiplier,
+        symbol: winningSymbol || 'bomb',
+        time: 'Just now',
+      });
+      if (recentCandyBonanzaWinners.length > 20) {
+        recentCandyBonanzaWinners.pop();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      roundId,
+      reels,
+      multiplier,
+      winType,
+      winningSymbol,
+      wonCoins,
+      spentCoins: bet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      history: recentCandyBonanzaHistory.slice(0, 15),
+      recentWinners: recentCandyBonanzaWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('spinCandyBonanza error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
