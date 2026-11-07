@@ -76,6 +76,7 @@ import GoliSodaGameModal from '../components/GoliSodaGameModal';
 import CandyBonanzaGameModal from '../components/CandyBonanzaGameModal';
 import PlinkoGameModal from '../components/PlinkoGameModal';
 import NariyalGameModal from '../components/NariyalGameModal';
+import HarpoonGameModal from '../components/HarpoonGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -199,6 +200,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [candyBonanzaModalVisible, setCandyBonanzaModalVisible] = useState(false);
   const [plinkoModalVisible, setPlinkoModalVisible] = useState(false);
   const [nariyalModalVisible, setNariyalModalVisible] = useState(false);
+  const [harpoonModalVisible, setHarpoonModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3079,6 +3081,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setPlinkoModalVisible(true);
           } else if (gameId === 'nariyal') {
             setNariyalModalVisible(true);
+          } else if (gameId === 'harpoon') {
+            setHarpoonModalVisible(true);
           }
         }}
       />
@@ -3310,6 +3314,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setNariyalModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+      {/* ══ GOLDEN HARPOON (SPEARFISHING • 30X GOLDEN MERMAID) GAME MODAL ══ */}
+      <HarpoonGameModal
+        visible={harpoonModalVisible}
+        onClose={() => setHarpoonModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setHarpoonModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

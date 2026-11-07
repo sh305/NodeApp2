@@ -32,6 +32,8 @@ const {
   dropPlinkoBall,
   getNariyalState,
   playNariyalSmash,
+  getHarpoonState,
+  fireHarpoonShot,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -98,5 +100,9 @@ router.post('/plinko/drop', protect, dropPlinkoBall);
 // Nariyal Phodo Routes
 router.get('/nariyal/state', getNariyalState);
 router.post('/nariyal/smash', protect, playNariyalSmash);
+
+// Golden Harpoon Fish Hunt Routes
+router.get('/harpoon/state', getHarpoonState);
+router.post('/harpoon/fire', protect, fireHarpoonShot);
 
 module.exports = router;

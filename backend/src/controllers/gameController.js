@@ -3100,3 +3100,180 @@ exports.playNariyalSmash = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ==========================================
+// 16. GOLDEN HARPOON FISH HUNT (30X MERMAID OCEAN HUNT)
+// ==========================================
+
+const HARPOON_CREATURES = [
+  { id: 'mermaid', name: 'Golden Mermaid', multiplier: 30, weight: 4, color: '#F59E0B' },
+  { id: 'shark', name: 'Great White Shark', multiplier: 12, weight: 15, color: '#06B6D4' },
+  { id: 'kraken', name: 'Giant Kraken', multiplier: 5, weight: 55, color: '#A855F7' },
+  { id: 'puffer', name: 'Spiky Pufferfish', multiplier: 2.5, weight: 210, color: '#10B981' },
+  { id: 'crab', name: 'Golden Beach Crab', multiplier: 0.6, weight: 716, color: '#F43F5E' },
+];
+
+const recentHarpoonHistory = [
+  { roundId: 'FH101', creature: 'shark', multiplier: 12, won: true, timestamp: Date.now() - 140000 },
+  { roundId: 'FH102', creature: 'puffer', multiplier: 2.5, won: true, timestamp: Date.now() - 110000 },
+  { roundId: 'FH103', creature: 'crab', multiplier: 0.6, won: true, timestamp: Date.now() - 90000 },
+  { roundId: 'FH104', creature: 'mermaid', multiplier: 30, won: true, timestamp: Date.now() - 65000 },
+  { roundId: 'FH105', creature: 'kraken', multiplier: 5, won: true, timestamp: Date.now() - 40000 },
+  { roundId: 'FH106', creature: 'puffer', multiplier: 2.5, won: true, timestamp: Date.now() - 20000 },
+];
+
+const recentHarpoonWinners = [
+  { name: 'Sameer 🧜‍♀️', amount: 300000, multiplier: 30, creature: 'mermaid', time: '1m ago' },
+  { name: 'Karan 🦈', amount: 120000, multiplier: 12, creature: 'shark', time: '2m ago' },
+  { name: 'Ayesha 🐙', amount: 50000, multiplier: 5, creature: 'kraken', time: '4m ago' },
+  { name: 'Rohit 🐡', amount: 25000, multiplier: 2.5, creature: 'puffer', time: '6m ago' },
+  { name: 'Pooja 🧜‍♀️', amount: 300000, multiplier: 30, creature: 'mermaid', time: '8m ago' },
+];
+
+function getRandomHarpoonCatch() {
+  const totalWeight = HARPOON_CREATURES.reduce((sum, c) => sum + c.weight, 0);
+  let rand = Math.random() * totalWeight;
+  for (const c of HARPOON_CREATURES) {
+    if (rand < c.weight) return c;
+    rand -= c.weight;
+  }
+  return HARPOON_CREATURES[HARPOON_CREATURES.length - 1];
+}
+
+/**
+ * @desc    Get Golden Harpoon Game State
+ * @route   GET /api/games/harpoon/state
+ */
+exports.getHarpoonState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins harpoonStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.harpoonStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.harpoonStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 999999,
+      creatures: HARPOON_CREATURES,
+      history: recentHarpoonHistory.slice(0, 15),
+      recentWinners: recentHarpoonWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('getHarpoonState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Fire Harpoon Shot (1-Shot Fish Catch)
+ * @route   POST /api/games/harpoon/fire
+ */
+exports.fireHarpoonShot = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { betAmount } = req.body;
+    const bet = parseInt(betAmount, 10);
+    if (isNaN(bet) || bet < 100) {
+      return res.status(400).json({ success: false, message: 'Minimum bet is 100 coins' });
+    }
+
+    const user = await User.findById(userId).select('coins harpoonStats name');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < bet) {
+      return res.status(400).json({ success: false, message: 'Insufficient coins' });
+    }
+
+    // Determine caught creature
+    const caught = getRandomHarpoonCatch();
+    const wonCoins = Math.floor(bet * caught.multiplier);
+    const coinDelta = wonCoins - bet;
+
+    // Daily earnings calculation
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.harpoonStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.harpoonStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + Math.max(0, coinDelta);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: coinDelta,
+          'harpoonStats.roundsPlayed': 1,
+          'harpoonStats.totalWinnings': wonCoins,
+        },
+        $set: {
+          'harpoonStats.todayEarnings': newTodayEarnings,
+          'harpoonStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    ).select('coins');
+
+    const roundId = 'FH' + Math.floor(100 + Math.random() * 900);
+    const newRound = {
+      roundId,
+      creature: caught.id,
+      multiplier: caught.multiplier,
+      won: wonCoins > 0,
+      timestamp: Date.now(),
+    };
+    recentHarpoonHistory.unshift(newRound);
+    if (recentHarpoonHistory.length > 30) {
+      recentHarpoonHistory.pop();
+    }
+
+    if (wonCoins >= 10000) {
+      recentHarpoonWinners.unshift({
+        name: (user.name || 'Ocean Hunter').slice(0, 10),
+        amount: wonCoins,
+        multiplier: caught.multiplier,
+        creature: caught.id,
+        time: 'Just now',
+      });
+      if (recentHarpoonWinners.length > 20) {
+        recentHarpoonWinners.pop();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      roundId,
+      creature: caught.id,
+      creatureName: caught.name,
+      multiplier: caught.multiplier,
+      color: caught.color,
+      wonCoins,
+      spentCoins: bet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      history: recentHarpoonHistory.slice(0, 15),
+      recentWinners: recentHarpoonWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('fireHarpoonShot error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

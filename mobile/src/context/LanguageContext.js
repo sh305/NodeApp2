@@ -337,6 +337,51 @@ ramCache.set('hi:::2. Tap Coconut 1, Coconut 2, or Coconut 3 to place your bet.'
 ramCache.set('hi:::3. Tap SMASH COCONUT! to strike the coconuts with the wooden chopper.', '3. लकड़ी के दाव से नारियल फोड़ने के लिए SMASH COCONUT! दबाएं।');
 ramCache.set('hi:::4. The coconuts crack open with splashing water to reveal treasures!', '4. नारियल पानी के छींटों के साथ टूटते हैं और खजाना निकलता है!');
 
+// Golden Harpoon Fish Hunt (Underwater Spearfishing)
+ramCache.set('hi:::Golden Harpoon', 'गोल्डन हार्पून');
+ramCache.set('hi:::Golden Harpoon Rules', 'गोल्डन हार्पून नियम');
+ramCache.set('hi:::Deep Sea 30X Spearfishing', 'डीप सी 30X फिश हंट');
+ramCache.set('hi:::Select Chip & Fire', 'चिप चुनें और फायर करें');
+ramCache.set('hi:::FIRE HARPOON!', 'हार्पून फायर!');
+ramCache.set('hi:::HUNTING...', 'शिकार जारी...');
+ramCache.set('hi:::AUTO 10', 'ऑटो 10');
+ramCache.set('hi:::Auto-hunt started (10 rounds)', 'ऑटो-हंट शुरू (10 राउंड)');
+ramCache.set('hi:::Auto-hunt stopped', 'ऑटो-हंट रोका गया');
+ramCache.set('hi:::Recent Catches', 'हाल के शिकार');
+ramCache.set('hi:::No catches yet. Fire your first harpoon!', 'अभी कोई शिकार नहीं। अपना पहला हार्पून फायर करें!');
+ramCache.set('hi:::Top Ocean Hunters', 'शीर्ष महासागर शिकारी');
+ramCache.set('hi:::No hunters today yet', 'आज अभी कोई शिकारी नहीं');
+ramCache.set('hi:::No champion hunters yet', 'अभी कोई चैंपियन शिकारी नहीं');
+ramCache.set('hi:::HARPOON HUNTER!', 'हार्पून शिकारी!');
+ramCache.set('hi:::30X MERMAID JACKPOT!', '30X जलपरी जैकपॉट!');
+ramCache.set('hi:::12X SHARK MEGA CATCH!', '12X शार्क मेगा शिकार!');
+ramCache.set('hi:::5X KRAKEN BIG WIN!', '5X क्रैकन बड़ी जीत!');
+ramCache.set('hi:::NICE PUFFER CATCH!', 'बढ़िया पफ़रफ़िश शिकार!');
+ramCache.set('hi:::CRAB CONSOLATION RETURN', 'केकड़ा सांत्वना रिटर्न');
+ramCache.set('hi:::Golden Mermaid', 'गोल्डन जलपरी');
+ramCache.set('hi:::Great White Shark', 'ग्रेट व्हाइट शार्क');
+ramCache.set('hi:::Giant Kraken', 'विशाल क्रैकन');
+ramCache.set('hi:::Spiky Pufferfish', 'कांटेदार पफ़रफ़िश');
+ramCache.set('hi:::Beach Crab', 'समुद्री केकड़ा');
+ramCache.set('hi:::Ocean Jackpot', 'महासागर जैकपॉट');
+ramCache.set('hi:::Mega Catch', 'मेगा कैच');
+ramCache.set('hi:::Big Catch', 'बड़ा कैच');
+ramCache.set('hi:::Profit Catch', 'प्रॉफ़िट कैच');
+ramCache.set('hi:::Consolation', 'सांत्वना');
+ramCache.set('hi:::Shot failed', 'शॉट विफल');
+ramCache.set('hi:::Shot request failed', 'शॉट अनुरोध विफल');
+ramCache.set('hi:::Insufficient coins for selected shot.', 'चुने गए शॉट के लिए पर्याप्त सिक्के नहीं हैं।');
+ramCache.set('hi:::🧜‍♀️ Golden Mermaid: Super Ocean Jackpot!', '🧜‍♀️ गोल्डन जलपरी: सुपर महासागर जैकपॉट!');
+ramCache.set('hi:::🦈 Great White Shark: Mega Fierce Predator Catch!', '🦈 ग्रेट व्हाइट शार्क: भयंकर शिकारी मेगा कैच!');
+ramCache.set('hi:::🐙 Giant Kraken: Legendary Deep-Sea Tentacle Win!', '🐙 विशाल क्रैकन: गहरा महासागरीय टेंटेकल जीत!');
+ramCache.set('hi:::🐡 Spiky Pufferfish: Solid Profit Catch!', '🐡 कांटेदार पफ़रफ़िश: शानदार प्रॉफ़िट कैच!');
+ramCache.set('hi:::🦀 Beach Crab: Safe Consolation Shell Return.', '🦀 समुद्री केकड़ा: सुरक्षित सांत्वना शैल रिटर्न।');
+ramCache.set('hi:::1. Select your spear chip from the bottom bar (min 100 coins).', '1. नीचे के बार से हार्पून चिप चुनें (न्यूनतम 100 सिक्के)।');
+ramCache.set('hi:::2. Tap FIRE HARPOON! to launch the golden laser spear into the deep ocean reef.', '2. गहरे महासागर में गोल्डन लेज़र हार्पून दागने के लिए FIRE HARPOON! दबाएं।');
+ramCache.set('hi:::3. The spear strikes a target sea creature, wraps in a golden net, and reels in coins!', '3. हार्पून समुद्री जीव पर वार कर सोने के जाल में लपेट कर सिक्के खींचता है!');
+ramCache.set('hi:::4. Target 5 swimming creatures with up to 30X grand payouts!', '4. 5 तैरते जीवों पर निशाना लगाएं और 30X तक का बड़ा इनाम पाएं!');
+ramCache.set('hi:::5. Enable AUTO 10 for continuous 10-shot deep sea spearfishing action.', '5. लगातार 10-शॉट फिश हंटिंग के लिए AUTO 10 चालू करें।');
+
 // Goli Soda Pop (Authentic Marble Fizz 1-Shot)
 ramCache.set('hi:::Goli Soda Pop', 'गोली सोडा पॉप');
 ramCache.set('hi:::5X Mega Fizz • 1-Shot Marble Pop', '5X मेगा फिज़ • 1-शॉट गोली पॉप');

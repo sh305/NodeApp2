@@ -29,6 +29,7 @@ import { GoliSodaTileIcon } from './GoliSodaIcons';
 import { CandyBonanzaTileIcon } from './CandyBonanzaIcons';
 import { PlinkoTileIcon } from './PlinkoIcons';
 import { NariyalTileIcon } from './NariyalIcons';
+import { HarpoonTileIcon } from './HarpoonIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -644,7 +645,48 @@ function NariyalTile() {
   );
 }
 
-// 15 Flagship Games Configuration
+/**
+ * Modern Square Game Tile for Golden Harpoon Fish Hunt (Underwater Spearfishing)
+ */
+function HarpoonTile() {
+  return (
+    <View style={[styles.tileBox, styles.harpoonTileBorder]}>
+      <LinearGradient
+        colors={['#082F49', '#0284C7', '#0369A1', '#0C4A6E']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Ocean Bubbles & Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="20" r="2.2" fill="#38BDF8" opacity={0.8} />
+          <Circle cx="80" cy="24" r="1.8" fill="#FDE047" opacity={0.9} />
+          <Circle cx="22" cy="72" r="1.5" fill="#67E8F9" opacity={0.7} />
+          <Circle cx="76" cy="68" r="2.5" fill="#38BDF8" opacity={0.6} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.95} />
+        </Svg>
+
+        {/* Harpoon Emblem Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <HarpoonTileIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonCyanGold}>
+          <Text style={styles.bottomRibbonCyanGoldText}>30X MERMAID 🧜‍♀️</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 16 Flagship Games Configuration
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -720,6 +762,11 @@ const GAMES = [
     id: 'nariyal',
     title: 'Nariyal Phodo',
     TileComponent: NariyalTile,
+  },
+  {
+    id: 'harpoon',
+    title: 'Golden Harpoon',
+    TileComponent: HarpoonTile,
   },
 ];
 
@@ -1302,6 +1349,29 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   bottomRibbonEmeraldPearlText: {
+    color: '#FEF08A',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  harpoonTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#38BDF8',
+  },
+  bottomRibbonCyanGold: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(2, 132, 199, 0.95)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(56, 189, 248, 0.6)',
+    zIndex: 3,
+  },
+  bottomRibbonCyanGoldText: {
     color: '#FEF08A',
     fontSize: 9,
     fontWeight: '900',
