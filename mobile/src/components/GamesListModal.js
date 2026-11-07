@@ -28,6 +28,7 @@ import { MatkaCrackTileIcon } from './MatkaCrackIcons';
 import { GoliSodaTileIcon } from './GoliSodaIcons';
 import { CandyBonanzaTileIcon } from './CandyBonanzaIcons';
 import { PlinkoTileIcon } from './PlinkoIcons';
+import { NariyalTileIcon } from './NariyalIcons';
 
 /**
  * Modern Square Game Tile for Greedy Baby
@@ -602,7 +603,48 @@ function PlinkoTile() {
   );
 }
 
-// 14 Flagship Games Configuration
+
+/**
+ * Modern Square Game Tile for Nariyal Phodo (Coconut Smash)
+ */
+function NariyalTile() {
+  return (
+    <View style={[styles.tileBox, styles.nariyalTileBorder]}>
+      <LinearGradient
+        colors={['#064E3B', '#047857', '#065F46', '#022C22']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.tileGradient}
+      >
+        {/* Tropical Sparkles */}
+        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
+          <Circle cx="16" cy="18" r="2" fill="#FEF08A" opacity={0.9} />
+          <Circle cx="80" cy="20" r="2" fill="#34D399" opacity={0.85} />
+          <Circle cx="20" cy="74" r="1.6" fill="#38BDF8" opacity={0.8} />
+          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FEF08A" opacity={0.95} />
+        </Svg>
+
+        {/* Coconut Emblem Symbol */}
+        <View style={styles.slotCenterSymbol}>
+          <NariyalTileIcon size={50} />
+        </View>
+
+        {/* Bottom Multiplier Ribbon */}
+        <View style={styles.bottomRibbonEmeraldPearl}>
+          <Text style={styles.bottomRibbonEmeraldPearlText}>20X PEARL 🥥</Text>
+        </View>
+
+        {/* Glass shine reflection overlay */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)', 'transparent']}
+          style={styles.glassShine}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+// 15 Flagship Games Configuration
 const GAMES = [
   {
     id: 'greedy_baby',
@@ -673,6 +715,11 @@ const GAMES = [
     id: 'plinko',
     title: 'Plinko Drop',
     TileComponent: PlinkoTile,
+  },
+  {
+    id: 'nariyal',
+    title: 'Nariyal Phodo',
+    TileComponent: NariyalTile,
   },
 ];
 
@@ -1232,6 +1279,29 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   bottomRibbonAmberGoldText: {
+    color: '#FEF08A',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  nariyalTileBorder: {
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+  },
+  bottomRibbonEmeraldPearl: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(5, 150, 105, 0.95)',
+    paddingVertical: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(52, 211, 153, 0.6)',
+    zIndex: 3,
+  },
+  bottomRibbonEmeraldPearlText: {
     color: '#FEF08A',
     fontSize: 9,
     fontWeight: '900',

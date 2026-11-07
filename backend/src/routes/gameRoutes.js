@@ -30,6 +30,8 @@ const {
   spinCandyBonanza,
   getPlinkoState,
   dropPlinkoBall,
+  getNariyalState,
+  playNariyalSmash,
 } = require('../controllers/gameController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -92,5 +94,9 @@ router.post('/candy-bonanza/spin', protect, spinCandyBonanza);
 // Plinko Drop Routes
 router.get('/plinko/state', getPlinkoState);
 router.post('/plinko/drop', protect, dropPlinkoBall);
+
+// Nariyal Phodo Routes
+router.get('/nariyal/state', getNariyalState);
+router.post('/nariyal/smash', protect, playNariyalSmash);
 
 module.exports = router;

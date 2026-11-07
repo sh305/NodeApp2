@@ -2885,3 +2885,218 @@ exports.dropPlinkoBall = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+// ==========================================
+// 15. NARIYAL PHODO (COCONUT SMASH • 20X GOLDEN PEARL)
+// ==========================================
+
+const NARIYAL_MULTIPLIERS = {
+  pearl: 20,
+  malai: 5,
+  water: 2.5,
+  dry: 0,
+};
+
+const recentNariyalHistory = [
+  { roundId: 'NP101', results: { coco1: 'malai', coco2: 'water', coco3: 'dry' }, pearlCoco: null, timestamp: Date.now() - 150000 },
+  { roundId: 'NP102', results: { coco1: 'dry', coco2: 'pearl', coco3: 'water' }, pearlCoco: 'coco2', timestamp: Date.now() - 120000 },
+  { roundId: 'NP103', results: { coco1: 'water', coco2: 'dry', coco3: 'malai' }, pearlCoco: null, timestamp: Date.now() - 90000 },
+  { roundId: 'NP104', results: { coco1: 'malai', coco2: 'water', coco3: 'dry' }, pearlCoco: null, timestamp: Date.now() - 70000 },
+  { roundId: 'NP105', results: { coco1: 'pearl', coco2: 'dry', coco3: 'water' }, pearlCoco: 'coco1', timestamp: Date.now() - 40000 },
+  { roundId: 'NP106', results: { coco1: 'water', coco2: 'malai', coco3: 'dry' }, pearlCoco: null, timestamp: Date.now() - 15000 },
+];
+
+const recentNariyalWinners = [
+  { name: 'Vikram 🥥', amount: 200000, prize: 'pearl', coco: 'coco2', time: '1m ago' },
+  { name: 'Sameer 🌴', amount: 50000, prize: 'malai', coco: 'coco1', time: '2m ago' },
+  { name: 'Pooja 💦', amount: 25000, prize: 'water', coco: 'coco3', time: '3m ago' },
+  { name: 'Deepak 🥥', amount: 100000, prize: 'pearl', coco: 'coco1', time: '6m ago' },
+  { name: 'Kavita 🌴', amount: 50000, prize: 'malai', coco: 'coco2', time: '8m ago' },
+];
+
+/**
+ * @desc    Get Nariyal Phodo Game State
+ * @route   GET /api/games/nariyal/state
+ */
+exports.getNariyalState = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    let userCoins = 0;
+    let todayEarnings = 0;
+
+    if (userId) {
+      const user = await User.findById(userId).select('coins nariyalStats');
+      if (user) {
+        userCoins = user.coins || 0;
+        const todayStr = getTodayString();
+        if (user.nariyalStats?.lastEarningsDate === todayStr) {
+          todayEarnings = user.nariyalStats.todayEarnings || 0;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      userCoins,
+      todayEarnings,
+      jackpotPool: 777777,
+      multipliers: NARIYAL_MULTIPLIERS,
+      history: recentNariyalHistory.slice(0, 15),
+      recentWinners: recentNariyalWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('getNariyalState error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Play Nariyal Phodo Round (Smash Coconut 1-Shot)
+ * @route   POST /api/games/nariyal/smash
+ */
+exports.playNariyalSmash = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { bets } = req.body;
+    if (!bets || typeof bets !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid bets object' });
+    }
+
+    const validCocos = ['coco1', 'coco2', 'coco3'];
+    let totalBet = 0;
+    const cleanBets = {};
+
+    for (const coco of validCocos) {
+      const val = bets[coco];
+      if (typeof val === 'number' && val > 0) {
+        cleanBets[coco] = Math.floor(val);
+        totalBet += cleanBets[coco];
+      } else {
+        cleanBets[coco] = 0;
+      }
+    }
+
+    if (totalBet < 100) {
+      return res.status(400).json({ success: false, message: 'Minimum total bet is 100 coins' });
+    }
+
+    const user = await User.findById(userId).select('coins nariyalStats name');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if ((user.coins || 0) < totalBet) {
+      return res.status(400).json({ success: false, message: 'Insufficient coins' });
+    }
+
+    // Determine 3 coconut outcomes
+    // 10% chance for 20X Golden Pearl round, 90% standard fresh malai round
+    const isJackpotRound = Math.random() < 0.12;
+    const prizeList = isJackpotRound
+      ? ['pearl', 'malai', 'dry']
+      : ['malai', 'water', 'dry'];
+
+    // Shuffle outcomes across coco1, coco2, coco3
+    for (let i = prizeList.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = prizeList[i];
+      prizeList[i] = prizeList[j];
+      prizeList[j] = temp;
+    }
+
+    const results = {
+      coco1: prizeList[0],
+      coco2: prizeList[1],
+      coco3: prizeList[2],
+    };
+
+    let wonCoins = 0;
+    let pearlCoco = null;
+    let malaiCoco = null;
+
+    validCocos.forEach((key) => {
+      const outcome = results[key];
+      if (outcome === 'pearl') pearlCoco = key;
+      if (outcome === 'malai') malaiCoco = key;
+      const mult = NARIYAL_MULTIPLIERS[outcome] || 0;
+      if (cleanBets[key] > 0) {
+        wonCoins += Math.floor(cleanBets[key] * mult);
+      }
+    });
+
+    const coinDelta = wonCoins - totalBet;
+
+    // Daily earnings calculation
+    const todayStr = getTodayString();
+    let currentTodayEarnings = 0;
+    if (user.nariyalStats?.lastEarningsDate === todayStr) {
+      currentTodayEarnings = user.nariyalStats.todayEarnings || 0;
+    }
+    const newTodayEarnings = currentTodayEarnings + Math.max(0, coinDelta);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          coins: coinDelta,
+          'nariyalStats.roundsPlayed': 1,
+          'nariyalStats.totalWinnings': wonCoins,
+        },
+        $set: {
+          'nariyalStats.todayEarnings': newTodayEarnings,
+          'nariyalStats.lastEarningsDate': todayStr,
+        },
+      },
+      { new: true }
+    ).select('coins');
+
+    const roundId = 'NP' + Math.floor(100 + Math.random() * 900);
+    const newRound = {
+      roundId,
+      results,
+      pearlCoco,
+      malaiCoco,
+      won: wonCoins > 0,
+      timestamp: Date.now(),
+    };
+    recentNariyalHistory.unshift(newRound);
+    if (recentNariyalHistory.length > 30) {
+      recentNariyalHistory.pop();
+    }
+
+    if (wonCoins >= 10000) {
+      recentNariyalWinners.unshift({
+        name: (user.name || 'Coconut King').slice(0, 10),
+        amount: wonCoins,
+        prize: wonCoins >= totalBet * 10 ? 'pearl' : 'malai',
+        coco: pearlCoco || malaiCoco || 'coco2',
+        time: 'Just now',
+      });
+      if (recentNariyalWinners.length > 20) {
+        recentNariyalWinners.pop();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      roundId,
+      results,
+      pearlCoco,
+      malaiCoco,
+      wonCoins,
+      spentCoins: totalBet,
+      remainingCoins: updatedUser.coins,
+      todayEarnings: newTodayEarnings,
+      history: recentNariyalHistory.slice(0, 15),
+      recentWinners: recentNariyalWinners.slice(0, 12),
+    });
+  } catch (error) {
+    console.error('playNariyalSmash error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

@@ -75,6 +75,7 @@ import MatkaCrackGameModal from '../components/MatkaCrackGameModal';
 import GoliSodaGameModal from '../components/GoliSodaGameModal';
 import CandyBonanzaGameModal from '../components/CandyBonanzaGameModal';
 import PlinkoGameModal from '../components/PlinkoGameModal';
+import NariyalGameModal from '../components/NariyalGameModal';
 import { musicPlayer } from '../services/musicPlayerService';
 import agoraVoiceService from '../services/agoraVoiceService';
 import { useLanguage } from '../context/LanguageContext';
@@ -197,6 +198,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [goliSodaModalVisible, setGoliSodaModalVisible] = useState(false);
   const [candyBonanzaModalVisible, setCandyBonanzaModalVisible] = useState(false);
   const [plinkoModalVisible, setPlinkoModalVisible] = useState(false);
+  const [nariyalModalVisible, setNariyalModalVisible] = useState(false);
   const [choosePkModalVisible, setChoosePkModalVisible] = useState(false);
   const [inviteRoomPkModalVisible, setInviteRoomPkModalVisible] = useState(false);
   const [pkInviteReceived, setPkInviteReceived] = useState(null);
@@ -3075,6 +3077,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setCandyBonanzaModalVisible(true);
           } else if (gameId === 'plinko') {
             setPlinkoModalVisible(true);
+          } else if (gameId === 'nariyal') {
+            setNariyalModalVisible(true);
           }
         }}
       />
@@ -3291,6 +3295,21 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setPlinkoModalVisible(false);
+          navigation.navigate('Wallet', { initialTab: 'coins' });
+        }}
+      />
+      {/* ══ NARIYAL PHODO (COCONUT SMASH • 20X GOLDEN PEARL) GAME MODAL ══ */}
+      <NariyalGameModal
+        visible={nariyalModalVisible}
+        onClose={() => setNariyalModalVisible(false)}
+        currentUser={currentUser}
+        onCoinBalanceUpdate={(newCoins) => {
+          if (currentUser && newCoins !== undefined) {
+            currentUser.coins = newCoins;
+          }
+        }}
+        onRechargePress={() => {
+          setNariyalModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

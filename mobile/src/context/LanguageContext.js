@@ -301,6 +301,42 @@ ramCache.set('hi:::5. You instantly win your bet multiplied by the bucket\'s mul
 ramCache.set('hi:::Drop failed', 'ड्रॉप विफल');
 ramCache.set('hi:::Drop request failed', 'ड्रॉप अनुरोध विफल');
 
+// Nariyal Phodo (Coconut Smash)
+ramCache.set('hi:::Nariyal Phodo', 'नारियल फोड़ो');
+ramCache.set('hi:::Coconut Smash', 'कोकोनट स्मैश');
+ramCache.set('hi:::Nariyal Phodo Rules', 'नारियल फोड़ो नियम');
+ramCache.set('hi:::SMASH COCONUT!', 'नारियल फोड़ो!');
+ramCache.set('hi:::SMASHING...', 'फूट रहा है...');
+ramCache.set('hi:::Select Chip & Tap Coconut', 'चिप चुनें और नारियल दबाएं');
+ramCache.set('hi:::Recent Smashes', 'हाल के स्मैश');
+ramCache.set('hi:::Last 15 rounds', 'पिछले 15 राउंड');
+ramCache.set('hi:::No smashes yet. Smash your first coconut!', 'अभी कोई स्मैश नहीं। अपना पहला नारियल फोड़ें!');
+ramCache.set('hi:::Top Coconut Masters', 'शीर्ष नारियल मास्टर्स');
+ramCache.set('hi:::NARIYAL PHODO WINNER!', 'नारियल फोड़ो विजेता!');
+ramCache.set('hi:::20X GOLDEN PEARL JACKPOT!', '20X गोल्डन पर्ल जैकपॉट!');
+ramCache.set('hi:::5X MALAI MEGA WIN!', '5X मलाई मेगा जीत!');
+ramCache.set('hi:::PARTIAL RETURN!', 'आंशिक रिटर्न!');
+ramCache.set('hi:::BETTER LUCK NEXT SMASH!', 'अगले स्मैश में शुभकामनाएं!');
+ramCache.set('hi:::Coconut 1', 'नारियल 1');
+ramCache.set('hi:::Coconut 2', 'नारियल 2');
+ramCache.set('hi:::Coconut 3', 'नारियल 3');
+ramCache.set('hi:::Left Coconut', 'बायां नारियल');
+ramCache.set('hi:::Center Coconut', 'मध्य नारियल');
+ramCache.set('hi:::Right Coconut', 'दायां नारियल');
+ramCache.set('hi:::Place at least 100 coins bet on any coconut!', 'किसी भी नारियल पर कम से कम 100 सिक्के लगाएं!');
+ramCache.set('hi:::No previous bet to repeat', 'दोहराने के लिए पिछला दांव नहीं');
+ramCache.set('hi:::Insufficient coins to double bet.', 'दांव दोगुना करने के लिए पर्याप्त सिक्के नहीं हैं।');
+ramCache.set('hi:::Smash failed', 'स्मैश विफल');
+ramCache.set('hi:::Smash request failed', 'स्मैश अनुरोध विफल');
+ramCache.set('hi:::💎 Golden Pearl: Super Grand Jackpot!', '💎 गोल्डन पर्ल: सुपर ग्रैंड जैकपॉट!');
+ramCache.set('hi:::🥥 Creamy Malai: Big Sweet Win!', '🥥 ताज़ा मलाई: बड़ी मीठी जीत!');
+ramCache.set('hi:::💦 Sweet Water: Fresh Splash Win!', '💦 मीठा पानी: ताज़ा स्प्लैश जीत!');
+ramCache.set('hi:::🍂 Dry Shell: Empty dry shell.', '🍂 सूखा खोपरा: खाली सूखा खोल।');
+ramCache.set('hi:::1. Select a coin chip from the bottom bar (min 100 coins).', '1. नीचे के बार से कॉइन चिप चुनें (न्यूनतम 100 सिक्के)।');
+ramCache.set('hi:::2. Tap Coconut 1, Coconut 2, or Coconut 3 to place your bet.', '2. अपना दांव लगाने के लिए नारियल 1, नारियल 2 या नारियल 3 पर टैप करें।');
+ramCache.set('hi:::3. Tap SMASH COCONUT! to strike the coconuts with the wooden chopper.', '3. लकड़ी के दाव से नारियल फोड़ने के लिए SMASH COCONUT! दबाएं।');
+ramCache.set('hi:::4. The coconuts crack open with splashing water to reveal treasures!', '4. नारियल पानी के छींटों के साथ टूटते हैं और खजाना निकलता है!');
+
 // Goli Soda Pop (Authentic Marble Fizz 1-Shot)
 ramCache.set('hi:::Goli Soda Pop', 'गोली सोडा पॉप');
 ramCache.set('hi:::5X Mega Fizz • 1-Shot Marble Pop', '5X मेगा फिज़ • 1-शॉट गोली पॉप');
