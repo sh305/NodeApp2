@@ -65,10 +65,6 @@ export default function HarpoonGameModal({
   const [history, setHistory] = useState([]);
   const [recentWinners, setRecentWinners] = useState([]);
 
-  // Auto-Fire State
-  const [autoShotsLeft, setAutoShotsLeft] = useState(0);
-  const autoFireTimerRef = useRef(null);
-
   // Animations
   const spearYAnim = useRef(new Animated.Value(0)).current;
   const spearScaleAnim = useRef(new Animated.Value(1)).current;
@@ -135,34 +131,15 @@ export default function HarpoonGameModal({
         isMountedRef.current = false;
         pulseLoop.stop();
         swimLoop.stop();
-        if (autoFireTimerRef.current) clearTimeout(autoFireTimerRef.current);
       };
     }
   }, [visible, fetchGameState, fireBtnPulse, swimBobAnim]);
-
-  // Handle Bet Adjustments
-  const handleHalfBet = () => {
-    if (isFiring) return;
-    setBetAmount((prev) => Math.max(100, Math.floor(prev / 2)));
-  };
-
-  const handleDoubleBet = () => {
-    if (isFiring) return;
-    setBetAmount((prev) => Math.min(Math.max(100, userCoins), prev * 2));
-  };
-
-  const handleMaxBet = () => {
-    if (isFiring) return;
-    const maxVal = Math.min(50000, userCoins);
-    setBetAmount(maxVal >= 100 ? maxVal : 100);
-  };
 
   // Main Harpoon Fire Shot
   const handleFireHarpoon = async () => {
     if (isFiringRef.current) return;
     if (userCoins < betAmount) {
       showToast(t('Insufficient coins! Please recharge.'), 'error');
-      setAutoShotsLeft(0);
       return;
     }
 
@@ -281,17 +258,6 @@ export default function HarpoonGameModal({
             }
           }, 2400);
         }
-
-        // Auto-fire handler
-        setAutoShotsLeft((prev) => {
-          const nextCount = prev > 1 ? prev - 1 : 0;
-          if (nextCount > 0) {
-            autoFireTimerRef.current = setTimeout(() => {
-              if (isMountedRef.current) handleFireHarpoon();
-            }, 1200);
-          }
-          return nextCount;
-        });
       }, 350);
     } catch (err) {
       console.error('handleFireHarpoon error:', err);
@@ -299,26 +265,6 @@ export default function HarpoonGameModal({
       if (onCoinBalanceUpdate) onCoinBalanceUpdate(prevCoins);
       showToast(t(err.response?.data?.message || 'Hunt request failed'), 'error');
       setIsFiring(false);
-      setAutoShotsLeft(0);
-    }
-  };
-
-  // Toggle Auto Fire
-  const handleToggleAutoFire = (count) => {
-    if (autoShotsLeft > 0) {
-      setAutoShotsLeft(0);
-      if (autoFireTimerRef.current) clearTimeout(autoFireTimerRef.current);
-      showToast(t('Auto-hunt stopped'), 'info');
-    } else {
-      if (userCoins < betAmount) {
-        showToast(t('Insufficient coins! Please recharge.'), 'error');
-        return;
-      }
-      setAutoShotsLeft(count);
-      showToast(t('Auto-hunt started'), 'success');
-      if (!isFiring) {
-        handleFireHarpoon();
-      }
     }
   };
 
@@ -633,55 +579,6 @@ export default function HarpoonGameModal({
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-
-              {/* Quick Multiplier Adjusters & Auto-Hunt (Clean 4-button row, NO overlapping) */}
-              <View style={styles.multiplierAdjustRow}>
-                <TouchableOpacity
-                  style={styles.adjustBtn}
-                  activeOpacity={0.75}
-                  onPress={handleHalfBet}
-                  disabled={isFiring}
-                >
-                  <Text style={styles.adjustBtnText}>1/2</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.adjustBtn}
-                  activeOpacity={0.75}
-                  onPress={handleDoubleBet}
-                  disabled={isFiring}
-                >
-                  <Text style={styles.adjustBtnText}>2X</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.adjustBtn, styles.adjustBtnMax]}
-                  activeOpacity={0.75}
-                  onPress={handleMaxBet}
-                  disabled={isFiring}
-                >
-                  <Text style={styles.adjustBtnTextMax}>MAX</Text>
-                </TouchableOpacity>
-
-                {/* Auto Hunt Toggle */}
-                <TouchableOpacity
-                  style={[
-                    styles.autoBtn,
-                    autoShotsLeft > 0 && styles.autoBtnActive,
-                  ]}
-                  activeOpacity={0.75}
-                  onPress={() => handleToggleAutoFire(10)}
-                >
-                  <Text
-                    style={[
-                      styles.autoBtnText,
-                      autoShotsLeft > 0 && styles.autoBtnTextActive,
-                    ]}
-                  >
-                    {autoShotsLeft > 0 ? `${t('STOP')} (${autoShotsLeft})` : t('Auto 10')}
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
 
@@ -1321,59 +1218,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-  },
-  multiplierAdjustRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
-    width: '100%',
-  },
-  adjustBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  adjustBtnText: {
-    color: '#CBD5E1',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  adjustBtnMax: {
-    backgroundColor: 'rgba(239, 68, 68, 0.18)',
-    borderColor: 'rgba(239, 68, 68, 0.4)',
-  },
-  adjustBtnTextMax: {
-    color: '#F87171',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  autoBtn: {
-    flex: 1.3,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: 'rgba(6, 182, 212, 0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#06B6D4',
-  },
-  autoBtnActive: {
-    backgroundColor: '#DC2626',
-    borderColor: '#EF4444',
-  },
-  autoBtnText: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  autoBtnTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '900',
   },
   fireBtn: {
     width: '100%',

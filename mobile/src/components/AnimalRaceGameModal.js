@@ -630,6 +630,7 @@ export default function AnimalRaceGameModal({
                       colors={isSelected ? ['#F59E0B', '#D97706'] : ['#334155', '#1E293B']}
                       style={styles.chipGrad}
                     >
+                      <ShinyCoinIcon size={12} />
                       <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
                         {chip >= 1000 ? `${chip / 1000}k` : chip}
                       </Text>
@@ -1122,9 +1123,12 @@ const styles = StyleSheet.create({
     borderColor: '#FDE047',
   },
   chipGrad: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   chipText: {
     color: '#94A3B8',

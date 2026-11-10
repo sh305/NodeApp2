@@ -24,7 +24,7 @@ import {
 import { ShinyCoinIcon } from './FoodIcons';
 
 // Available Chip Denominations
-const CHIPS = [100, 500, 1000, 5000, 10000, 50000];
+const CHIPS = [100, 500, 1000, 5000, 10000];
 
 export default function MatkaCrackGameModal({
   visible,
@@ -648,6 +648,7 @@ export default function MatkaCrackGameModal({
                       activeOpacity={0.8}
                       onPress={() => setSelectedChip(chip)}
                     >
+                      <ShinyCoinIcon size={13} />
                       <Text
                         style={[
                           styles.chipBtnText,
@@ -1110,8 +1111,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     backgroundColor: '#2A1308',
     borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 3,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },

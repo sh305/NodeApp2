@@ -24,7 +24,7 @@ import {
 } from './PlinkoIcons';
 import { ShinyCoinIcon } from './FoodIcons';
 
-const CHIPS = [100, 500, 1000, 5000, 10000, 25000];
+const CHIPS = [100, 500, 1000, 5000, 10000];
 
 const BUCKETS = [
   { index: 0, multiplier: 25, label: '25X', color: '#EF4444', border: '#F87171', bg: 'rgba(239, 68, 68, 0.28)' },
@@ -69,10 +69,6 @@ export default function PlinkoGameModal({
   // History & Winners
   const [history, setHistory] = useState([]);
   const [recentWinners, setRecentWinners] = useState([]);
-
-  // Auto-Drop State
-  const [autoDropsLeft, setAutoDropsLeft] = useState(0);
-  const autoDropTimerRef = useRef(null);
 
   // Ball Coordinates
   const ballXAnim = useRef(new Animated.Value(0)).current;
@@ -140,27 +136,9 @@ export default function PlinkoGameModal({
       return () => {
         isMountedRef.current = false;
         pulseLoop.stop();
-        if (autoDropTimerRef.current) clearTimeout(autoDropTimerRef.current);
       };
     }
   }, [visible, fetchGameState, dropBtnPulse]);
-
-  // Handle Bet Adjustments
-  const handleHalfBet = () => {
-    if (isDropping) return;
-    setBetAmount((prev) => Math.max(100, Math.floor(prev / 2)));
-  };
-
-  const handleDoubleBet = () => {
-    if (isDropping) return;
-    setBetAmount((prev) => Math.min(Math.max(100, userCoins), prev * 2));
-  };
-
-  const handleMaxBet = () => {
-    if (isDropping) return;
-    const maxVal = Math.min(50000, userCoins);
-    setBetAmount(maxVal >= 100 ? maxVal : 100);
-  };
 
   // Run Drop Animation
   const animateBallDrop = (path, bucketIndex, onFinish) => {
@@ -325,17 +303,6 @@ export default function PlinkoGameModal({
             }
           }, 2400);
         }
-
-        // Auto-drop handler
-        setAutoDropsLeft((prev) => {
-          const nextCount = prev > 1 ? prev - 1 : 0;
-          if (nextCount > 0) {
-            autoDropTimerRef.current = setTimeout(() => {
-              if (isMountedRef.current) handleDropBall();
-            }, 1000);
-          }
-          return nextCount;
-        });
       });
     } catch (err) {
       console.error('handleDropBall error:', err);
@@ -343,26 +310,6 @@ export default function PlinkoGameModal({
       if (onCoinBalanceUpdate) onCoinBalanceUpdate(prevCoins);
       showToast(t(err.response?.data?.message || 'Drop request failed'), 'error');
       setIsDropping(false);
-      setAutoDropsLeft(0);
-    }
-  };
-
-  // Toggle Auto Drop
-  const handleToggleAutoDrop = (count) => {
-    if (autoDropsLeft > 0) {
-      setAutoDropsLeft(0);
-      if (autoDropTimerRef.current) clearTimeout(autoDropTimerRef.current);
-      showToast(t('Auto-drop stopped'), 'info');
-    } else {
-      if (userCoins < betAmount) {
-        showToast(t('Insufficient coins! Please recharge.'), 'error');
-        return;
-      }
-      setAutoDropsLeft(count);
-      showToast(t('Auto-drop started'), 'success');
-      if (!isDropping) {
-        handleDropBall();
-      }
     }
   };
 
@@ -582,21 +529,22 @@ export default function PlinkoGameModal({
               </View>
             )}
 
-            {/* ══ CONTROLS: CHIP SELECTOR & MULTIPLIERS ══ */}
+            {/* ══ CONTROLS: CHIP SELECTOR (GOLD COINS) ══ */}
             <View style={styles.controlsSection}>
               <View style={styles.controlsHeader}>
                 <Text style={styles.controlsTitle}><T>Select Chip</T></Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={styles.currentBetBadge}>
                   <Text style={styles.currentBetLabel}><T>Current Bet</T>:</Text>
                   <ShinyCoinIcon size={14} />
                   <Text style={styles.currentBetValue}>{betAmount.toLocaleString()}</Text>
                 </View>
               </View>
 
-              {/* Chips Row */}
+              {/* Chips Row with Authentic Golden Coins */}
               <View style={styles.chipsRow}>
                 {CHIPS.map((chip) => {
                   const isSelected = betAmount === chip;
+                  const label = chip >= 1000 ? `${chip / 1000}k` : `${chip}`;
                   return (
                     <TouchableOpacity
                       key={`chip_${chip}`}
@@ -605,66 +553,30 @@ export default function PlinkoGameModal({
                       onPress={() => !isDropping && setBetAmount(chip)}
                       disabled={isDropping}
                     >
-                      <Text style={[styles.chipBtnText, isSelected && styles.chipBtnTextActive]}>
-                        {chip >= 1000 ? `${chip / 1000}k` : chip}
-                      </Text>
+                      {isSelected ? (
+                        <LinearGradient
+                          colors={['#F59E0B', '#D97706', '#92400E']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.chipActiveGradient}
+                        >
+                          <ShinyCoinIcon size={14} />
+                          <Text style={styles.chipTextActive}>{label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={styles.chipInactiveContent}>
+                          <ShinyCoinIcon size={13} />
+                          <Text style={styles.chipTextInactive}>{label}</Text>
+                        </View>
+                      )}
                     </TouchableOpacity>
                   );
                 })}
               </View>
-
-              {/* Quick Multiplier Adjusters */}
-              <View style={styles.multiplierAdjustRow}>
-                <TouchableOpacity
-                  style={styles.adjustBtn}
-                  activeOpacity={0.75}
-                  onPress={handleHalfBet}
-                  disabled={isDropping}
-                >
-                  <Text style={styles.adjustBtnText}>1/2</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.adjustBtn}
-                  activeOpacity={0.75}
-                  onPress={handleDoubleBet}
-                  disabled={isDropping}
-                >
-                  <Text style={styles.adjustBtnText}>2X</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.adjustBtn, styles.adjustBtnMax]}
-                  activeOpacity={0.75}
-                  onPress={handleMaxBet}
-                  disabled={isDropping}
-                >
-                  <Text style={styles.adjustBtnTextMax}>MAX</Text>
-                </TouchableOpacity>
-
-                {/* Auto Drop Toggle */}
-                <TouchableOpacity
-                  style={[
-                    styles.autoBtn,
-                    autoDropsLeft > 0 && styles.autoBtnActive,
-                  ]}
-                  activeOpacity={0.75}
-                  onPress={() => handleToggleAutoDrop(10)}
-                >
-                  <Text
-                    style={[
-                      styles.autoBtnText,
-                      autoDropsLeft > 0 && styles.autoBtnTextActive,
-                    ]}
-                  >
-                    {autoDropsLeft > 0 ? `${t('STOP')} (${autoDropsLeft})` : t('Auto 10')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
             </View>
 
-            {/* ══ BIG DROP BALL BUTTON ══ */}
-            <Animated.View style={{ transform: [{ scale: isDropping ? 1 : dropBtnPulse }] }}>
+            {/* ══ BIG DROP BALL BUTTON WITH COIN BADGE ══ */}
+            <Animated.View style={{ transform: [{ scale: isDropping ? 1 : dropBtnPulse }], width: '100%' }}>
               <TouchableOpacity
                 style={[styles.dropBtn, isDropping && styles.dropBtnDisabled]}
                 activeOpacity={0.75}
@@ -681,6 +593,12 @@ export default function PlinkoGameModal({
                   <Text style={styles.dropBtnText}>
                     {isDropping ? t('DROPPING...') : t('DROP BALL!')}
                   </Text>
+                  {!isDropping && (
+                    <View style={styles.dropBtnCostPill}>
+                      <ShinyCoinIcon size={14} />
+                      <Text style={styles.dropBtnCostText}>{betAmount.toLocaleString()}</Text>
+                    </View>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </Animated.View>
@@ -1121,6 +1039,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  currentBetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    gap: 4,
+  },
   currentBetLabel: {
     color: '#94A3B8',
     fontSize: 12,
@@ -1131,90 +1060,59 @@ const styles = StyleSheet.create({
   },
   chipsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 6,
+    marginBottom: 4,
   },
   chipBtn: {
     flex: 1,
-    minWidth: 46,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    height: 40,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   chipBtnActive: {
-    backgroundColor: 'rgba(245, 158, 11, 0.25)',
-    borderColor: '#F59E0B',
+    elevation: 4,
   },
-  chipBtnText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  chipBtnTextActive: {
-    color: '#FDE047',
-    fontWeight: '900',
-  },
-  multiplierAdjustRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  adjustBtn: {
+  chipInactiveContent: {
     flex: 1,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 12,
+    gap: 4,
   },
-  adjustBtnText: {
+  chipActiveGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FEF08A',
+    borderRadius: 12,
+    gap: 4,
+  },
+  chipTextInactive: {
     color: '#CBD5E1',
     fontSize: 12,
     fontWeight: '700',
   },
-  adjustBtnMax: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: '#EF4444',
-  },
-  adjustBtnTextMax: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  autoBtn: {
-    flex: 1.4,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#6366F1',
-  },
-  autoBtnActive: {
-    backgroundColor: '#EF4444',
-    borderColor: '#EF4444',
-  },
-  autoBtnText: {
-    color: '#A5B4FC',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  autoBtnTextActive: {
+  chipTextActive: {
     color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '900',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   dropBtn: {
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 14,
     elevation: 6,
   },
   dropBtnDisabled: {
@@ -1225,8 +1123,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 24,
-    gap: 10,
+    paddingHorizontal: 20,
+    gap: 8,
   },
   dropBtnIcon: {
     fontSize: 18,
@@ -1236,6 +1134,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0.8,
+  },
+  dropBtnCostPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginLeft: 6,
+    gap: 4,
+  },
+  dropBtnCostText: {
+    color: '#FDE047',
+    fontSize: 13,
+    fontWeight: '900',
   },
   historyCard: {
     width: '100%',

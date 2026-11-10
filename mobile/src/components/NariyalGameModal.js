@@ -27,7 +27,7 @@ import {
 } from './NariyalIcons';
 import { ShinyCoinIcon } from './FoodIcons';
 
-const CHIPS = [100, 500, 1000, 5000, 10000, 25000];
+const CHIPS = [100, 500, 1000, 5000, 10000];
 
 const COCO_ITEMS = [
   { id: 'coco1', label: 'Coconut 1', sub: 'Left Coconut' },
@@ -573,7 +573,7 @@ export default function NariyalGameModal({
                 </View>
               </View>
 
-              {/* Chips Row */}
+              {/* Chips Row with Authentic Golden Coins */}
               <View style={styles.chipsRow}>
                 {CHIPS.map((chip) => {
                   const isSelected = selectedChip === chip;
@@ -585,6 +585,7 @@ export default function NariyalGameModal({
                       onPress={() => setSelectedChip(chip)}
                       disabled={isSmashing}
                     >
+                      <ShinyCoinIcon size={13} />
                       <Text style={[styles.chipBtnText, isSelected && styles.chipBtnTextActive]}>
                         {chip >= 1000 ? `${chip / 1000}k` : chip}
                       </Text>
@@ -611,15 +612,6 @@ export default function NariyalGameModal({
                   disabled={isSmashing}
                 >
                   <Text style={styles.actionBtnText}><T>Re-Bet</T></Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.actionBtnDouble]}
-                  activeOpacity={0.75}
-                  onPress={handleDoubleBets}
-                  disabled={isSmashing || totalBetAmount === 0}
-                >
-                  <Text style={styles.actionBtnTextDouble}>2X</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1133,8 +1125,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
