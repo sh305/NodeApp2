@@ -20,6 +20,7 @@ import { useToast } from './Toast';
 import {
   CandySymbolRenderer,
 } from './CandyBonanzaIcons';
+import { ShinyCoinIcon } from './FoodIcons';
 
 const CHIPS = [50, 100, 500, 1000, 5000, 10000, 25000];
 const ALL_SYMBOLS = ['jelly_bean', 'gummy_bear', 'grape_gummy', 'donut', 'lollipop', 'bomb'];
@@ -334,7 +335,7 @@ export default function CandyBonanzaGameModal({
             <View style={styles.balanceItem}>
               <Text style={styles.balanceLabel}><T>My Coins</T></Text>
               <View style={styles.coinValueRow}>
-                <Text style={styles.coinEmoji}>🪙</Text>
+                <ShinyCoinIcon size={20} />
                 <Text style={styles.coinValueText}>{userCoins.toLocaleString()}</Text>
               </View>
             </View>
@@ -493,7 +494,10 @@ export default function CandyBonanzaGameModal({
             <View style={styles.betControlsCard}>
               <View style={styles.betControlsHeader}>
                 <Text style={styles.betControlLabel}><T>Current Bet</T>:</Text>
-                <Text style={styles.betControlValue}>{betAmount.toLocaleString()} 🪙</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <ShinyCoinIcon size={16} />
+                  <Text style={styles.betControlValue}>{betAmount.toLocaleString()}</Text>
+                </View>
               </View>
 
               {/* Quick Multiplier Buttons */}
@@ -554,7 +558,7 @@ export default function CandyBonanzaGameModal({
                         }
                         style={styles.chipPillGrad}
                       >
-                        <Text style={styles.chipEmoji}>🪙</Text>
+                        <ShinyCoinIcon size={14} />
                         <Text
                           style={[
                             styles.chipText,
@@ -694,7 +698,10 @@ export default function CandyBonanzaGameModal({
                   <View key={`cb_w_${i}`} style={styles.winnerRow}>
                     <Text style={styles.winnerName}>{w.name}</Text>
                     <Text style={styles.winnerPrizeBadge}>{w.multiplier}X Win</Text>
-                    <Text style={styles.winnerAmount}>+{w.amount?.toLocaleString()} 🪙</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <ShinyCoinIcon size={12} />
+                      <Text style={styles.winnerAmount}>+{w.amount?.toLocaleString()}</Text>
+                    </View>
                   </View>
                 ))}
               </View>

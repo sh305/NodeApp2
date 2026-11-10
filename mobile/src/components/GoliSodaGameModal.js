@@ -21,6 +21,7 @@ import {
   GoliSodaBottleGraphic,
   WoodenOpenerGraphic,
 } from './GoliSodaIcons';
+import { ShinyCoinIcon } from './FoodIcons';
 
 // Available Chip Denominations
 const CHIPS = [100, 500, 1000, 5000, 10000, 50000];
@@ -418,7 +419,7 @@ export default function GoliSodaGameModal({
             <View style={styles.balanceItem}>
               <Text style={styles.balanceLabel}><T>My Coins</T></Text>
               <View style={styles.coinValueRow}>
-                <Text style={styles.coinEmoji}>🪙</Text>
+                <ShinyCoinIcon size={20} />
                 <Text style={styles.coinValueText}>{userCoins.toLocaleString()}</Text>
               </View>
             </View>
@@ -693,9 +694,12 @@ export default function GoliSodaGameModal({
                 </View>
                 <View style={styles.betAmountContainer}>
                   <Text style={styles.betAmountLabel}><T>Bet</T>:</Text>
-                  <Text style={styles.betAmountValue}>
-                    {bets.bottle1 > 0 ? `${bets.bottle1.toLocaleString()} 🪙` : '—'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    {bets.bottle1 > 0 && <ShinyCoinIcon size={12} />}
+                    <Text style={styles.betAmountValue}>
+                      {bets.bottle1 > 0 ? bets.bottle1.toLocaleString() : '—'}
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
@@ -717,9 +721,12 @@ export default function GoliSodaGameModal({
                 </View>
                 <View style={styles.betAmountContainer}>
                   <Text style={styles.betAmountLabel}><T>Bet</T>:</Text>
-                  <Text style={styles.betAmountValue}>
-                    {bets.bottle2 > 0 ? `${bets.bottle2.toLocaleString()} 🪙` : '—'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    {bets.bottle2 > 0 && <ShinyCoinIcon size={12} />}
+                    <Text style={styles.betAmountValue}>
+                      {bets.bottle2 > 0 ? bets.bottle2.toLocaleString() : '—'}
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
@@ -741,9 +748,12 @@ export default function GoliSodaGameModal({
                 </View>
                 <View style={styles.betAmountContainer}>
                   <Text style={styles.betAmountLabel}><T>Bet</T>:</Text>
-                  <Text style={styles.betAmountValue}>
-                    {bets.bottle3 > 0 ? `${bets.bottle3.toLocaleString()} 🪙` : '—'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    {bets.bottle3 > 0 && <ShinyCoinIcon size={12} />}
+                    <Text style={styles.betAmountValue}>
+                      {bets.bottle3 > 0 ? bets.bottle3.toLocaleString() : '—'}
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             </View>
@@ -773,7 +783,7 @@ export default function GoliSodaGameModal({
                         }
                         style={styles.chipPillGrad}
                       >
-                        <Text style={styles.chipEmoji}>🪙</Text>
+                        <ShinyCoinIcon size={14} />
                         <Text
                           style={[
                             styles.chipText,
@@ -809,9 +819,12 @@ export default function GoliSodaGameModal({
 
               <View style={styles.totalBetDisplay}>
                 <Text style={styles.totalBetLabel}><T>Total Bet</T>:</Text>
-                <Text style={styles.totalBetAmount}>
-                  {totalCurrentBet.toLocaleString()} 🪙
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <ShinyCoinIcon size={14} />
+                  <Text style={styles.totalBetAmount}>
+                    {totalCurrentBet.toLocaleString()}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -867,7 +880,10 @@ export default function GoliSodaGameModal({
                     <Text style={styles.winnerPrizeBadge}>
                       {w.prize === 'mega' ? '💎 5X Mega' : '🪙 2.5X Super'}
                     </Text>
-                    <Text style={styles.winnerAmount}>+{w.amount?.toLocaleString()} 🪙</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <ShinyCoinIcon size={12} />
+                      <Text style={styles.winnerAmount}>+{w.amount?.toLocaleString()}</Text>
+                    </View>
                   </View>
                 ))}
               </View>

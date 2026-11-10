@@ -21,6 +21,7 @@ import {
   OrnateTreasureMatkaGraphic,
   GoldenHammerGraphic,
 } from './MatkaCrackIcons';
+import { ShinyCoinIcon } from './FoodIcons';
 
 // Available Chip Denominations
 const CHIPS = [100, 500, 1000, 5000, 10000, 50000];
@@ -386,7 +387,7 @@ export default function MatkaCrackGameModal({
             {/* Top User Balance & Stats Bar */}
             <View style={styles.statsBar}>
               <View style={styles.balancePill}>
-                <Text style={styles.balanceCoinIcon}>🪙</Text>
+                <ShinyCoinIcon size={20} />
                 <Text style={styles.balanceText}>{userCoins.toLocaleString()}</Text>
                 <TouchableOpacity
                   style={styles.rechargeBtn}
@@ -400,11 +401,17 @@ export default function MatkaCrackGameModal({
               <View style={styles.betStatsGroup}>
                 <View style={styles.statChip}>
                   <Text style={styles.statChipLabel}><T>Total Bet</T>:</Text>
-                  <Text style={styles.statChipVal}>{totalBetAmount.toLocaleString()} 🪙</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <ShinyCoinIcon size={12} />
+                    <Text style={styles.statChipVal}>{totalBetAmount.toLocaleString()}</Text>
+                  </View>
                 </View>
                 <View style={styles.statChip}>
                   <Text style={styles.statChipLabel}><T>Today Won</T>:</Text>
-                  <Text style={styles.statChipWon}>{todayEarnings.toLocaleString()} 🪙</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <ShinyCoinIcon size={12} />
+                    <Text style={styles.statChipWon}>{todayEarnings.toLocaleString()}</Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -523,7 +530,8 @@ export default function MatkaCrackGameModal({
                   <Text style={styles.cardPayoutRange}>2.5X ~ 5X</Text>
                   {bets.pot1 > 0 && (
                     <View style={styles.betPill}>
-                      <Text style={styles.betPillText}>{bets.pot1.toLocaleString()} 🪙</Text>
+                      <ShinyCoinIcon size={12} />
+                      <Text style={styles.betPillText}>{bets.pot1.toLocaleString()}</Text>
                     </View>
                   )}
                 </LinearGradient>
@@ -548,7 +556,8 @@ export default function MatkaCrackGameModal({
                   <Text style={styles.cardPayoutRange}>2.5X ~ 5X</Text>
                   {bets.pot2 > 0 && (
                     <View style={styles.betPill}>
-                      <Text style={styles.betPillText}>{bets.pot2.toLocaleString()} 🪙</Text>
+                      <ShinyCoinIcon size={12} />
+                      <Text style={styles.betPillText}>{bets.pot2.toLocaleString()}</Text>
                     </View>
                   )}
                 </LinearGradient>
@@ -573,7 +582,8 @@ export default function MatkaCrackGameModal({
                   <Text style={styles.cardPayoutRange}>2.5X ~ 5X</Text>
                   {bets.pot3 > 0 && (
                     <View style={styles.betPill}>
-                      <Text style={styles.betPillText}>{bets.pot3.toLocaleString()} 🪙</Text>
+                      <ShinyCoinIcon size={12} />
+                      <Text style={styles.betPillText}>{bets.pot3.toLocaleString()}</Text>
                     </View>
                   )}
                 </LinearGradient>
@@ -691,9 +701,12 @@ export default function MatkaCrackGameModal({
                 </Text>
 
                 <View style={styles.wonAmountBadge}>
-                  <Text style={styles.wonAmountText}>
-                    +{winResult.wonCoins.toLocaleString()} 🪙
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <ShinyCoinIcon size={24} />
+                    <Text style={styles.wonAmountText}>
+                      +{winResult.wonCoins.toLocaleString()}
+                    </Text>
+                  </View>
                 </View>
 
                 <TouchableOpacity

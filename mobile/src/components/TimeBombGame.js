@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { T } from './TranslatedText';
 import { useToast } from './Toast';
 
-const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
+const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ARENA_WIDTH = Math.min(SCREEN_WIDTH - 24, 400);
@@ -57,7 +57,7 @@ function PlayerSeat({ player, isHolder, isEliminated, isMe, passCount }) {
           <Image
             source={{ uri: player.avatar }}
             style={styles.avatarImage}
-            defaultSource={require('../../assets/icons/green_coin.png')}
+            defaultSource={require('../../assets/icons/gold_coin.png')}
           />
         ) : (
           <Text style={styles.avatarEmoji}>{player.avatar || '😐'}</Text>
@@ -185,7 +185,7 @@ export default function TimeBombGame({ playersCount = 2, currentUser, betAmount 
       {/* Pot badge row — header is shown by GamingView above */}
       <View style={styles.potRow}>
         <View style={styles.potBadge}>
-          <Image source={GREEN_COIN_IMG} style={styles.potCoinImg} />
+          <Image source={GOLD_COIN_IMG} style={styles.potCoinImg} />
           <Text style={styles.potText}>{totalPot}</Text>
         </View>
       </View>

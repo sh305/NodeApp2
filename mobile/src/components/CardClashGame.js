@@ -19,7 +19,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ARENA_WIDTH = Math.min(SCREEN_WIDTH - 24, 384);
 
 const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
-const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
 
 // Card Deck Values (Rank 2 to 14)
 // Rank 14 = Ace (Highest), 13 = King, 12 = Queen, 11 = Jack
@@ -649,10 +648,10 @@ export default function CardClashGame({
         </View>
 
         <View style={styles.potPill}>
-          <Image source={GREEN_COIN_IMG} style={styles.coinIcon} resizeMode="contain" />
+          <Image source={GOLD_COIN_IMG} style={styles.coinIcon} resizeMode="contain" />
           <View>
             <Text style={styles.potLabel}><T>TOTAL POT</T></Text>
-            <Text style={styles.potValue}>{totalPotValue} <T>Game Coins</T></Text>
+            <Text style={styles.potValue}>{totalPotValue} <T>Coins</T></Text>
           </View>
         </View>
 
@@ -937,9 +936,9 @@ export default function CardClashGame({
 
             {/* Pot Prize Box */}
             <View style={styles.prizeBox}>
-              <Image source={GREEN_COIN_IMG} style={{ width: 28, height: 28 }} resizeMode="contain" />
+              <Image source={GOLD_COIN_IMG} style={{ width: 28, height: 28 }} resizeMode="contain" />
               <Text style={styles.prizeAmount}>
-                {matchWinnerSlot === myPlayer.slot ? `+${totalPotValue - betAmount}` : `-${betAmount}`} <T>Game Coins</T>
+                {matchWinnerSlot === myPlayer.slot ? `+${totalPotValue - betAmount}` : `-${betAmount}`} <T>Coins</T>
               </Text>
             </View>
 

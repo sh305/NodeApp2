@@ -1168,7 +1168,7 @@ function initRoomSockets(io) {
     // ================= REAL-TIME REGISTERED USERS GAME LOBBY =================
     socket.on('find_or_create_game_lobby', async ({ gameId, gameMode, bet, maxPlayers, userId }, callback) => {
       try {
-        const realUser = await User.findById(userId).select('name avatar gameCoins');
+        const realUser = await User.findById(userId).select('name avatar coins gameCoins');
         if (!realUser) {
           const err = { message: 'Only registered users can join games.' };
           if (callback) callback({ error: err.message });
@@ -1176,8 +1176,9 @@ function initRoomSockets(io) {
         }
 
         const requiredBet = Number(bet) || 100;
-        if ((realUser.gameCoins || 0) < requiredBet) {
-          const err = { message: `Insufficient Game Coins! ${requiredBet} coins required to join this match.` };
+        const userBal = (realUser.coins !== undefined ? realUser.coins : realUser.gameCoins) || 0;
+        if (userBal < requiredBet) {
+          const err = { message: `Insufficient Coins! ${requiredBet} coins required to join this match.` };
           if (callback) callback({ error: err.message });
           return socket.emit('game_lobby_error', err);
         }
@@ -1304,7 +1305,7 @@ function initRoomSockets(io) {
 
         let realUser = null;
         if (userId) {
-          realUser = await User.findById(userId).select('name avatar gameCoins');
+          realUser = await User.findById(userId).select('name avatar coins gameCoins');
         }
         if (!realUser) {
           const err = { message: 'Only registered users can join games.' };
@@ -1313,8 +1314,9 @@ function initRoomSockets(io) {
         }
 
         const requiredBet = Number(lobby.bet) || 100;
-        if ((realUser.gameCoins || 0) < requiredBet) {
-          const err = { message: `Insufficient Game Coins! ${requiredBet} coins required to join this match.` };
+        const userBal = (realUser.coins !== undefined ? realUser.coins : realUser.gameCoins) || 0;
+        if (userBal < requiredBet) {
+          const err = { message: `Insufficient Coins! ${requiredBet} coins required to join this match.` };
           if (callback) callback({ error: err.message });
           return socket.emit('game_lobby_error', err);
         }
@@ -1404,7 +1406,7 @@ function initRoomSockets(io) {
 
         let realUser = null;
         if (userId) {
-          realUser = await User.findById(userId).select('name avatar gameCoins');
+          realUser = await User.findById(userId).select('name avatar coins gameCoins');
         }
         if (!realUser) {
           const err = { message: 'Only registered users can join this game.' };
@@ -1413,8 +1415,9 @@ function initRoomSockets(io) {
         }
 
         const requiredBet = Number(lobby.bet) || 100;
-        if ((realUser.gameCoins || 0) < requiredBet) {
-          const err = { message: `Insufficient Game Coins! ${requiredBet} coins required to join this match.` };
+        const userBal = (realUser.coins !== undefined ? realUser.coins : realUser.gameCoins) || 0;
+        if (userBal < requiredBet) {
+          const err = { message: `Insufficient Coins! ${requiredBet} coins required to join this match.` };
           if (callback) callback({ error: err.message });
           return socket.emit('game_lobby_error', err);
         }
@@ -1477,7 +1480,7 @@ function initRoomSockets(io) {
 
         let realUser = null;
         if (userId) {
-          realUser = await User.findById(userId).select('name avatar gameCoins');
+          realUser = await User.findById(userId).select('name avatar coins gameCoins');
         }
         if (!realUser) {
           console.warn(`⚠️ [Socket] User ${userId} not found in DB for create_game_lobby`);
@@ -1487,8 +1490,9 @@ function initRoomSockets(io) {
         }
 
         const requiredBet = Number(data?.bet) || 100;
-        if ((realUser.gameCoins || 0) < requiredBet) {
-          const err = { message: `Insufficient Game Coins! ${requiredBet} coins required to create this match.` };
+        const userBal = (realUser.coins !== undefined ? realUser.coins : realUser.gameCoins) || 0;
+        if (userBal < requiredBet) {
+          const err = { message: `Insufficient Coins! ${requiredBet} coins required to create this match.` };
           if (callback) callback({ error: err.message });
           return socket.emit('game_lobby_error', err);
         }
@@ -1539,7 +1543,7 @@ function initRoomSockets(io) {
           return socket.emit('game_lobby_error', err);
         }
 
-        const realUser = await User.findById(userId).select('name avatar gameCoins');
+        const realUser = await User.findById(userId).select('name avatar coins gameCoins');
         if (!realUser) {
           const err = { message: 'Only registered users can join this game.' };
           if (callback) callback({ error: err.message });
@@ -1547,8 +1551,9 @@ function initRoomSockets(io) {
         }
 
         const requiredBet = Number(lobby.bet) || 100;
-        if ((realUser.gameCoins || 0) < requiredBet) {
-          const err = { message: `Insufficient Game Coins! ${requiredBet} coins required to join this match.` };
+        const userBal = (realUser.coins !== undefined ? realUser.coins : realUser.gameCoins) || 0;
+        if (userBal < requiredBet) {
+          const err = { message: `Insufficient Coins! ${requiredBet} coins required to join this match.` };
           if (callback) callback({ error: err.message });
           return socket.emit('game_lobby_error', err);
         }
@@ -1648,29 +1653,30 @@ function initRoomSockets(io) {
       const betAmt = Number(lobby.bet) || 100;
       const totalPot = betAmt * lobby.players.length;
 
-      // Verify all players have sufficient game coins right before starting
+      // Verify all players have sufficient coins right before starting
       for (const p of lobby.players) {
         if (p.userId) {
-          const userDoc = await User.findById(p.userId).select('name gameCoins');
-          if (!userDoc || (userDoc.gameCoins || 0) < betAmt) {
+          const userDoc = await User.findById(p.userId).select('name coins gameCoins');
+          const bal = (userDoc?.coins !== undefined ? userDoc.coins : userDoc?.gameCoins) || 0;
+          if (!userDoc || bal < betAmt) {
             const err = {
-              message: `${p.name || 'A player'} has insufficient Game Coins (${userDoc?.gameCoins || 0}/${betAmt}) to start!`,
+              message: `${p.name || 'A player'} has insufficient Coins (${bal}/${betAmt}) to start!`,
             };
             return io.to(`game_lobby_${cleanCode}`).emit('game_lobby_error', err);
           }
         }
       }
 
-      // Deduct bet coins from all participating players in MongoDB upon match start
+      // Deduct bet coins from all participating players in MongoDB upon match start (from main wallet coins)
       for (const p of lobby.players) {
         if (p.userId) {
           try {
             await User.findByIdAndUpdate(
               p.userId,
-              { $inc: { gameCoins: -betAmt } },
+              { $inc: { coins: -betAmt, gameCoins: -betAmt } },
               { new: true }
             );
-            console.log(`💸 [Match Start] Deducted ${betAmt} game coins from ${p.name} (${p.userId})`);
+            console.log(`💸 [Match Start] Deducted ${betAmt} golden coins from ${p.name} (${p.userId})`);
           } catch (e) {
             console.error(`Error deducting bet for user ${p.userId}:`, e);
           }
@@ -1766,7 +1772,7 @@ function initRoomSockets(io) {
         for (const p of match.players) {
           if (p.userId) {
             try {
-              await User.findByIdAndUpdate(p.userId, { $inc: { gameCoins: match.bet } });
+              await User.findByIdAndUpdate(p.userId, { $inc: { coins: match.bet, gameCoins: match.bet } });
             } catch (e) {
               console.error('Error refunding draw coins:', e);
             }
@@ -1947,13 +1953,14 @@ function initRoomSockets(io) {
           if (winner) {
             console.log(`🏆 [Match] Last remaining player ${winner.name} (${winner.userId}) wins entire pot of ${match.totalPot} coins!`);
 
-            // Automatically add entire pot to winner in MongoDB
+            // Automatically add entire pot to winner in MongoDB (into wallet coins)
             try {
               const winUser = await User.findById(winner.userId);
               if (winUser) {
+                winUser.coins = (winUser.coins || 0) + match.totalPot;
                 winUser.gameCoins = (winUser.gameCoins || 0) + match.totalPot;
                 await winUser.save();
-                console.log(`💰 [Match] Added ${match.totalPot} coins to ${winUser.name}. New balance: ${winUser.gameCoins}`);
+                console.log(`💰 [Match] Added ${match.totalPot} coins to ${winUser.name}. New balance: ${winUser.coins}`);
               }
             } catch (dbErr) {
               console.error('Error awarding win coins to last player:', dbErr);
@@ -2005,13 +2012,14 @@ function initRoomSockets(io) {
 
         console.log(`🏆 [Match] Player ${winner.name} won match in room "${cleanCode}". Total pot: ${match.totalPot}`);
 
-        // Automatically add entire pot to winner in MongoDB
+        // Automatically add entire pot to winner in MongoDB (into wallet coins)
         try {
           const winUser = await User.findById(winner.userId);
           if (winUser) {
+            winUser.coins = (winUser.coins || 0) + match.totalPot;
             winUser.gameCoins = (winUser.gameCoins || 0) + match.totalPot;
             await winUser.save();
-            console.log(`💰 [Match] Added ${match.totalPot} coins to ${winUser.name}. New balance: ${winUser.gameCoins}`);
+            console.log(`💰 [Match] Added ${match.totalPot} coins to ${winUser.name}. New balance: ${winUser.coins}`);
           }
         } catch (dbErr) {
           console.error('Error awarding win coins in DB:', dbErr);
@@ -2149,6 +2157,7 @@ function initRoomSockets(io) {
                 // Award total pot to the last remaining player in DB
                 User.findById(winner.userId).then((winUser) => {
                   if (winUser) {
+                    winUser.coins = (winUser.coins || 0) + match.totalPot;
                     winUser.gameCoins = (winUser.gameCoins || 0) + match.totalPot;
                     return winUser.save();
                   }

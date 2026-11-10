@@ -25,6 +25,7 @@ import {
   DryHuskCoconutGraphic,
   HeavyCoconutChopperGraphic,
 } from './NariyalIcons';
+import { ShinyCoinIcon } from './FoodIcons';
 
 const CHIPS = [100, 500, 1000, 5000, 10000, 25000];
 
@@ -364,7 +365,7 @@ export default function NariyalGameModal({
               activeOpacity={0.75}
               onPress={onRechargePress}
             >
-              <Text style={styles.coinBalanceIcon}>🪙</Text>
+              <ShinyCoinIcon size={20} />
               <Text style={styles.coinBalanceText}>
                 {userCoins.toLocaleString()}
               </Text>
@@ -396,7 +397,10 @@ export default function NariyalGameModal({
           <View style={styles.subHeader}>
             <View style={styles.subHeaderLeft}>
               <Text style={styles.subHeaderLabel}><T>Today Won</T>:</Text>
-              <Text style={styles.subHeaderValue}>+{todayEarnings.toLocaleString()} 🪙</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <ShinyCoinIcon size={14} />
+                <Text style={styles.subHeaderValue}>+{todayEarnings.toLocaleString()}</Text>
+              </View>
             </View>
             <View style={styles.subHeaderBadge}>
               <Text style={styles.subHeaderBadgeText}>💎 20X GOLDEN PEARL</Text>
@@ -465,8 +469,9 @@ export default function NariyalGameModal({
                       {/* Bet Badge On Coconut */}
                       {betOnThis > 0 && (
                         <View style={styles.betPill}>
+                          <ShinyCoinIcon size={12} />
                           <Text style={styles.betPillText}>
-                            {betOnThis >= 1000 ? `${betOnThis / 1000}k` : betOnThis} 🪙
+                            {betOnThis >= 1000 ? `${betOnThis / 1000}k` : betOnThis}
                           </Text>
                         </View>
                       )}
@@ -534,13 +539,14 @@ export default function NariyalGameModal({
                       ? t('PARTIAL RETURN!')
                       : t('BETTER LUCK NEXT SMASH!')}
                   </Text>
-                  <Text style={styles.winResultDetails}>
-                    <T>Won</T>{' '}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <Text style={styles.winResultDetails}><T>Won</T> </Text>
+                    <ShinyCoinIcon size={14} />
                     <Text style={styles.winCoinsHighlight}>
-                      +{winResult.wonCoins.toLocaleString()} 🪙
+                      +{winResult.wonCoins.toLocaleString()}
                     </Text>
-                    {' • '}<T>Bet</T>: {winResult.spentCoins.toLocaleString()} 🪙
-                  </Text>
+                    <Text style={styles.winResultDetails}>{' • '}<T>Bet</T>: {winResult.spentCoins.toLocaleString()}</Text>
+                  </View>
                 </View>
               </View>
             )}
@@ -549,10 +555,11 @@ export default function NariyalGameModal({
             <View style={styles.controlsSection}>
               <View style={styles.controlsHeader}>
                 <Text style={styles.controlsTitle}><T>Select Chip & Tap Coconut</T></Text>
-                <Text style={styles.currentBetLabel}>
-                  <T>Total Bet</T>:{' '}
-                  <Text style={styles.currentBetValue}>{totalBetAmount.toLocaleString()} 🪙</Text>
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.currentBetLabel}><T>Total Bet</T>:</Text>
+                  <ShinyCoinIcon size={14} />
+                  <Text style={styles.currentBetValue}>{totalBetAmount.toLocaleString()}</Text>
+                </View>
               </View>
 
               {/* Chips Row */}
@@ -663,7 +670,10 @@ export default function NariyalGameModal({
                       <Text style={styles.winnerPrizeBadge}>
                         {winner.prize === 'pearl' ? '💎 20X PEARL' : '🥥 5X MALAI'}
                       </Text>
-                      <Text style={styles.winnerAmount}>+{winner.amount.toLocaleString()} 🪙</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <ShinyCoinIcon size={12} />
+                        <Text style={styles.winnerAmount}>+{winner.amount.toLocaleString()}</Text>
+                      </View>
                     </View>
                   </View>
                 ))}
@@ -694,9 +704,12 @@ export default function NariyalGameModal({
                 <Text style={styles.celebrationSub}>
                   <T>Congratulations! You won</T>
                 </Text>
-                <Text style={styles.celebrationAmount}>
-                  +{winResult.wonCoins.toLocaleString()} 🪙
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <ShinyCoinIcon size={26} />
+                  <Text style={styles.celebrationAmount}>
+                    +{winResult.wonCoins.toLocaleString()}
+                  </Text>
+                </View>
               </LinearGradient>
             </Animated.View>
           )}

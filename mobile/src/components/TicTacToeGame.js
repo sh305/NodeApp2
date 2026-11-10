@@ -18,7 +18,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOARD_SIZE = Math.min(SCREEN_WIDTH - 32, 360);
 const CELL_SIZE = (BOARD_SIZE - 16) / 3;
 
-const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
+const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
 
 // 8 Winning Combinations for 3x3 Tic Tac Toe
 const WIN_LINES = [
@@ -449,10 +449,10 @@ export default function TicTacToeGame({
       {/* MATCH STAKES & WINNER POT STRIP */}
       <View style={styles.stakesStrip}>
         <View style={styles.stakesStripItem}>
-          <Image source={GREEN_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
+          <Image source={GOLD_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
           <View>
             <Text style={styles.stakesStripLabel}><T>Bets / Player</T></Text>
-            <Text style={styles.stakesStripVal}>{currentBet} <T>Game Coins</T></Text>
+            <Text style={styles.stakesStripVal}>{currentBet} <T>Coins</T></Text>
           </View>
         </View>
 
@@ -462,7 +462,7 @@ export default function TicTacToeGame({
           <Text style={styles.stakesTrophyEmoji}>🏆</Text>
           <View>
             <Text style={styles.stakesStripLabel}><T>Winner Takes Pot</T></Text>
-            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Game Coins</T></Text>
+            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Coins</T></Text>
           </View>
         </View>
 
@@ -559,7 +559,7 @@ export default function TicTacToeGame({
               </View>
 
               <View style={styles.centerMedallionRow}>
-                <Image source={GREEN_COIN_IMG} style={styles.centerCoinImg} resizeMode="contain" />
+                <Image source={GOLD_COIN_IMG} style={styles.centerCoinImg} resizeMode="contain" />
                 <Text style={styles.centerBetAmountText}>{currentBet}</Text>
               </View>
 

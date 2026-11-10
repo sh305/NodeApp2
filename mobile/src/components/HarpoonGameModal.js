@@ -25,6 +25,7 @@ import {
   GoldenCrabGraphic,
   GoldenLaserHarpoonGraphic,
 } from './HarpoonIcons';
+import { ShinyCoinIcon } from './FoodIcons';
 
 const CHIPS = [100, 500, 1000, 5000, 10000, 25000];
 
@@ -360,7 +361,7 @@ export default function HarpoonGameModal({
               activeOpacity={0.75}
               onPress={onRechargePress}
             >
-              <Text style={styles.coinBalanceIcon}>🪙</Text>
+              <ShinyCoinIcon size={20} />
               <Text style={styles.coinBalanceText}>
                 {userCoins.toLocaleString()}
               </Text>
@@ -392,7 +393,10 @@ export default function HarpoonGameModal({
           <View style={styles.subHeader}>
             <View style={styles.subHeaderLeft}>
               <Text style={styles.subHeaderLabel}><T>Today Won</T>:</Text>
-              <Text style={styles.subHeaderValue}>+{todayEarnings.toLocaleString()} 🪙</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <ShinyCoinIcon size={14} />
+                <Text style={styles.subHeaderValue}>+{todayEarnings.toLocaleString()}</Text>
+              </View>
             </View>
             <View style={styles.subHeaderBadge}>
               <Text style={styles.subHeaderBadgeText}>🧜‍♀️ 30X MERMAID JACKPOT</Text>
@@ -524,13 +528,14 @@ export default function HarpoonGameModal({
                       ? t('NICE CATCH!')
                       : t('CRAB CONSOLATION RETURN')}
                   </Text>
-                  <Text style={styles.winResultDetails}>
-                    <T>Won</T>{' '}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <Text style={styles.winResultDetails}><T>Won</T> </Text>
+                    <ShinyCoinIcon size={14} />
                     <Text style={styles.winCoinsHighlight}>
-                      +{winResult.wonCoins.toLocaleString()} 🪙
+                      +{winResult.wonCoins.toLocaleString()}
                     </Text>
-                    {' • '}<T>Bet</T>: {winResult.spentCoins.toLocaleString()} 🪙
-                  </Text>
+                    <Text style={styles.winResultDetails}>{' • '}<T>Bet</T>: {winResult.spentCoins.toLocaleString()}</Text>
+                  </View>
                 </View>
               </View>
             )}
@@ -539,10 +544,11 @@ export default function HarpoonGameModal({
             <View style={styles.controlsSection}>
               <View style={styles.controlsHeader}>
                 <Text style={styles.controlsTitle}><T>Select Chip</T></Text>
-                <Text style={styles.currentBetLabel}>
-                  <T>Current Bet</T>:{' '}
-                  <Text style={styles.currentBetValue}>{betAmount.toLocaleString()} 🪙</Text>
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.currentBetLabel}><T>Current Bet</T>:</Text>
+                  <ShinyCoinIcon size={14} />
+                  <Text style={styles.currentBetValue}>{betAmount.toLocaleString()}</Text>
+                </View>
               </View>
 
               {/* Chips Row */}
@@ -679,7 +685,10 @@ export default function HarpoonGameModal({
                     </View>
                     <View style={styles.winnerRight}>
                       <Text style={styles.winnerMultiplier}>{winner.multiplier}X</Text>
-                      <Text style={styles.winnerAmount}>+{winner.amount.toLocaleString()} 🪙</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <ShinyCoinIcon size={12} />
+                        <Text style={styles.winnerAmount}>+{winner.amount.toLocaleString()}</Text>
+                      </View>
                     </View>
                   </View>
                 ))}
@@ -720,9 +729,12 @@ export default function HarpoonGameModal({
                 <Text style={styles.celebrationSub}>
                   <T>Congratulations! You won</T>
                 </Text>
-                <Text style={styles.celebrationAmount}>
-                  +{winResult.wonCoins.toLocaleString()} 🪙
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <ShinyCoinIcon size={26} />
+                  <Text style={styles.celebrationAmount}>
+                    +{winResult.wonCoins.toLocaleString()}
+                  </Text>
+                </View>
               </LinearGradient>
             </Animated.View>
           )}

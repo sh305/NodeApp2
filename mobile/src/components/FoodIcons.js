@@ -1,4 +1,5 @@
 import React from 'react';
+import { Image } from 'react-native';
 import Svg, {
   Path,
   Circle,
@@ -436,20 +437,15 @@ export const GreedyBabyCharacter = ({ size = 80 }) => (
 );
 
 /**
- * Gold Coin Icon
+ * Gold Coin Icon (Exact match to Wallet's real gold_coin.png asset)
  */
-export const ShinyCoinIcon = ({ size = 20 }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Defs>
-      <RadialGradient id="coinG" cx="12" cy="12" r="11">
-        <Stop offset="0%" stopColor="#FDE68A" />
-        <Stop offset="70%" stopColor="#F59E0B" />
-        <Stop offset="100%" stopColor="#B45309" />
-      </RadialGradient>
-    </Defs>
-    <Circle cx="12" cy="12" r="11" fill="url(#coinG)" stroke="#FDE68A" strokeWidth="1.5" />
-    <Circle cx="12" cy="12" r="8.5" stroke="#D97706" strokeWidth="1" strokeDasharray="2 1" />
-    <Path d="M12 7 V17 M9.5 9.5 H14.5 C15.5 9.5 15.5 12 14.5 12 H10 C9 12 9 14.5 10 14.5 H14.5" stroke="#78350F" strokeWidth="1.8" strokeLinecap="round" />
-  </Svg>
+export const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
+
+export const ShinyCoinIcon = ({ size = 20, style }) => (
+  <Image
+    source={GOLD_COIN_IMG}
+    style={[{ width: size, height: size }, style]}
+    resizeMode="contain"
+  />
 );
 

@@ -21,7 +21,7 @@ const BOARD_SIZE = Math.min(SCREEN_WIDTH - 20, 380);
 const CELL_SIZE = BOARD_SIZE / 10;
 const TOKEN_SIZE = Math.max(18, Math.round(CELL_SIZE * 0.72));
 
-const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
+const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
 
 // Authentic Snakes and Ladders mappings
 export const LADDERS = {
@@ -733,10 +733,10 @@ export default function SnakeLadderGame({
       {/* MATCH STAKES & WINNER POT STRIP */}
       <View style={styles.stakesStrip}>
         <View style={styles.stakesStripItem}>
-          <Image source={GREEN_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
+          <Image source={GOLD_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
           <View>
             <Text style={styles.stakesStripLabel}><T>Bets / Player</T></Text>
-            <Text style={styles.stakesStripVal}>{currentBet} <T>Game Coins</T></Text>
+            <Text style={styles.stakesStripVal}>{currentBet} <T>Coins</T></Text>
           </View>
         </View>
 
@@ -746,7 +746,7 @@ export default function SnakeLadderGame({
           <Text style={styles.stakesTrophyEmoji}>🏆</Text>
           <View>
             <Text style={styles.stakesStripLabel}><T>Winner Takes Pot</T></Text>
-            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Game Coins</T></Text>
+            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Coins</T></Text>
           </View>
         </View>
 
@@ -785,7 +785,7 @@ export default function SnakeLadderGame({
               </View>
 
               <View style={styles.centerMedallionRow}>
-                <Image source={GREEN_COIN_IMG} style={styles.centerCoinImg} resizeMode="contain" />
+                <Image source={GOLD_COIN_IMG} style={styles.centerCoinImg} resizeMode="contain" />
                 <Text style={styles.centerBetAmountText}>{currentBet}</Text>
               </View>
 

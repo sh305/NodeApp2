@@ -20,7 +20,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ARENA_WIDTH = Math.min(SCREEN_WIDTH - 24, 380);
 
 const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
-const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
 
 // Visual representation of dice dots (1 to 6) or custom equipped dice image
 function DiceFace({ value, size = 68, isRolling = false, theme = 'white', customDiceImage = null }) {
@@ -729,10 +728,10 @@ export default function DiceBattleGame({
         </View>
 
         <View style={styles.potPill}>
-          <Image source={GREEN_COIN_IMG} style={styles.coinIcon} resizeMode="contain" />
+          <Image source={GOLD_COIN_IMG} style={styles.coinIcon} resizeMode="contain" />
           <View>
             <Text style={styles.potLabel}><T>TOTAL POT</T></Text>
-            <Text style={styles.potValue}>{totalPotValue} <T>Game Coins</T></Text>
+            <Text style={styles.potValue}>{totalPotValue} <T>Coins</T></Text>
           </View>
         </View>
 
@@ -1010,9 +1009,9 @@ export default function DiceBattleGame({
 
             {/* Pot Prize Box */}
             <View style={styles.prizeBox}>
-              <Image source={GREEN_COIN_IMG} style={{ width: 28, height: 28 }} resizeMode="contain" />
+              <Image source={GOLD_COIN_IMG} style={{ width: 28, height: 28 }} resizeMode="contain" />
               <Text style={styles.prizeAmount}>
-                {matchWinnerSlot === myPlayer.slot ? `+${totalPotValue - betAmount}` : `-${betAmount}`} <T>Game Coins</T>
+                {matchWinnerSlot === myPlayer.slot ? `+${totalPotValue - betAmount}` : `-${betAmount}`} <T>Coins</T>
               </Text>
             </View>
 

@@ -54,7 +54,7 @@ const POCKETS = [
   { id: 'BR', x: BOARD_SIZE - FRAME_WIDTH - 14, y: BOARD_SIZE - FRAME_WIDTH - 14, name: 'Bottom-Right' },
 ];
 
-const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
+const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
 
 // Setup central coins (Classic 19-piece flower matching user's screenshot)
 const createInitialPucks = (isTurbo = false) => {
@@ -1112,10 +1112,10 @@ export default function CarromGame({
       {/* MATCH STAKES STRIP */}
       <View style={styles.stakesStrip}>
         <View style={styles.stakesStripItem}>
-          <Image source={GREEN_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
+          <Image source={GOLD_COIN_IMG} style={styles.stakesStripCoin} resizeMode="contain" />
           <View>
             <Text style={styles.stakesStripLabel}><T>Bet</T></Text>
-            <Text style={styles.stakesStripVal}>{currentBet} <T>Game Coins</T></Text>
+            <Text style={styles.stakesStripVal}>{currentBet} <T>Coins</T></Text>
           </View>
         </View>
         <View style={styles.stakesStripDivider} />
@@ -1123,7 +1123,7 @@ export default function CarromGame({
           <Text style={styles.stakesTrophyEmoji}>🏆</Text>
           <View>
             <Text style={styles.stakesStripLabel}><T>Total Pot</T></Text>
-            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Game Coins</T></Text>
+            <Text style={styles.stakesStripPotVal}>{totalPot} <T>Coins</T></Text>
           </View>
         </View>
         <View style={styles.stakesStripDivider} />

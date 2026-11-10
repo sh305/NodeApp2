@@ -23,6 +23,7 @@ import {
   VioletGemIcon,
   RedGemIcon,
 } from './ColorPredictionIcons';
+import { ShinyCoinIcon } from './FoodIcons';
 
 // Available Chip Denominations
 const CHIPS = [100, 500, 1000, 5000, 10000, 50000];
@@ -475,7 +476,7 @@ export default function ColorPredictionGameModal({
             {/* Top User Balance & Stats Bar */}
             <View style={styles.statsBar}>
               <View style={styles.balancePill}>
-                <Text style={styles.balanceCoinIcon}>🪙</Text>
+                <ShinyCoinIcon size={20} />
                 <Text style={styles.balanceText}>{userCoins.toLocaleString()}</Text>
                 <TouchableOpacity
                   style={styles.rechargeBtn}
@@ -489,11 +490,17 @@ export default function ColorPredictionGameModal({
               <View style={styles.betStatsGroup}>
                 <View style={styles.statChip}>
                   <Text style={styles.statChipLabel}><T>Total Bet</T>:</Text>
-                  <Text style={styles.statChipVal}>{totalBetAmount.toLocaleString()} 🪙</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <ShinyCoinIcon size={12} />
+                    <Text style={styles.statChipVal}>{totalBetAmount.toLocaleString()}</Text>
+                  </View>
                 </View>
                 <View style={styles.statChip}>
                   <Text style={styles.statChipLabel}><T>Today Won</T>:</Text>
-                  <Text style={styles.statChipWon}>{todayEarnings.toLocaleString()} 🪙</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <ShinyCoinIcon size={12} />
+                    <Text style={styles.statChipWon}>{todayEarnings.toLocaleString()}</Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -583,7 +590,8 @@ export default function ColorPredictionGameModal({
                   <Text style={styles.colorCardMultiplier}>2X</Text>
                   {colorBets.green > 0 && (
                     <View style={styles.betPill}>
-                      <Text style={styles.betPillText}>{colorBets.green.toLocaleString()} 🪙</Text>
+                      <ShinyCoinIcon size={12} />
+                      <Text style={styles.betPillText}>{colorBets.green.toLocaleString()}</Text>
                     </View>
                   )}
                 </LinearGradient>
@@ -610,7 +618,8 @@ export default function ColorPredictionGameModal({
                   <Text style={styles.colorCardMultiplier}>4.5X</Text>
                   {colorBets.violet > 0 && (
                     <View style={styles.betPill}>
-                      <Text style={styles.betPillText}>{colorBets.violet.toLocaleString()} 🪙</Text>
+                      <ShinyCoinIcon size={12} />
+                      <Text style={styles.betPillText}>{colorBets.violet.toLocaleString()}</Text>
                     </View>
                   )}
                 </LinearGradient>
@@ -637,7 +646,8 @@ export default function ColorPredictionGameModal({
                   <Text style={styles.colorCardMultiplier}>2X</Text>
                   {colorBets.red > 0 && (
                     <View style={styles.betPill}>
-                      <Text style={styles.betPillText}>{colorBets.red.toLocaleString()} 🪙</Text>
+                      <ShinyCoinIcon size={12} />
+                      <Text style={styles.betPillText}>{colorBets.red.toLocaleString()}</Text>
                     </View>
                   )}
                 </LinearGradient>
@@ -840,9 +850,12 @@ export default function ColorPredictionGameModal({
                 </Text>
 
                 <View style={styles.wonAmountBadge}>
-                  <Text style={styles.wonAmountText}>
-                    +{winResult.wonCoins.toLocaleString()} 🪙
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <ShinyCoinIcon size={24} />
+                    <Text style={styles.wonAmountText}>
+                      +{winResult.wonCoins.toLocaleString()}
+                    </Text>
+                  </View>
                 </View>
 
                 <TouchableOpacity

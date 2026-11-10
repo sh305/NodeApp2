@@ -22,6 +22,7 @@ import {
   BullseyeTargetIcon,
   GoldenDartIcon,
 } from './BullseyeDartsIcons';
+import { ShinyCoinIcon } from './FoodIcons';
 
 // Available Chip Denominations
 const CHIPS = [100, 500, 1000, 5000, 10000, 50000];
@@ -428,7 +429,7 @@ export default function BullseyeDartsGameModal({
             {/* Top User Balance & Stats Bar */}
             <View style={styles.statsBar}>
               <View style={styles.balancePill}>
-                <Text style={styles.balanceCoinIcon}>🪙</Text>
+                <ShinyCoinIcon size={20} />
                 <Text style={styles.balanceText}>{userCoins.toLocaleString()}</Text>
                 <TouchableOpacity
                   style={styles.rechargeBtn}
@@ -442,11 +443,17 @@ export default function BullseyeDartsGameModal({
               <View style={styles.betStatsGroup}>
                 <View style={styles.statChip}>
                   <Text style={styles.statChipLabel}><T>Total Bet</T>:</Text>
-                  <Text style={styles.statChipVal}>{totalBetAmount.toLocaleString()} 🪙</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <ShinyCoinIcon size={12} />
+                    <Text style={styles.statChipVal}>{totalBetAmount.toLocaleString()}</Text>
+                  </View>
                 </View>
                 <View style={styles.statChip}>
                   <Text style={styles.statChipLabel}><T>Today Won</T>:</Text>
-                  <Text style={styles.statChipWon}>{todayEarnings.toLocaleString()} 🪙</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <ShinyCoinIcon size={12} />
+                    <Text style={styles.statChipWon}>{todayEarnings.toLocaleString()}</Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -539,7 +546,8 @@ export default function BullseyeDartsGameModal({
                     <Text style={styles.zoneMultiplier}>25X</Text>
                     {bets.goldenEye > 0 && (
                       <View style={styles.betBadge}>
-                        <Text style={styles.betBadgeText}>{bets.goldenEye.toLocaleString()} 🪙</Text>
+                        <ShinyCoinIcon size={12} />
+                        <Text style={styles.betBadgeText}>{bets.goldenEye.toLocaleString()}</Text>
                       </View>
                     )}
                   </LinearGradient>
@@ -566,7 +574,8 @@ export default function BullseyeDartsGameModal({
                     <Text style={styles.zoneMultiplier}>10X</Text>
                     {bets.bullseye > 0 && (
                       <View style={styles.betBadge}>
-                        <Text style={styles.betBadgeText}>{bets.bullseye.toLocaleString()} 🪙</Text>
+                        <ShinyCoinIcon size={12} />
+                        <Text style={styles.betBadgeText}>{bets.bullseye.toLocaleString()}</Text>
                       </View>
                     )}
                   </LinearGradient>
@@ -596,7 +605,8 @@ export default function BullseyeDartsGameModal({
                     <Text style={styles.zoneMultiplier}>3X</Text>
                     {bets.precision > 0 && (
                       <View style={styles.betBadge}>
-                        <Text style={styles.betBadgeText}>{bets.precision.toLocaleString()} 🪙</Text>
+                        <ShinyCoinIcon size={12} />
+                        <Text style={styles.betBadgeText}>{bets.precision.toLocaleString()}</Text>
                       </View>
                     )}
                   </LinearGradient>
@@ -623,7 +633,8 @@ export default function BullseyeDartsGameModal({
                     <Text style={styles.zoneMultiplier}>1.5X</Text>
                     {bets.outer > 0 && (
                       <View style={styles.betBadge}>
-                        <Text style={styles.betBadgeText}>{bets.outer.toLocaleString()} 🪙</Text>
+                        <ShinyCoinIcon size={12} />
+                        <Text style={styles.betBadgeText}>{bets.outer.toLocaleString()}</Text>
                       </View>
                     )}
                   </LinearGradient>
@@ -648,7 +659,10 @@ export default function BullseyeDartsGameModal({
                   >
                     <Text style={styles.colorSideTitle}>🔴 <T>RED</T> (2X)</Text>
                     {bets.red > 0 && (
-                      <Text style={styles.colorSideBetVal}>{bets.red.toLocaleString()} 🪙</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                        <ShinyCoinIcon size={12} />
+                        <Text style={styles.colorSideBetVal}>{bets.red.toLocaleString()}</Text>
+                      </View>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -669,7 +683,10 @@ export default function BullseyeDartsGameModal({
                   >
                     <Text style={styles.colorSideTitle}>⚫ <T>BLACK</T> (2X)</Text>
                     {bets.black > 0 && (
-                      <Text style={styles.colorSideBetVal}>{bets.black.toLocaleString()} 🪙</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                        <ShinyCoinIcon size={12} />
+                        <Text style={styles.colorSideBetVal}>{bets.black.toLocaleString()}</Text>
+                      </View>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -796,9 +813,12 @@ export default function BullseyeDartsGameModal({
                 </Text>
 
                 <View style={styles.wonAmountBadge}>
-                  <Text style={styles.wonAmountText}>
-                    +{winResult.wonCoins.toLocaleString()} 🪙
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <ShinyCoinIcon size={24} />
+                    <Text style={styles.wonAmountText}>
+                      +{winResult.wonCoins.toLocaleString()}
+                    </Text>
+                  </View>
                 </View>
 
                 <TouchableOpacity

@@ -33,7 +33,6 @@ const CHEST_REWARDS = [100, 300, 600, 1000, 1500, 2200, 3500];
 
 // Local bundled Flaticon PNG assets (100% reliable, zero network delay or CDN blocks)
 const GOLD_COIN_IMG = require('../../assets/icons/gold_coin.png');
-const GREEN_COIN_IMG = require('../../assets/icons/green_coin.png');
 const SILVER_CHEST_IMG = require('../../assets/icons/silver_chest.png');
 const SILVER_CHEST_OPEN_IMG = require('../../assets/icons/silver_chest_open.png');
 const SHOP_IMG = require('../../assets/icons/shop.png');
@@ -52,9 +51,17 @@ export default function GamingView({
   // Top Sub-Tabs inside Gaming: Ludo, Dominos, UNO, Games
   const [activeGameTab, setActiveGameTab] = useState('Ludo');
 
-  // Currencies: Golden Wallet Coins & Green Game Coins
+  // Currencies: Golden Wallet Coins (Primary Game Currency)
   const [walletCoins, setWalletCoins] = useState(currentUser?.coins || 0);
-  const [gameCoins, setGameCoins] = useState(currentUser?.gameCoins || 0);
+  const [gameCoins, setGameCoins] = useState(currentUser?.coins || 0);
+
+  // Sync with currentUser prop updates
+  useEffect(() => {
+    if (currentUser?.coins !== undefined) {
+      setWalletCoins(currentUser.coins);
+      setGameCoins(currentUser.coins);
+    }
+  }, [currentUser?.coins]);
 
   // Daily Silver Chest Claim State
   const [chestModalVisible, setChestModalVisible] = useState(false);
@@ -182,12 +189,14 @@ export default function GamingView({
         setCanClaimChest(res.data.canClaim);
         setCurrentStreak(res.data.streak || 0);
         setNextReward(res.data.nextReward || 100);
-        setGameCoins(res.data.gameCoins || 0);
-        setWalletCoins(res.data.walletCoins || 0);
+        const actualBal = res.data.coins !== undefined ? res.data.coins : (res.data.walletCoins || res.data.gameCoins || 0);
+        setGameCoins(actualBal);
+        setWalletCoins(actualBal);
+        if (currentUser) currentUser.coins = actualBal;
       }
     } catch (err) {
       // Fallback to local user defaults
-      setGameCoins(currentUser?.gameCoins || 0);
+      setGameCoins(currentUser?.coins || 0);
       setWalletCoins(currentUser?.coins || 0);
     }
   };
@@ -327,7 +336,7 @@ export default function GamingView({
         const profit = Math.max(0, pot - bet);
         setGameCoins((prev) => prev + pot);
         showToast(
-          `${t('Opponent left the match! You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${pot})`,
+          `${t('Opponent left the match! You won')} +${profit} ${t('Coins!')} 🏆🎉 (${t('Total Pot')}: ${pot})`,
           'success'
         );
         setGameResult('won');
@@ -365,7 +374,7 @@ export default function GamingView({
         setGameCoins((prev) => prev + pot);
         fetchChestStatus();
         showToast(
-          `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${pot})`,
+          `${t('Victory!')} ${t('You won')} +${profit} ${t('Coins!')} 🏆🎉 (${t('Total Pot')}: ${pot})`,
           'success'
         );
         setGameResult('won');
@@ -458,7 +467,7 @@ export default function GamingView({
     setMatchTotalPot(requiredBet * (selectedPlayers || 2));
     if (gameCoins < requiredBet) {
       showToast(
-        t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+        t('Insufficient Coins! Please claim free coins from the Silver Chest.'),
         'error'
       );
       setSetupModalVisible(false);
@@ -591,7 +600,7 @@ export default function GamingView({
     const requiredBet = codePreviewLobby?.bet || selectedGame?.bet || 100;
     if (gameCoins < requiredBet) {
       showToast(
-        t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+        t('Insufficient Coins! Please claim free coins from the Silver Chest.'),
         'error'
       );
       setJoinGameCodeModalVisible(false);
@@ -744,7 +753,7 @@ export default function GamingView({
     const requiredBet = selectedGame?.bet || 100;
     if (gameCoins < requiredBet) {
       showToast(
-        t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+        t('Insufficient Coins! Please claim free coins from the Silver Chest.'),
         'error'
       );
       setChestModalVisible(true);
@@ -801,7 +810,7 @@ export default function GamingView({
     const requiredBet = selectedGame?.bet || matchBetRef.current || ludoBetAmount || 100;
     if (gameCoins < requiredBet) {
       showToast(
-        t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+        t('Insufficient Coins! Please claim free coins from the Silver Chest.'),
         'error'
       );
       setLocalLobbyVisible(false);
@@ -855,13 +864,13 @@ export default function GamingView({
     if (gameCoins < selectedGame.bet) {
       if (canClaimChest) {
         showToast(
-          t('Insufficient Game Coins! Please claim free coins from the Silver Chest.'),
+          t('Insufficient Coins! Please claim free coins from the Silver Chest.'),
           'error'
         );
         setSetupModalVisible(false);
         setChestModalVisible(true);
       } else {
-        showToast(t('Insufficient Game Coins!'), 'error');
+        showToast(t('Insufficient Coins!'), 'error');
       }
       return;
     }
@@ -1082,20 +1091,20 @@ export default function GamingView({
       if (res.data?.success) {
         setGameCoins(res.data.gameCoins);
         showToast(
-          `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
+          `${t('Victory!')} ${t('You won')} +${profit} ${t('Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
           'success'
         );
       } else {
         setGameCoins((prev) => prev + totalPot);
         showToast(
-          `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
+          `${t('Victory!')} ${t('You won')} +${profit} ${t('Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
           'success'
         );
       }
     } catch (err) {
       setGameCoins((prev) => prev + totalPot);
       showToast(
-        `${t('Victory!')} ${t('You won')} +${profit} ${t('Game Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
+        `${t('Victory!')} ${t('You won')} +${profit} ${t('Coins!')} 🏆🎉 (${t('Total Pot')}: ${totalPot})`,
         'success'
       );
     }
@@ -1122,7 +1131,7 @@ export default function GamingView({
       // Handled silently
     }
     showToast(
-      `${t('Match lost!')} -${bet} ${t('Game Coins deducted.')}`,
+      `${t('Match lost!')} -${bet} ${t('Coins deducted.')}`,
       'error'
     );
 
@@ -1232,7 +1241,7 @@ export default function GamingView({
     setArenaGamePhase('waiting');
     setActiveGameArena(null);
     showToast(
-      `${t('Match forfeited!')} -${bet} ${t('Game Coins deducted.')}`,
+      `${t('Match forfeited!')} -${bet} ${t('Coins deducted.')}`,
       'error'
     );
   };
@@ -1280,7 +1289,7 @@ export default function GamingView({
         </TouchableOpacity>
       </View>
 
-      {/* 2. USER COINS & CURRENCY BAR (Golden Wallet Coins + Green Game Coins) */}
+      {/* 2. USER COINS & CURRENCY BAR (Golden Wallet Coins + Green Coins) */}
       <View style={styles.userCurrencyBar}>
         {/* Left: User Avatar */}
         <View style={styles.userAvatarWrap}>
@@ -1302,10 +1311,7 @@ export default function GamingView({
             if (navigation?.navigate) {
               navigation.navigate('Wallet');
             } else {
-              showToast(
-                t(`Main Wallet Coins: ${walletCoins} 🪙. (Use Game Coins to play games)`),
-                'info'
-              );
+              showToast(t(`Golden Coins: ${walletCoins.toLocaleString()}`), 'info');
             }
           }}
         >
@@ -1314,22 +1320,22 @@ export default function GamingView({
             style={styles.coinIconImg}
             resizeMode="contain"
           />
-          <Text style={styles.coinText}>{walletCoins}</Text>
+          <Text style={styles.coinText}>{walletCoins.toLocaleString()}</Text>
           <Text style={styles.coinChevron}>›</Text>
         </TouchableOpacity>
 
-        {/* Currency Pill 2: Green Game Coins (Used specifically for games) */}
+        {/* Currency Pill 2: Daily Free Chest */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.gameCoinPill}
           onPress={() => setChestModalVisible(true)}
         >
           <Image
-            source={GREEN_COIN_IMG}
+            source={SILVER_CHEST_IMG}
             style={styles.coinIconImg}
             resizeMode="contain"
           />
-          <Text style={styles.gameCoinText}>{gameCoins}</Text>
+          <Text style={styles.gameCoinText}>{canClaimChest ? t('Claim Free 🎁') : t('Free Chest')}</Text>
           <Text style={styles.coinChevron}>›</Text>
         </TouchableOpacity>
 
@@ -1347,7 +1353,7 @@ export default function GamingView({
         </TouchableOpacity>
       </View>
 
-      {/* 3. SILVER TREASURE CHEST (Daily Free Game Coins Claim Button) */}
+      {/* 3. SILVER TREASURE CHEST (Daily Free Coins Claim Button) */}
       <View style={styles.silverChestRow}>
         <TouchableOpacity
           activeOpacity={0.85}
@@ -1415,7 +1421,7 @@ export default function GamingView({
               >
                 <Text style={styles.betLabel}>{t('BETS')}</Text>
                 <Image
-                  source={GREEN_COIN_IMG}
+                  source={GOLD_COIN_IMG}
                   style={{ width: 18, height: 18 }}
                   resizeMode="contain"
                 />
@@ -1496,7 +1502,7 @@ export default function GamingView({
               <View style={styles.betPill}>
                 <Text style={styles.betLabel}><T>BETS</T></Text>
                 <Image
-                  source={GREEN_COIN_IMG}
+                  source={GOLD_COIN_IMG}
                   style={{ width: 18, height: 18 }}
                   resizeMode="contain"
                 />
@@ -1570,7 +1576,7 @@ export default function GamingView({
               <View style={styles.betPill}>
                 <Text style={styles.betLabel}><T>BETS</T></Text>
                 <Image
-                  source={GREEN_COIN_IMG}
+                  source={GOLD_COIN_IMG}
                   style={{ width: 18, height: 18 }}
                   resizeMode="contain"
                 />
@@ -1713,7 +1719,7 @@ export default function GamingView({
               <View style={styles.betPill}>
                 <Text style={styles.betLabel}><T>BETS</T></Text>
                 <Image
-                  source={GREEN_COIN_IMG}
+                  source={GOLD_COIN_IMG}
                   style={{ width: 18, height: 18 }}
                   resizeMode="contain"
                 />
@@ -1832,7 +1838,7 @@ export default function GamingView({
               <View style={styles.betPill}>
                 <Text style={styles.betLabel}><T>BETS</T></Text>
                 <Image
-                  source={GREEN_COIN_IMG}
+                  source={GOLD_COIN_IMG}
                   style={{ width: 18, height: 18 }}
                   resizeMode="contain"
                 />
@@ -1980,7 +1986,7 @@ export default function GamingView({
               </View>
               <View style={styles.betPill}>
                 <Text style={styles.betLabel}><T>BETS</T></Text>
-                <Image source={GREEN_COIN_IMG} style={{ width: 18, height: 18 }} resizeMode="contain" />
+                <Image source={GOLD_COIN_IMG} style={{ width: 18, height: 18 }} resizeMode="contain" />
                 <Text style={styles.betAmount}>{ludoBetAmount} <T>Coins</T></Text>
               </View>
               <Text style={styles.betSubLimit}><T>Pass the bomb before it blows! Last survivor wins the pot.</T></Text>
@@ -2122,7 +2128,7 @@ export default function GamingView({
                 resizeMode="contain"
               />
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.chestModalTitle}>{t('Daily Game Coins')}</Text>
+                <Text style={styles.chestModalTitle}>{t('Daily Coins')}</Text>
                 <Text style={styles.chestModalSub}>
                   {t('Claim free coins daily! Streak increases your reward.')}
                 </Text>
@@ -2149,7 +2155,7 @@ export default function GamingView({
                   >
                     <Text style={styles.streakDayLabel}>{t(`Day ${day}`)}</Text>
                     <Image
-                      source={GREEN_COIN_IMG}
+                      source={GOLD_COIN_IMG}
                       style={{ width: 22, height: 22, marginVertical: 4 }}
                       resizeMode="contain"
                     />
@@ -2232,14 +2238,14 @@ export default function GamingView({
             {/* Coins Earned Highlight */}
             <View style={styles.rewardCoinsPill}>
               <Image
-                source={GREEN_COIN_IMG}
+                source={GOLD_COIN_IMG}
                 style={{ width: 28, height: 28 }}
                 resizeMode="contain"
               />
               <Text style={styles.rewardCoinsValue}>
                 +{rewardClaimInfo.coins}
               </Text>
-              <Text style={styles.rewardCoinsUnit}>{t('Game Coins')}</Text>
+              <Text style={styles.rewardCoinsUnit}>{t('Coins')}</Text>
             </View>
 
             <Text style={styles.openChestSubtext}>
@@ -2432,12 +2438,12 @@ export default function GamingView({
                 <Text style={styles.betSummaryLabel}>{t('Game Bet')}:</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Image
-                    source={GREEN_COIN_IMG}
+                    source={GOLD_COIN_IMG}
                     style={{ width: 16, height: 16 }}
                     resizeMode="contain"
                   />
                   <Text style={styles.betSummaryValue}>
-                    {selectedGame?.bet || 100} {t('Game Coins')}
+                    {selectedGame?.bet || 100} {t('Coins')}
                   </Text>
                 </View>
               </View>
@@ -2445,12 +2451,12 @@ export default function GamingView({
                 <Text style={styles.betSummaryLabel}>{t('Your Balance')}:</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Image
-                    source={GREEN_COIN_IMG}
+                    source={GOLD_COIN_IMG}
                     style={{ width: 16, height: 16 }}
                     resizeMode="contain"
                   />
                   <Text style={[styles.betSummaryValue, gameCoins < (selectedGame?.bet || 100) && { color: '#EF4444' }]}>
-                    {gameCoins} {t('Game Coins')}
+                    {gameCoins} {t('Coins')}
                   </Text>
                 </View>
               </View>
@@ -2460,7 +2466,7 @@ export default function GamingView({
             {gameCoins < (selectedGame?.bet || 100) && (
               <View style={styles.insufficientWarningBox}>
                 <Text style={styles.insufficientWarningText}>
-                  ⚠️ {t('Insufficient Game Coins!')}
+                  ⚠️ {t('Insufficient Coins!')}
                 </Text>
                 {canClaimChest && (
                   <TouchableOpacity
@@ -2532,13 +2538,13 @@ export default function GamingView({
             <View style={styles.betModalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Image
-                  source={GREEN_COIN_IMG}
+                  source={GOLD_COIN_IMG}
                   style={{ width: 28, height: 28 }}
                   resizeMode="contain"
                 />
                 <View>
                   <Text style={styles.betModalTitle}>{t('Select Bet Amount')}</Text>
-                  <Text style={styles.betModalSub}>{t('Choose match stakes in Game Coins')}</Text>
+                  <Text style={styles.betModalSub}>{t('Choose match stakes in Coins')}</Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -2555,11 +2561,11 @@ export default function GamingView({
               <Text style={styles.betModalBalanceLabel}>{t('Your Balance')}:</Text>
               <View style={styles.betModalBalancePill}>
                 <Image
-                  source={GREEN_COIN_IMG}
+                  source={GOLD_COIN_IMG}
                   style={{ width: 16, height: 16 }}
                   resizeMode="contain"
                 />
-                <Text style={styles.betModalBalanceValue}>{gameCoins} {t('Game Coins')}</Text>
+                <Text style={styles.betModalBalanceValue}>{gameCoins} {t('Coins')}</Text>
               </View>
             </View>
 
@@ -2585,12 +2591,12 @@ export default function GamingView({
                       setBetSelectModalVisible(false);
                       if (!hasEnough) {
                         showToast(
-                          `${t('Bet set to')} ${amount} ${t('Game Coins!')} ⚠️ ${t('Insufficient Game Coins to play. Claim from Silver Chest.')}`,
+                          `${t('Bet set to')} ${amount} ${t('Coins!')} ⚠️ ${t('Insufficient Coins to play. Claim from Silver Chest.')}`,
                           'info'
                         );
                       } else {
                         showToast(
-                          `${t('Bet set to')} ${amount} ${t('Game Coins!')} 🪙`,
+                          `${t('Bet set to')} ${amount} ${t('Coins!')} 🪙`,
                           'success'
                         );
                       }
@@ -2602,7 +2608,7 @@ export default function GamingView({
                       </View>
                     )}
                     <Image
-                      source={GREEN_COIN_IMG}
+                      source={GOLD_COIN_IMG}
                       style={styles.betCardCoinImg}
                       resizeMode="contain"
                     />
@@ -2684,7 +2690,7 @@ export default function GamingView({
                   </Text>
                   <View style={styles.lobbyPreviewBetPill}>
                     <Image
-                      source={GREEN_COIN_IMG}
+                      source={GOLD_COIN_IMG}
                       style={{ width: 18, height: 18 }}
                       resizeMode="contain"
                     />
@@ -3046,12 +3052,12 @@ export default function GamingView({
             </Text>
             <View style={styles.quitLossBadge}>
               <Image
-                source={GREEN_COIN_IMG}
+                source={GOLD_COIN_IMG}
                 style={{ width: 18, height: 18 }}
                 resizeMode="contain"
               />
               <Text style={styles.quitLossBadgeText}>
-                -{selectedGame?.bet || 100} {t('Game Coins')}
+                -{selectedGame?.bet || 100} {t('Coins')}
               </Text>
             </View>
             <View style={styles.quitModalActionsRow}>

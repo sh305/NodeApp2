@@ -656,8 +656,9 @@ exports.getGameChestStatus = async (req, res) => {
       canClaim,
       streak,
       nextReward,
-      gameCoins: user.gameCoins || 0,
+      gameCoins: user.coins || 0,
       walletCoins: user.coins || 0,
+      coins: user.coins || 0,
       rewardTable: CHEST_REWARDS,
     });
   } catch (error) {
@@ -665,7 +666,7 @@ exports.getGameChestStatus = async (req, res) => {
   }
 };
 
-// @desc    Claim Daily Silver Chest Reward (Free Green Game Coins)
+// @desc    Claim Daily Silver Chest Reward (Free Golden Coins directly added to Wallet)
 // @route   POST /api/users/game-chest/claim
 exports.claimGameChest = async (req, res) => {
   try {
@@ -702,6 +703,7 @@ exports.claimGameChest = async (req, res) => {
     const rewardIndex = (newStreak - 1) % CHEST_REWARDS.length;
     const rewardCoins = CHEST_REWARDS[rewardIndex];
 
+    user.coins = (user.coins || 0) + rewardCoins;
     user.gameCoins = (user.gameCoins || 0) + rewardCoins;
     user.gameChestStreak = newStreak;
     user.lastGameChestClaim = now;
@@ -709,9 +711,11 @@ exports.claimGameChest = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Badhai ho! Day ${newStreak} ka Silver Chest claim safal raha. +${rewardCoins} Game Coins mile! 🎉`,
+      message: `Congratulations! Day ${newStreak} Silver Chest claim successful. +${rewardCoins} Golden Coins added to wallet! 🎉`,
       rewardCoins,
-      gameCoins: user.gameCoins,
+      coins: user.coins,
+      gameCoins: user.coins,
+      walletCoins: user.coins,
       streak: newStreak,
       canClaim: false,
     });
@@ -720,7 +724,7 @@ exports.claimGameChest = async (req, res) => {
   }
 };
 
-// @desc    Deduct Game Coins for Bet
+// @desc    Deduct Game Coins for Bet (Using Real Wallet Golden Coins)
 // @route   POST /api/users/game/deduct-bet
 exports.deductGameBet = async (req, res) => {
   try {
@@ -731,28 +735,32 @@ exports.deductGameBet = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const currentCoins = user.gameCoins || 0;
+    const currentCoins = user.coins || 0;
     if (currentCoins < betAmount) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient Game Coins! ${betAmount} coins required.`,
+        message: `Insufficient Coins! ${betAmount} coins required.`,
       });
     }
 
-    user.gameCoins = currentCoins - betAmount;
+    user.coins = currentCoins - betAmount;
+    user.gameCoins = Math.max(0, (user.gameCoins || 0) - betAmount);
     await user.save();
 
     return res.status(200).json({
       success: true,
-      message: `${betAmount} Game Coins bet placed! Good luck 🎮`,
-      gameCoins: user.gameCoins,
+      message: `${betAmount} Golden Coins bet placed! Good luck 🎮`,
+      coins: user.coins,
+      userCoins: user.coins,
+      gameCoins: user.coins,
+      walletCoins: user.coins,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Award Win Coins when User Wins a Game
+// @desc    Award Win Coins when User Wins a Game (Credited to Real Wallet Golden Coins)
 // @route   POST /api/users/game/award-win
 exports.awardGameWin = async (req, res) => {
   try {
@@ -764,13 +772,17 @@ exports.awardGameWin = async (req, res) => {
     }
 
     const prize = Math.max(1, Number(winAmount) || 180);
+    user.coins = (user.coins || 0) + prize;
     user.gameCoins = (user.gameCoins || 0) + prize;
     await user.save();
 
     return res.status(200).json({
       success: true,
-      message: `Victory! You won +${prize} Game Coins! 🏆🎉`,
-      gameCoins: user.gameCoins,
+      message: `Victory! You won +${prize} Golden Coins! 🏆🎉`,
+      coins: user.coins,
+      userCoins: user.coins,
+      gameCoins: user.coins,
+      walletCoins: user.coins,
       winAmount: prize,
     });
   } catch (error) {
@@ -792,9 +804,12 @@ exports.forfeitGame = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: reason === 'quit'
-        ? `Bet of ${betAmount} Game Coins forfeited for quitting.`
-        : `Bet of ${betAmount} Game Coins deducted for match loss.`,
-      gameCoins: user.gameCoins,
+        ? `Bet of ${betAmount} Coins forfeited for quitting.`
+        : `Bet of ${betAmount} Coins deducted for match loss.`,
+      coins: user.coins,
+      userCoins: user.coins,
+      gameCoins: user.coins,
+      walletCoins: user.coins,
       lostAmount: betAmount,
       reason,
     });
@@ -820,13 +835,17 @@ exports.refundGameBet = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid refund reason.' });
     }
 
+    user.coins = (user.coins || 0) + bet;
     user.gameCoins = (user.gameCoins || 0) + bet;
     await user.save();
 
     return res.status(200).json({
       success: true,
-      message: `${bet} Game Coins refunded. Reason: ${reason}.`,
-      gameCoins: user.gameCoins,
+      message: `${bet} Golden Coins refunded. Reason: ${reason}.`,
+      coins: user.coins,
+      userCoins: user.coins,
+      gameCoins: user.coins,
+      walletCoins: user.coins,
       refundedAmount: bet,
     });
   } catch (error) {
