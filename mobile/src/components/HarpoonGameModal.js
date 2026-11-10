@@ -547,7 +547,7 @@ export default function HarpoonGameModal({
                 </View>
               </View>
 
-              {/* Chips Row with Authentic Golden Coins */}
+              {/* Chips Row with Authentic Golden Coins on EVERY Chip */}
               <View style={styles.chipsRow}>
                 {CHIPS.map((chip) => {
                   const isSelected = betAmount === chip;
@@ -560,22 +560,12 @@ export default function HarpoonGameModal({
                       onPress={() => !isFiring && setBetAmount(chip)}
                       disabled={isFiring}
                     >
-                      {isSelected ? (
-                        <LinearGradient
-                          colors={['#F59E0B', '#D97706', '#92400E']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.chipActiveGradient}
-                        >
-                          <ShinyCoinIcon size={14} />
-                          <Text style={styles.chipTextActive}>{label}</Text>
-                        </LinearGradient>
-                      ) : (
-                        <View style={styles.chipInactiveContent}>
-                          <ShinyCoinIcon size={13} />
-                          <Text style={styles.chipTextInactive}>{label}</Text>
-                        </View>
-                      )}
+                      <View style={styles.chipInnerRow}>
+                        <ShinyCoinIcon size={14} />
+                        <Text style={[styles.chipBtnText, isSelected && styles.chipBtnTextActive]}>
+                          {label}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -1180,44 +1170,33 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 40,
     borderRadius: 12,
-    overflow: 'hidden',
-  },
-  chipBtnActive: {
-    elevation: 4,
-  },
-  chipInactiveContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 12,
-    gap: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chipActiveGradient: {
-    flex: 1,
+  chipBtnActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: '#FEF08A',
+    borderWidth: 1.5,
+    elevation: 4,
+  },
+  chipInnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FEF08A',
-    borderRadius: 12,
     gap: 4,
   },
-  chipTextInactive: {
+  chipBtnText: {
     color: '#CBD5E1',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  chipTextActive: {
-    color: '#FFFFFF',
-    fontSize: 12,
+  chipBtnTextActive: {
+    color: '#FDE047',
     fontWeight: '900',
-    textShadowColor: 'rgba(0, 0, 0, 0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 13,
   },
   fireBtn: {
     width: '100%',

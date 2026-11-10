@@ -148,41 +148,6 @@ export default function NariyalGameModal({
     } catch (e) {}
   };
 
-  // Clear bets
-  const handleClearBets = () => {
-    if (isSmashing) return;
-    setBets({ coco1: 0, coco2: 0, coco3: 0 });
-  };
-
-  // Re-bet previous bets
-  const handleRebet = () => {
-    if (isSmashing) return;
-    if (!lastBets) {
-      showToast(t('No previous bet to repeat'), 'info');
-      return;
-    }
-    const prevTotal = (lastBets.coco1 || 0) + (lastBets.coco2 || 0) + (lastBets.coco3 || 0);
-    if (prevTotal > userCoins) {
-      showToast(t('Insufficient coins! Please recharge.'), 'error');
-      return;
-    }
-    setBets({ ...lastBets });
-  };
-
-  // Double current bets
-  const handleDoubleBets = () => {
-    if (isSmashing || totalBetAmount === 0) return;
-    if (totalBetAmount * 2 > userCoins) {
-      showToast(t('Insufficient coins to double bet.'), 'error');
-      return;
-    }
-    setBets((prev) => ({
-      coco1: (prev.coco1 || 0) * 2,
-      coco2: (prev.coco2 || 0) * 2,
-      coco3: (prev.coco3 || 0) * 2,
-    }));
-  };
-
   // Run Smash Action
   const handleSmashCoconuts = async () => {
     if (isSmashingRef.current) return;
@@ -562,21 +527,22 @@ export default function NariyalGameModal({
               </View>
             )}
 
-            {/* ══ CONTROLS: CHIP SELECTOR & ACTIONS ══ */}
+            {/* ══ CONTROLS: CHIP SELECTOR (GOLD COINS) ══ */}
             <View style={styles.controlsSection}>
               <View style={styles.controlsHeader}>
                 <Text style={styles.controlsTitle}><T>Select Chip & Tap Coconut</T></Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={styles.currentBetBadge}>
                   <Text style={styles.currentBetLabel}><T>Total Bet</T>:</Text>
                   <ShinyCoinIcon size={14} />
                   <Text style={styles.currentBetValue}>{totalBetAmount.toLocaleString()}</Text>
                 </View>
               </View>
 
-              {/* Chips Row with Authentic Golden Coins */}
+              {/* Chips Row with Authentic Golden Coins on EVERY Chip */}
               <View style={styles.chipsRow}>
                 {CHIPS.map((chip) => {
                   const isSelected = selectedChip === chip;
+                  const label = chip >= 1000 ? `${chip / 1000}k` : `${chip}`;
                   return (
                     <TouchableOpacity
                       key={`chip_${chip}`}
@@ -585,39 +551,20 @@ export default function NariyalGameModal({
                       onPress={() => setSelectedChip(chip)}
                       disabled={isSmashing}
                     >
-                      <ShinyCoinIcon size={13} />
-                      <Text style={[styles.chipBtnText, isSelected && styles.chipBtnTextActive]}>
-                        {chip >= 1000 ? `${chip / 1000}k` : chip}
-                      </Text>
+                      <View style={styles.chipInnerRow}>
+                        <ShinyCoinIcon size={14} />
+                        <Text style={[styles.chipBtnText, isSelected && styles.chipBtnTextActive]}>
+                          {label}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-
-              {/* Quick Action Adjusters */}
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  activeOpacity={0.75}
-                  onPress={handleClearBets}
-                  disabled={isSmashing || totalBetAmount === 0}
-                >
-                  <Text style={styles.actionBtnText}><T>Clear</T></Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  activeOpacity={0.75}
-                  onPress={handleRebet}
-                  disabled={isSmashing}
-                >
-                  <Text style={styles.actionBtnText}><T>Re-Bet</T></Text>
-                </TouchableOpacity>
-              </View>
             </View>
 
             {/* ══ BIG SMASH COCONUT BUTTON ══ */}
-            <Animated.View style={{ transform: [{ scale: isSmashing ? 1 : smashBtnPulse }] }}>
+            <Animated.View style={{ transform: [{ scale: isSmashing ? 1 : smashBtnPulse }], width: '100%' }}>
               <TouchableOpacity
                 style={[styles.smashBtn, isSmashing && styles.smashBtnDisabled]}
                 activeOpacity={0.75}
@@ -634,6 +581,12 @@ export default function NariyalGameModal({
                   <Text style={styles.smashBtnText}>
                     {isSmashing ? t('SMASHING...') : t('SMASH COCONUT!')}
                   </Text>
+                  {totalBetAmount > 0 && !isSmashing && (
+                    <View style={styles.smashCostPill}>
+                      <ShinyCoinIcon size={14} />
+                      <Text style={styles.smashCostText}>{totalBetAmount.toLocaleString()}</Text>
+                    </View>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </Animated.View>
@@ -1105,6 +1058,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  currentBetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    gap: 4,
+  },
   currentBetLabel: {
     color: '#94A3B8',
     fontSize: 12,
@@ -1115,69 +1079,48 @@ const styles = StyleSheet.create({
   },
   chipsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 6,
+    marginBottom: 4,
   },
   chipBtn: {
     flex: 1,
-    minWidth: 46,
-    paddingVertical: 8,
-    borderRadius: 10,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipBtnActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: '#FEF08A',
+    borderWidth: 1.5,
+    elevation: 4,
+  },
+  chipInnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  chipBtnActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.25)',
-    borderColor: '#10B981',
   },
   chipBtnText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  chipBtnTextActive: {
-    color: '#34D399',
-    fontWeight: '900',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  actionBtnText: {
     color: '#CBD5E1',
     fontSize: 12,
-    fontWeight: '700',
-  },
-  actionBtnDouble: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: '#10B981',
-  },
-  actionBtnTextDouble: {
-    color: '#34D399',
-    fontSize: 12,
     fontWeight: '800',
+  },
+  chipBtnTextActive: {
+    color: '#FDE047',
+    fontWeight: '900',
+    fontSize: 13,
   },
   smashBtn: {
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 14,
     elevation: 6,
   },
   smashBtnDisabled: {
@@ -1188,8 +1131,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 24,
-    gap: 10,
+    paddingHorizontal: 20,
+    gap: 8,
   },
   smashBtnIcon: {
     fontSize: 20,
@@ -1199,6 +1142,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0.8,
+  },
+  smashCostPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginLeft: 6,
+    gap: 4,
+  },
+  smashCostText: {
+    color: '#FDE047',
+    fontSize: 13,
+    fontWeight: '900',
   },
   historyCard: {
     width: '100%',
