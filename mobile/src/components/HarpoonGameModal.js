@@ -27,7 +27,7 @@ import {
 } from './HarpoonIcons';
 import { ShinyCoinIcon } from './FoodIcons';
 
-const CHIPS = [100, 500, 1000, 5000, 10000, 25000];
+const CHIPS = [100, 500, 1000, 5000, 10000];
 
 const CREATURES_PREVIEW = [
   { id: 'mermaid', name: 'Golden Mermaid', multiplier: 30, color: '#F59E0B' },
@@ -75,6 +75,7 @@ export default function HarpoonGameModal({
   const gunRecoilAnim = useRef(new Animated.Value(0)).current;
   const catchBobAnim = useRef(new Animated.Value(0)).current;
   const fireBtnPulse = useRef(new Animated.Value(1)).current;
+  const swimBobAnim = useRef(new Animated.Value(0)).current;
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
 
@@ -122,13 +123,22 @@ export default function HarpoonGameModal({
       );
       pulseLoop.start();
 
+      const swimLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(swimBobAnim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(swimBobAnim, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      );
+      swimLoop.start();
+
       return () => {
         isMountedRef.current = false;
         pulseLoop.stop();
+        swimLoop.stop();
         if (autoFireTimerRef.current) clearTimeout(autoFireTimerRef.current);
       };
     }
-  }, [visible, fetchGameState, fireBtnPulse]);
+  }, [visible, fetchGameState, fireBtnPulse, swimBobAnim]);
 
   // Handle Bet Adjustments
   const handleHalfBet = () => {
@@ -329,6 +339,15 @@ export default function HarpoonGameModal({
     }
   };
 
+  const swimY1 = swimBobAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -6],
+  });
+  const swimY2 = swimBobAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-6, 0],
+  });
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.modalBackdrop}>
@@ -422,16 +441,17 @@ export default function HarpoonGameModal({
             {/* ══ ARENA: DEEP OCEAN REEF SPEARFISHING ══ */}
             <View style={styles.arenaCard}>
               <LinearGradient
-                colors={['#082F49', '#075985', '#0C4A6E', '#031726']}
+                colors={['#031726', '#073352', '#0A4A74', '#041B2E']}
                 style={StyleSheet.absoluteFill}
               />
 
               {/* Water Wave Effect Guides */}
-              <View style={styles.bubbleLayer}>
-                <View style={[styles.bubble, { top: 20, left: '15%', width: 10, height: 10 }]} />
-                <View style={[styles.bubble, { top: 50, left: '78%', width: 14, height: 14 }]} />
-                <View style={[styles.bubble, { top: 90, left: '30%', width: 8, height: 8 }]} />
-                <View style={[styles.bubble, { top: 130, left: '85%', width: 12, height: 12 }]} />
+              <View style={styles.bubbleLayer} pointerEvents="none">
+                <View style={[styles.bubble, { top: 16, left: '12%', width: 10, height: 10 }]} />
+                <View style={[styles.bubble, { top: 45, left: '76%', width: 14, height: 14 }]} />
+                <View style={[styles.bubble, { top: 80, left: '25%', width: 8, height: 8 }]} />
+                <View style={[styles.bubble, { top: 110, left: '88%', width: 11, height: 11 }]} />
+                <View style={[styles.bubble, { top: 140, left: '48%', width: 7, height: 7 }]} />
               </View>
 
               {/* Ocean Target Creature Display */}
@@ -445,7 +465,7 @@ export default function HarpoonGameModal({
                           {
                             scale: catchBobAnim.interpolate({
                               inputRange: [0, 1],
-                              outputRange: [0.8, 1.05],
+                              outputRange: [0.8, 1.08],
                             }),
                           },
                         ],
@@ -468,25 +488,43 @@ export default function HarpoonGameModal({
                   </Animated.View>
                 ) : (
                   <View style={styles.swimmingPreviewRow}>
-                    <View style={styles.previewCreatureBox}>
+                    <Animated.View style={[styles.previewCreatureBox, styles.previewBoxMermaid, { transform: [{ translateY: swimY1 }] }]}>
+                      <View style={styles.previewTagPillGold}>
+                        <Text style={styles.previewTagText}>30X</Text>
+                      </View>
                       <GoldenMermaidGraphic size={52} />
-                      <Text style={styles.previewTagGold}>30X</Text>
-                    </View>
-                    <View style={styles.previewCreatureBox}>
+                      <Text style={styles.creatureLabel} numberOfLines={1}>Mermaid</Text>
+                    </Animated.View>
+
+                    <Animated.View style={[styles.previewCreatureBox, styles.previewBoxShark, { transform: [{ translateY: swimY2 }] }]}>
+                      <View style={styles.previewTagPillCyan}>
+                        <Text style={styles.previewTagText}>12X</Text>
+                      </View>
                       <GreatWhiteSharkGraphic size={52} />
-                      <Text style={styles.previewTagCyan}>12X</Text>
-                    </View>
-                    <View style={styles.previewCreatureBox}>
+                      <Text style={styles.creatureLabel} numberOfLines={1}>Shark</Text>
+                    </Animated.View>
+
+                    <Animated.View style={[styles.previewCreatureBox, styles.previewBoxKraken, { transform: [{ translateY: swimY1 }] }]}>
+                      <View style={styles.previewTagPillPurple}>
+                        <Text style={styles.previewTagText}>5X</Text>
+                      </View>
                       <GiantKrakenGraphic size={52} />
-                      <Text style={styles.previewTagPurple}>5X</Text>
-                    </View>
-                    <View style={styles.previewCreatureBox}>
+                      <Text style={styles.creatureLabel} numberOfLines={1}>Kraken</Text>
+                    </Animated.View>
+
+                    <Animated.View style={[styles.previewCreatureBox, styles.previewBoxPuffer, { transform: [{ translateY: swimY2 }] }]}>
+                      <View style={styles.previewTagPillGreen}>
+                        <Text style={styles.previewTagText}>2.5X</Text>
+                      </View>
                       <SpikyPufferfishGraphic size={52} />
-                      <Text style={styles.previewTagGreen}>2.5X</Text>
-                    </View>
+                      <Text style={styles.creatureLabel} numberOfLines={1}>Puffer</Text>
+                    </Animated.View>
                   </View>
                 )}
               </View>
+
+              {/* Aiming Laser Line Indicator */}
+              <View style={styles.aimingGuideLine} pointerEvents="none" />
 
               {/* Animated Flying Harpoon Spear */}
               <Animated.View
@@ -501,13 +539,14 @@ export default function HarpoonGameModal({
                 <View style={styles.laserTridentBeam} />
               </Animated.View>
 
-              {/* Gun Turret Mounted at Bottom */}
+              {/* Gun Turret Mounted at Bottom with Submarine Platform Deck */}
               <Animated.View
                 style={[
                   styles.harpoonGunBase,
                   { transform: [{ translateY: gunRecoilAnim }] },
                 ]}
               >
+                <View style={styles.gunDeckPlatform} />
                 <GoldenLaserHarpoonGraphic size={64} />
               </Animated.View>
             </View>
@@ -555,17 +594,18 @@ export default function HarpoonGameModal({
             <View style={styles.controlsSection}>
               <View style={styles.controlsHeader}>
                 <Text style={styles.controlsTitle}><T>Select Chip</T></Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={styles.currentBetBadge}>
                   <Text style={styles.currentBetLabel}><T>Current Bet</T>:</Text>
                   <ShinyCoinIcon size={14} />
                   <Text style={styles.currentBetValue}>{betAmount.toLocaleString()}</Text>
                 </View>
               </View>
 
-              {/* Chips Row */}
+              {/* Chips Row with Authentic Golden Coins */}
               <View style={styles.chipsRow}>
                 {CHIPS.map((chip) => {
                   const isSelected = betAmount === chip;
+                  const label = chip >= 1000 ? `${chip / 1000}k` : `${chip}`;
                   return (
                     <TouchableOpacity
                       key={`chip_${chip}`}
@@ -574,15 +614,28 @@ export default function HarpoonGameModal({
                       onPress={() => !isFiring && setBetAmount(chip)}
                       disabled={isFiring}
                     >
-                      <Text style={[styles.chipBtnText, isSelected && styles.chipBtnTextActive]}>
-                        {chip >= 1000 ? `${chip / 1000}k` : chip}
-                      </Text>
+                      {isSelected ? (
+                        <LinearGradient
+                          colors={['#F59E0B', '#D97706', '#92400E']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.chipActiveGradient}
+                        >
+                          <ShinyCoinIcon size={14} />
+                          <Text style={styles.chipTextActive}>{label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={styles.chipInactiveContent}>
+                          <ShinyCoinIcon size={13} />
+                          <Text style={styles.chipTextInactive}>{label}</Text>
+                        </View>
+                      )}
                     </TouchableOpacity>
                   );
                 })}
               </View>
 
-              {/* Quick Multiplier Adjusters & Auto-Hunt */}
+              {/* Quick Multiplier Adjusters & Auto-Hunt (Clean 4-button row, NO overlapping) */}
               <View style={styles.multiplierAdjustRow}>
                 <TouchableOpacity
                   style={styles.adjustBtn}
@@ -632,8 +685,8 @@ export default function HarpoonGameModal({
               </View>
             </View>
 
-            {/* ══ BIG FIRE HARPOON BUTTON ══ */}
-            <Animated.View style={{ transform: [{ scale: isFiring ? 1 : fireBtnPulse }] }}>
+            {/* ══ BIG FIRE HARPOON BUTTON WITH COIN COST BADGE ══ */}
+            <Animated.View style={{ transform: [{ scale: isFiring ? 1 : fireBtnPulse }], width: '100%' }}>
               <TouchableOpacity
                 style={[styles.fireBtn, isFiring && styles.fireBtnDisabled]}
                 activeOpacity={0.75}
@@ -650,6 +703,12 @@ export default function HarpoonGameModal({
                   <Text style={styles.fireBtnText}>
                     {isFiring ? t('HUNTING...') : t('FIRE HARPOON!')}
                   </Text>
+                  {!isFiring && (
+                    <View style={styles.fireBtnCostPill}>
+                      <ShinyCoinIcon size={14} />
+                      <Text style={styles.fireBtnCostText}>{betAmount.toLocaleString()}</Text>
+                    </View>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </Animated.View>
@@ -971,7 +1030,7 @@ const styles = StyleSheet.create({
   },
   arenaCard: {
     width: '100%',
-    height: 230,
+    height: 240,
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(6, 182, 212, 0.4)',
@@ -979,8 +1038,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    marginBottom: 16,
+    paddingTop: 16,
+    paddingBottom: 6,
+    marginBottom: 14,
   },
   bubbleLayer: {
     position: 'absolute',
@@ -992,49 +1052,86 @@ const styles = StyleSheet.create({
   bubble: {
     position: 'absolute',
     borderRadius: 10,
-    backgroundColor: 'rgba(186, 230, 253, 0.25)',
+    backgroundColor: 'rgba(186, 230, 253, 0.2)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   targetAquariumArea: {
     width: '100%',
-    height: 100,
+    height: 110,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
   },
   swimmingPreviewRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-evenly',
     width: '100%',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   previewCreatureBox: {
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 70,
   },
-  previewTagGold: {
-    color: '#FDE047',
-    fontSize: 11,
-    fontWeight: '900',
-    marginTop: 2,
+  previewBoxMermaid: {
+    borderColor: 'rgba(245, 158, 11, 0.45)',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
   },
-  previewTagCyan: {
-    color: '#38BDF8',
-    fontSize: 11,
-    fontWeight: '900',
-    marginTop: 2,
+  previewBoxShark: {
+    borderColor: 'rgba(6, 182, 212, 0.45)',
+    backgroundColor: 'rgba(6, 182, 212, 0.12)',
   },
-  previewTagPurple: {
-    color: '#C084FC',
-    fontSize: 11,
-    fontWeight: '900',
-    marginTop: 2,
+  previewBoxKraken: {
+    borderColor: 'rgba(168, 85, 247, 0.45)',
+    backgroundColor: 'rgba(168, 85, 247, 0.12)',
   },
-  previewTagGreen: {
-    color: '#34D399',
-    fontSize: 11,
+  previewBoxPuffer: {
+    borderColor: 'rgba(16, 185, 129, 0.45)',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  },
+  previewTagPillGold: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginBottom: 4,
+  },
+  previewTagPillCyan: {
+    backgroundColor: '#06B6D4',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginBottom: 4,
+  },
+  previewTagPillPurple: {
+    backgroundColor: '#A855F7',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginBottom: 4,
+  },
+  previewTagPillGreen: {
+    backgroundColor: '#10B981',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginBottom: 4,
+  },
+  previewTagText: {
+    color: '#FFFFFF',
+    fontSize: 10,
     fontWeight: '900',
-    marginTop: 2,
+  },
+  creatureLabel: {
+    color: '#E2E8F0',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 3,
   },
   caughtCreatureWrap: {
     alignItems: 'center',
@@ -1051,6 +1148,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '900',
+  },
+  aimingGuideLine: {
+    position: 'absolute',
+    bottom: 70,
+    width: 2,
+    height: 50,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    zIndex: 6,
   },
   spearProjectile: {
     position: 'absolute',
@@ -1071,6 +1178,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 15,
     marginTop: 'auto',
+  },
+  gunDeckPlatform: {
+    position: 'absolute',
+    bottom: -6,
+    width: 76,
+    height: 10,
+    backgroundColor: '#0F172A',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderWidth: 1,
+    borderColor: '#0284C7',
+    zIndex: -1,
   },
   winResultBanner: {
     flexDirection: 'row',
@@ -1116,12 +1235,12 @@ const styles = StyleSheet.create({
   },
   controlsSection: {
     width: '100%',
-    backgroundColor: '#0F1E2E',
+    backgroundColor: '#08192A',
     borderRadius: 16,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 16,
+    borderColor: 'rgba(6, 182, 212, 0.25)',
+    marginBottom: 14,
   },
   controlsHeader: {
     flexDirection: 'row',
@@ -1134,6 +1253,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  currentBetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    gap: 4,
+  },
   currentBetLabel: {
     color: '#94A3B8',
     fontSize: 12,
@@ -1144,14 +1274,63 @@ const styles = StyleSheet.create({
   },
   chipsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 6,
     marginBottom: 10,
   },
   chipBtn: {
     flex: 1,
-    minWidth: 46,
-    paddingVertical: 8,
+    height: 40,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  chipBtnActive: {
+    elevation: 4,
+  },
+  chipInactiveContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 12,
+    gap: 4,
+  },
+  chipActiveGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FEF08A',
+    borderRadius: 12,
+    gap: 4,
+  },
+  chipTextInactive: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  multiplierAdjustRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
+    width: '100%',
+  },
+  adjustBtn: {
+    flex: 1,
+    paddingVertical: 9,
     borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
@@ -1159,63 +1338,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  chipBtnActive: {
-    backgroundColor: 'rgba(6, 182, 212, 0.25)',
-    borderColor: '#06B6D4',
-  },
-  chipBtnText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  chipBtnTextActive: {
-    color: '#38BDF8',
-    fontWeight: '900',
-  },
-  multiplierAdjustRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  adjustBtn: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
   adjustBtnText: {
     color: '#CBD5E1',
     fontSize: 12,
-    fontWeight: '700',
-  },
-  adjustBtnMax: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: '#EF4444',
-  },
-  adjustBtnTextMax: {
-    color: '#EF4444',
-    fontSize: 12,
     fontWeight: '800',
   },
+  adjustBtnMax: {
+    backgroundColor: 'rgba(239, 68, 68, 0.18)',
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  adjustBtnTextMax: {
+    color: '#F87171',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   autoBtn: {
-    flex: 1.4,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: 'rgba(6, 182, 212, 0.2)',
+    flex: 1.3,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: 'rgba(6, 182, 212, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#06B6D4',
   },
   autoBtnActive: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#DC2626',
     borderColor: '#EF4444',
   },
   autoBtnText: {
-    color: '#BAE6FD',
+    color: '#38BDF8',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -1227,7 +1379,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 14,
     elevation: 6,
   },
   fireBtnDisabled: {
@@ -1238,8 +1390,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 24,
-    gap: 10,
+    paddingHorizontal: 20,
+    gap: 8,
   },
   fireBtnIcon: {
     fontSize: 18,
@@ -1249,6 +1401,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0.8,
+  },
+  fireBtnCostPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginLeft: 6,
+    gap: 4,
+  },
+  fireBtnCostText: {
+    color: '#FDE047',
+    fontSize: 13,
+    fontWeight: '900',
   },
   historyCard: {
     width: '100%',
