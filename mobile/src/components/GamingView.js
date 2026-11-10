@@ -3083,9 +3083,19 @@ export default function GamingView({
       </Modal>
 
       {/* ================= MODAL 3: INTERACTIVE GAME ARENAS (LUDO, DOMINOS, UNO) ================= */}
-      <Modal visible={!!activeGameArena} transparent animationType="slide">
+      <Modal visible={!!activeGameArena} transparent animationType="slide" statusBarTranslucent>
         <View style={styles.arenaBackdrop}>
-          <View style={styles.arenaContainer}>
+          <View
+            style={[
+              styles.arenaContainer,
+              {
+                paddingBottom:
+                  Platform.OS === 'android'
+                    ? Math.max(20, insets.bottom + 10)
+                    : 16,
+              },
+            ]}
+          >
             {/* Arena Header */}
             <View style={styles.arenaHeader}>
               <Text style={styles.arenaTitle}>

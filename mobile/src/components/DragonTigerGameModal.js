@@ -364,9 +364,10 @@ export default function DragonTigerGameModal({
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <View style={styles.modalBackdrop}>
-        <View style={[styles.container, { paddingTop: Math.max(12, insets.top), paddingBottom: Math.max(16, insets.bottom + 8) }]}>
+        <View style={[styles.container, { paddingTop: Math.max(12, insets.top) }]}>
           {/* ══ HEADER BAR ══ */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -416,8 +417,14 @@ export default function DragonTigerGameModal({
             </View>
           </View>
 
-          {/* ══ BALANCE & STATS BAR ══ */}
-          <View style={styles.statsBar}>
+          {/* ══ SCROLLABLE ARENA & BETTING CONTENT ══ */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 10 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* ══ BALANCE & STATS BAR ══ */}
+            <View style={styles.statsBar}>
             <View style={styles.coinBalanceBox}>
               <ShinyCoinIcon size={20} />
               <Text style={styles.coinBalanceText}>{displayCoins.toLocaleString()}</Text>
@@ -657,9 +664,20 @@ export default function DragonTigerGameModal({
               })}
             </ScrollView>
           </View>
+        </ScrollView>
 
-          {/* ══ FOOTER CONTROLS ══ */}
-          <View style={styles.footerControls}>
+        {/* ══ FOOTER CONTROLS ══ */}
+        <View
+          style={[
+            styles.footerControls,
+            {
+              paddingBottom:
+                Platform.OS === 'android'
+                  ? Math.max(28, insets.bottom + 16)
+                  : Math.max(16, insets.bottom),
+            },
+          ]}
+        >
             {/* Chips Row */}
             <View style={styles.chipsRow}>
               {CHIP_VALUES.map((chip) => (

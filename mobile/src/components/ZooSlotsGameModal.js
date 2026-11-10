@@ -339,9 +339,10 @@ export default function ZooSlotsGameModal({
         setAutoSpin(false);
         onClose();
       }}
+      statusBarTranslucent
     >
       <View style={styles.modalBackdrop}>
-        <View style={[styles.container, { paddingTop: Math.max(12, insets.top), paddingBottom: Math.max(16, insets.bottom + 8) }]}>
+        <View style={[styles.container, { paddingTop: Math.max(12, insets.top) }]}>
           {/* ══ HEADER BAR ══ */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -540,7 +541,17 @@ export default function ZooSlotsGameModal({
           </ScrollView>
 
           {/* ══ BET CHIPS & CONTROL FOOTER ══ */}
-          <View style={styles.footerControls}>
+          <View
+            style={[
+              styles.footerControls,
+              {
+                paddingBottom:
+                  Platform.OS === 'android'
+                    ? Math.max(28, insets.bottom + 16)
+                    : Math.max(16, insets.bottom),
+              },
+            ]}
+          >
             {/* Chips Selector Row */}
             <View style={styles.chipsRow}>
               {BET_CHIPS.map((chip) => (

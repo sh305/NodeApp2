@@ -334,14 +334,17 @@ export default function NariyalGameModal({
   });
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.modalBackdrop}>
         <View
           style={[
             styles.modalContent,
             {
-              height: Math.min(780, Math.floor(windowHeight * 0.88)),
-              paddingBottom: Math.max(16, insets.bottom + 8),
+              height: Math.min(800, Math.floor(windowHeight * 0.90)),
+              paddingBottom:
+                Platform.OS === 'android'
+                  ? Math.max(28, insets.bottom + 16)
+                  : Math.max(16, insets.bottom),
             },
           ]}
         >
@@ -409,7 +412,15 @@ export default function NariyalGameModal({
 
           <ScrollView
             style={styles.scrollBody}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingBottom:
+                  Platform.OS === 'android'
+                    ? Math.max(36, insets.bottom + 24)
+                    : Math.max(24, insets.bottom),
+              },
+            ]}
             showsVerticalScrollIndicator={false}
           >
             {/* ══ ARENA: TROPICAL WOODEN COCONUT STALL ══ */}

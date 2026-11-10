@@ -377,12 +377,13 @@ export default function GoliSodaGameModal({
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <View style={styles.modalOverlay}>
         <View
           style={[
             styles.container,
-            { paddingTop: Math.max(16, insets.top), paddingBottom: Math.max(16, insets.bottom) },
+            { paddingTop: Math.max(16, insets.top) },
           ]}
         >
           {/* ══ TOP BAR: BACK, BALANCE, TODAY EARNINGS, RULES ══ */}
@@ -446,7 +447,15 @@ export default function GoliSodaGameModal({
           {/* Main Scrollable Content */}
           <ScrollView
             style={styles.scrollArea}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingBottom:
+                  Platform.OS === 'android'
+                    ? Math.max(36, insets.bottom + 24)
+                    : Math.max(24, insets.bottom),
+              },
+            ]}
             showsVerticalScrollIndicator={false}
           >
             {/* ══ 1-SHOT SODA POPPING ARENA ══ */}

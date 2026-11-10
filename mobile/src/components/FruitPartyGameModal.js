@@ -382,9 +382,10 @@ export default function FruitPartyGameModal({
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <View style={styles.modalBackdrop}>
-        <View style={[styles.container, { paddingTop: Math.max(12, insets.top), paddingBottom: Math.max(16, insets.bottom + 8) }]}>
+        <View style={[styles.container, { paddingTop: Math.max(12, insets.top) }]}>
           {/* ══ HEADER BAR ══ */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -646,7 +647,17 @@ export default function FruitPartyGameModal({
           </View>
 
           {/* ══ FOOTER CONTROLS ══ */}
-          <View style={styles.footerControls}>
+          <View
+            style={[
+              styles.footerControls,
+              {
+                paddingBottom:
+                  Platform.OS === 'android'
+                    ? Math.max(28, insets.bottom + 16)
+                    : Math.max(16, insets.bottom),
+              },
+            ]}
+          >
             {/* Chips Row */}
             <View style={styles.chipsRow}>
               {CHIP_VALUES.map((chip) => (

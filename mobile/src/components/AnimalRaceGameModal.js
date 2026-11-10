@@ -364,6 +364,7 @@ export default function AnimalRaceGameModal({
       animationType="slide"
       transparent={false}
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <View style={styles.fullScreenContainer}>
         <LinearGradient
@@ -443,11 +444,17 @@ export default function AnimalRaceGameModal({
             </ScrollView>
           </View>
 
-          {/* ══ THE ANIMATED SAFARI RACE TRACK ══ */}
-          <View
-            style={styles.raceTrackCard}
-            onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width - 90)}
+          {/* ══ SCROLLABLE RACING ARENA & BETTING GRID ══ */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 12 }}
+            showsVerticalScrollIndicator={false}
           >
+            {/* ══ THE ANIMATED SAFARI RACE TRACK ══ */}
+            <View
+              style={styles.raceTrackCard}
+              onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width - 90)}
+            >
             {/* Track Header with Live Countdown Timer */}
             <View style={styles.trackHeaderRow}>
               <View style={styles.trackTitleRow}>
@@ -564,9 +571,20 @@ export default function AnimalRaceGameModal({
               })}
             </View>
           </View>
+        </ScrollView>
 
           {/* ══ CHIPS & ACTION CONTROLS ══ */}
-          <View style={[styles.footerControls, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
+          <View
+            style={[
+              styles.footerControls,
+              {
+                paddingBottom:
+                  Platform.OS === 'android'
+                    ? Math.max(28, insets.bottom + 16)
+                    : Math.max(16, insets.bottom),
+              },
+            ]}
+          >
             {/* Quick Action Buttons (Clear, Double, Repeat) */}
             <View style={styles.quickActionsRow}>
               <TouchableOpacity

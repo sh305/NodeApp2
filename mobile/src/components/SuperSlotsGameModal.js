@@ -340,6 +340,7 @@ export default function SuperSlotsGameModal({
       animationType="slide"
       transparent={false}
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <View style={styles.container}>
         {/* Deep Galaxy / Casino Velvet Background */}
@@ -413,7 +414,10 @@ export default function SuperSlotsGameModal({
 
         <ScrollView
           style={styles.mainScrollView}
-          contentContainerStyle={styles.mainScrollContent}
+          contentContainerStyle={[
+            styles.mainScrollContent,
+            { paddingBottom: Platform.OS === 'android' ? Math.max(36, insets.bottom + 24) : Math.max(24, insets.bottom) },
+          ]}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >

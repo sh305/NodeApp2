@@ -233,7 +233,7 @@ export default function PlinkoGameModal({
       setHighlightedBucket(bucketIndex);
       try {
         Vibration.vibrate(60);
-      } catch (e) {}
+      } catch (e) { }
 
       // Bucket pulse bounce
       Animated.sequence([
@@ -367,14 +367,17 @@ export default function PlinkoGameModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.modalOverlay}>
         <View
           style={[
             styles.container,
             {
-              height: Math.min(780, Math.floor(windowHeight * 0.88)),
-              paddingBottom: Math.max(16, insets.bottom),
+              height: Math.min(800, Math.floor(windowHeight * 0.90)),
+              paddingBottom:
+                Platform.OS === 'android'
+                  ? Math.max(28, insets.bottom + 16)
+                  : Math.max(16, insets.bottom),
             },
           ]}
         >
@@ -444,7 +447,15 @@ export default function PlinkoGameModal({
 
           <ScrollView
             style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingBottom:
+                  Platform.OS === 'android'
+                    ? Math.max(36, insets.bottom + 24)
+                    : Math.max(24, insets.bottom),
+              },
+            ]}
             showsVerticalScrollIndicator={false}
           >
             {/* ══ ARENA: TRIANGULAR PEGBOARD ══ */}
@@ -551,12 +562,12 @@ export default function PlinkoGameModal({
                     {winResult.multiplier >= 25
                       ? t('25X GRAND JACKPOT!')
                       : winResult.multiplier >= 10
-                      ? t('SUPER WIN!')
-                      : winResult.multiplier >= 4
-                      ? t('NICE WIN!')
-                      : winResult.multiplier >= 1
-                      ? t('PROFIT RETURN!')
-                      : t('CONSOLATION RETURN')}
+                        ? t('SUPER WIN!')
+                        : winResult.multiplier >= 4
+                          ? t('NICE WIN!')
+                          : winResult.multiplier >= 1
+                            ? t('PROFIT RETURN!')
+                            : t('CONSOLATION RETURN')}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                     <Text style={styles.winResultDetails}>
