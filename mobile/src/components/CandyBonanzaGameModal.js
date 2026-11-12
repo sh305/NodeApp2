@@ -22,7 +22,7 @@ import {
 } from './CandyBonanzaIcons';
 import { ShinyCoinIcon } from './FoodIcons';
 
-const CHIPS = [50, 100, 500, 1000, 5000, 10000, 25000];
+const CHIPS = [100, 500, 1000, 5000, 10000];
 const ALL_SYMBOLS = ['jelly_bean', 'gummy_bear', 'grape_gummy', 'donut', 'lollipop', 'bomb'];
 
 export default function CandyBonanzaGameModal({
@@ -52,10 +52,6 @@ export default function CandyBonanzaGameModal({
   // History & Winners
   const [history, setHistory] = useState([]);
   const [recentWinners, setRecentWinners] = useState([]);
-
-  // Auto-Spin State
-  const [autoSpinsLeft, setAutoSpinsLeft] = useState(0);
-  const autoSpinTimerRef = useRef(null);
 
   // Reel Animations (translates vertical offset during spin)
   const reel1Anim = useRef(new Animated.Value(0)).current;
@@ -107,7 +103,6 @@ export default function CandyBonanzaGameModal({
     }
     return () => {
       isMountedRef.current = false;
-      if (autoSpinTimerRef.current) clearTimeout(autoSpinTimerRef.current);
     };
   }, [visible, fetchGameState]);
 
@@ -234,49 +229,16 @@ export default function CandyBonanzaGameModal({
             Vibration.vibrate([0, 60, 40, 80]);
             triggerWinCelebration(data.wonCoins, data.multiplier, data.winType);
           }
-
-          // Handle Auto-spin sequence
-          if (autoSpinsLeft > 1) {
-            setAutoSpinsLeft((prev) => prev - 1);
-            autoSpinTimerRef.current = setTimeout(() => {
-              if (isMountedRef.current) handleSpin();
-            }, 1800);
-          } else {
-            setAutoSpinsLeft(0);
-          }
         }, 1450);
       }
     } catch (err) {
       console.error('spinCandyBonanza API error:', err);
       setIsSpinning(false);
-      setAutoSpinsLeft(0);
       showToast(t(err.response?.data?.message || 'Failed to spin candy reels'), 'error');
       // Re-fetch correct state in case of error
       fetchGameState();
     }
-  }, [betAmount, userCoins, showToast, t, onCoinBalanceUpdate, triggerWinCelebration, autoSpinsLeft, fetchGameState, reel1Anim, reel2Anim, reel3Anim]);
-
-  // Quick Bet Multiplier (1X, 2X, 5X, 10X of base 100)
-  const handleQuickMultiplier = (mult) => {
-    if (isSpinning) return;
-    const newBet = 100 * mult;
-    setBetAmount(newBet);
-    Vibration.vibrate(15);
-  };
-
-  // Toggle Auto-spin
-  const handleToggleAutoSpin = (count) => {
-    if (isSpinning) return;
-    if (autoSpinsLeft > 0) {
-      setAutoSpinsLeft(0);
-      if (autoSpinTimerRef.current) clearTimeout(autoSpinTimerRef.current);
-      showToast(t('Auto-spin stopped'), 'info');
-    } else {
-      setAutoSpinsLeft(count);
-      showToast(`${t('Auto-spin started')}: ${count} ${t('spins')}`, 'success');
-      handleSpin();
-    }
-  };
+  }, [betAmount, userCoins, showToast, t, onCoinBalanceUpdate, triggerWinCelebration, fetchGameState, reel1Anim, reel2Anim, reel3Anim]);
 
   // Interpolated spin jitter transforms
   const reel1TranslateY = reel1Anim.interpolate({
@@ -509,130 +471,66 @@ export default function CandyBonanzaGameModal({
                 </View>
               </View>
 
-              {/* Quick Multiplier Buttons */}
-              <View style={styles.quickMultRow}>
-                <TouchableOpacity
-                  style={[styles.multBtn, betAmount === 100 && styles.multBtnActive]}
-                  onPress={() => handleQuickMultiplier(1)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={styles.multBtnText}>100</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.multBtn, betAmount === 500 && styles.multBtnActive]}
-                  onPress={() => handleQuickMultiplier(5)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={styles.multBtnText}>500</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.multBtn, betAmount === 1000 && styles.multBtnActive]}
-                  onPress={() => handleQuickMultiplier(10)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={styles.multBtnText}>1,000</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.multBtn, betAmount === 5000 && styles.multBtnActive]}
-                  onPress={() => handleQuickMultiplier(50)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={styles.multBtnText}>5,000</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Chip Selector Row */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipsScroll}
-              >
+              {/* Chips Row with Authentic Golden Coins on EVERY Chip */}
+              <View style={styles.chipsRow}>
                 {CHIPS.map((chipVal) => {
                   const isSelected = betAmount === chipVal;
+                  const label = chipVal >= 1000 ? `${chipVal / 1000}k` : `${chipVal}`;
                   return (
                     <TouchableOpacity
                       key={`cb_chip_${chipVal}`}
                       activeOpacity={0.75}
                       onPress={() => setBetAmount(chipVal)}
-                      style={[styles.chipPill, isSelected && styles.chipPillSelected]}
+                      disabled={isSpinning}
+                      style={[styles.chipBtn, isSelected && styles.chipBtnActive]}
                     >
-                      <LinearGradient
-                        colors={
-                          isSelected
-                            ? ['#EC4899', '#BE185D']
-                            : ['#2D0A3D', '#1A0426']
-                        }
-                        style={styles.chipPillGrad}
-                      >
+                      <View style={styles.chipInnerRow}>
                         <ShinyCoinIcon size={14} />
-                        <Text
-                          style={[
-                            styles.chipText,
-                            isSelected && styles.chipTextSelected,
-                          ]}
-                        >
-                          {chipVal >= 1000 ? `${chipVal / 1000}k` : chipVal}
+                        <Text style={[styles.chipBtnText, isSelected && styles.chipBtnTextActive]}>
+                          {label}
                         </Text>
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
+              </View>
             </View>
 
-            {/* ══ BIG PULSATING SPIN & AUTO-SPIN BUTTONS ══ */}
-            <View style={styles.spinActionRow}>
-              {/* Auto-Spin Button */}
+            {/* ══ BIG VIBRANT SPIN BUTTON WITH COIN BADGE ══ */}
+            <Animated.View
+              style={[
+                styles.spinBtnWrapper,
+                { transform: [{ scale: isSpinning ? 0.96 : spinPulseAnim }], width: '100%', marginBottom: 16 },
+              ]}
+            >
               <TouchableOpacity
-                style={[
-                  styles.autoSpinBtn,
-                  autoSpinsLeft > 0 && styles.autoSpinBtnActive,
-                ]}
-                activeOpacity={0.75}
-                onPress={() => handleToggleAutoSpin(autoSpinsLeft > 0 ? 0 : 10)}
+                style={styles.spinTouchable}
+                activeOpacity={0.8}
+                disabled={isSpinning}
+                onPress={handleSpin}
               >
-                <Text style={styles.autoSpinEmoji}>🔁</Text>
-                <Text style={styles.autoSpinText}>
-                  {autoSpinsLeft > 0 ? `${autoSpinsLeft} <T>Left</T>` : <T>Auto 10</T>}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Big Vibrant SPIN Button */}
-              <Animated.View
-                style={[
-                  styles.spinBtnWrapper,
-                  { transform: [{ scale: isSpinning ? 0.96 : spinPulseAnim }] },
-                ]}
-              >
-                <TouchableOpacity
-                  style={styles.spinTouchable}
-                  activeOpacity={0.8}
-                  disabled={isSpinning}
-                  onPress={handleSpin}
+                <LinearGradient
+                  colors={
+                    isSpinning
+                      ? ['#475569', '#334155']
+                      : ['#EC4899', '#D946EF', '#8B5CF6']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.spinBtnGrad}
                 >
-                  <LinearGradient
-                    colors={
-                      isSpinning
-                        ? ['#475569', '#334155']
-                        : ['#EC4899', '#D946EF', '#8B5CF6']
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.spinBtnGrad}
-                  >
-                    <Text style={styles.spinBtnText}>
-                      {isSpinning ? <T>SPINNING...</T> : <T>SPIN!</T>}
-                    </Text>
-                    <Text style={styles.spinBtnSubText}>
-                      {betAmount.toLocaleString()} 🪙
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
+                  <Text style={styles.spinBtnText}>
+                    {isSpinning ? <T>SPINNING...</T> : <T>SPIN!</T>}
+                  </Text>
+                  {!isSpinning && (
+                    <View style={styles.spinCostPill}>
+                      <ShinyCoinIcon size={14} />
+                      <Text style={styles.spinCostText}>{betAmount.toLocaleString()}</Text>
+                    </View>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
 
             {/* ══ PAYTABLE PREVIEW CHIPS ══ */}
             <View style={styles.paytablePreviewContainer}>
@@ -1148,116 +1046,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
   },
-  quickMultRow: {
+  chipsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    width: '100%',
+    gap: 6,
+    marginBottom: 4,
   },
-  multBtn: {
+  chipBtn: {
     flex: 1,
-    backgroundColor: '#180620',
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginHorizontal: 3,
-    alignItems: 'center',
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
     borderColor: 'rgba(236, 72, 153, 0.3)',
-  },
-  multBtnActive: {
-    borderColor: '#EC4899',
-    backgroundColor: 'rgba(236, 72, 153, 0.25)',
-  },
-  multBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  chipsScroll: {
-    paddingVertical: 2,
-  },
-  chipPill: {
-    marginRight: 8,
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
-  chipPillSelected: {
-    borderWidth: 1.5,
-    borderColor: '#F472B6',
-  },
-  chipPillGrad: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  chipEmoji: {
-    fontSize: 12,
-    marginRight: 4,
-  },
-  chipText: {
-    color: '#C084FC',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  chipTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-  },
-  spinActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginVertical: 10,
-  },
-  autoSpinBtn: {
-    backgroundColor: '#260633',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(236, 72, 153, 0.35)',
-    minWidth: 90,
   },
-  autoSpinBtnActive: {
-    borderColor: '#EC4899',
+  chipBtnActive: {
     backgroundColor: 'rgba(236, 72, 153, 0.3)',
+    borderColor: '#F472B6',
+    borderWidth: 1.5,
+    elevation: 4,
   },
-  autoSpinEmoji: {
-    fontSize: 18,
+  chipInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
-  autoSpinText: {
-    color: '#F472B6',
-    fontSize: 11,
+  chipBtnText: {
+    color: '#CBD5E1',
+    fontSize: 12,
     fontWeight: '800',
-    marginTop: 2,
+  },
+  chipBtnTextActive: {
+    color: '#FEF08A',
+    fontWeight: '900',
+    fontSize: 13,
   },
   spinBtnWrapper: {
-    flex: 1,
-    marginLeft: 12,
-    borderRadius: 22,
+    width: '100%',
+    borderRadius: 20,
     overflow: 'hidden',
   },
   spinTouchable: {
     width: '100%',
   },
   spinBtnGrad: {
+    flexDirection: 'row',
     paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  spinBtnIcon: {
+    fontSize: 20,
   },
   spinBtnText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
   },
-  spinBtnSubText: {
+  spinCostPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginLeft: 6,
+    gap: 4,
+  },
+  spinCostText: {
     color: '#FEF08A',
-    fontSize: 11,
-    fontWeight: '800',
-    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '900',
   },
   paytablePreviewContainer: {
     backgroundColor: '#260633',
