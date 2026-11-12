@@ -24,7 +24,7 @@ import {
 import { ShinyCoinIcon } from './FoodIcons';
 
 // Available Chip Denominations
-const CHIPS = [100, 500, 1000, 5000, 10000, 50000];
+const CHIPS = [100, 500, 1000, 5000, 10000];
 
 export default function GoliSodaGameModal({
   visible,
@@ -704,9 +704,9 @@ export default function GoliSodaGameModal({
                 <View style={styles.betAmountContainer}>
                   <Text style={styles.betAmountLabel}><T>Bet</T>:</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                    {bets.bottle1 > 0 && <ShinyCoinIcon size={12} />}
+                    <ShinyCoinIcon size={12} />
                     <Text style={styles.betAmountValue}>
-                      {bets.bottle1 > 0 ? bets.bottle1.toLocaleString() : '—'}
+                      {(bets.bottle1 || 0).toLocaleString()}
                     </Text>
                   </View>
                 </View>
@@ -731,9 +731,9 @@ export default function GoliSodaGameModal({
                 <View style={styles.betAmountContainer}>
                   <Text style={styles.betAmountLabel}><T>Bet</T>:</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                    {bets.bottle2 > 0 && <ShinyCoinIcon size={12} />}
+                    <ShinyCoinIcon size={12} />
                     <Text style={styles.betAmountValue}>
-                      {bets.bottle2 > 0 ? bets.bottle2.toLocaleString() : '—'}
+                      {(bets.bottle2 || 0).toLocaleString()}
                     </Text>
                   </View>
                 </View>
@@ -758,9 +758,9 @@ export default function GoliSodaGameModal({
                 <View style={styles.betAmountContainer}>
                   <Text style={styles.betAmountLabel}><T>Bet</T>:</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                    {bets.bottle3 > 0 && <ShinyCoinIcon size={12} />}
+                    <ShinyCoinIcon size={12} />
                     <Text style={styles.betAmountValue}>
-                      {bets.bottle3 > 0 ? bets.bottle3.toLocaleString() : '—'}
+                      {(bets.bottle3 || 0).toLocaleString()}
                     </Text>
                   </View>
                 </View>
@@ -770,42 +770,32 @@ export default function GoliSodaGameModal({
             {/* ══ CHIP SELECTOR BAR ══ */}
             <View style={styles.chipsBarContainer}>
               <Text style={styles.sectionHeaderTitle}><T>Select Chip</T></Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipsScroll}
-              >
+              <View style={styles.chipsRow}>
                 {CHIPS.map((chipVal) => {
                   const isSelected = selectedChip === chipVal;
+                  const label = chipVal >= 1000 ? `${chipVal / 1000}k` : `${chipVal}`;
                   return (
                     <TouchableOpacity
                       key={`chip_${chipVal}`}
                       activeOpacity={0.75}
                       onPress={() => setSelectedChip(chipVal)}
-                      style={[styles.chipPill, isSelected && styles.chipPillSelected]}
+                      style={[styles.chipBtn, isSelected && styles.chipBtnActive]}
                     >
-                      <LinearGradient
-                        colors={
-                          isSelected
-                            ? ['#10B981', '#059669']
-                            : ['#1E293B', '#0F172A']
-                        }
-                        style={styles.chipPillGrad}
-                      >
+                      <View style={styles.chipInnerRow}>
                         <ShinyCoinIcon size={14} />
                         <Text
                           style={[
-                            styles.chipText,
-                            isSelected && styles.chipTextSelected,
+                            styles.chipBtnText,
+                            isSelected && styles.chipBtnTextActive,
                           ]}
                         >
-                          {chipVal >= 1000 ? `${chipVal / 1000}k` : chipVal}
+                          {label}
                         </Text>
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
+              </View>
             </View>
 
             {/* ══ TOTAL BET DISPLAY ══ */}
@@ -1416,36 +1406,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 6,
   },
-  chipsScroll: {
-    paddingVertical: 2,
+  chipsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 6,
+    marginVertical: 4,
   },
-  chipPill: {
-    marginRight: 8,
-    borderRadius: 18,
-    overflow: 'hidden',
+  chipBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chipPillSelected: {
-    borderWidth: 1.5,
+  chipBtnActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
     borderColor: '#34D399',
+    borderWidth: 1.5,
+    elevation: 4,
   },
-  chipPillGrad: {
+  chipInnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    gap: 4,
   },
-  chipEmoji: {
+  chipBtnText: {
+    color: '#CBD5E1',
     fontSize: 12,
-    marginRight: 4,
+    fontWeight: '800',
   },
-  chipText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  chipTextSelected: {
-    color: '#FFFFFF',
+  chipBtnTextActive: {
+    color: '#6EE7B7',
     fontWeight: '900',
+    fontSize: 13,
   },
   actionRow: {
     flexDirection: 'row',
