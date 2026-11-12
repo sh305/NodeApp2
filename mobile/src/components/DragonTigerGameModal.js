@@ -697,36 +697,6 @@ export default function DragonTigerGameModal({
                   </Text>
                 </TouchableOpacity>
               ))}
-
-              {/* Clear Button */}
-              <TouchableOpacity
-                style={styles.utilityBtn}
-                activeOpacity={0.75}
-                onPress={handleClearBets}
-                disabled={gamePhase !== 'BETTING' || isDealing || totalBetAmount === 0}
-              >
-                <Text style={styles.utilityBtnText}>🗑️</Text>
-              </TouchableOpacity>
-
-              {/* Rebet Button */}
-              <TouchableOpacity
-                style={styles.utilityBtn}
-                activeOpacity={0.75}
-                onPress={handleRebet}
-                disabled={gamePhase !== 'BETTING' || isDealing || !lastBets}
-              >
-                <Text style={styles.utilityBtnText}>🔁</Text>
-              </TouchableOpacity>
-
-              {/* Max Bet Button */}
-              <TouchableOpacity
-                style={styles.utilityBtn}
-                activeOpacity={0.75}
-                onPress={handleMaxBet}
-                disabled={gamePhase !== 'BETTING' || isDealing}
-              >
-                <Text style={styles.utilityBtnText}>⚡</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </View>

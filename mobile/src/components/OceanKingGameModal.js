@@ -693,36 +693,6 @@ export default function OceanKingGameModal({
                   </Text>
                 </TouchableOpacity>
               ))}
-
-              {/* Clear Button */}
-              <TouchableOpacity
-                style={styles.utilityBtn}
-                activeOpacity={0.75}
-                onPress={handleClearBets}
-                disabled={gamePhase !== 'BETTING' || isFiring || totalBetAmount === 0}
-              >
-                <Text style={styles.utilityBtnText}>🗑️</Text>
-              </TouchableOpacity>
-
-              {/* Rebet Button */}
-              <TouchableOpacity
-                style={styles.utilityBtn}
-                activeOpacity={0.75}
-                onPress={handleRebet}
-                disabled={gamePhase !== 'BETTING' || isFiring || !lastBets}
-              >
-                <Text style={styles.utilityBtnText}>🔁</Text>
-              </TouchableOpacity>
-
-              {/* Max Bet Button */}
-              <TouchableOpacity
-                style={styles.utilityBtn}
-                activeOpacity={0.75}
-                onPress={handleMaxBet}
-                disabled={gamePhase !== 'BETTING' || isFiring}
-              >
-                <Text style={styles.utilityBtnText}>⚡</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </View>

@@ -725,26 +725,6 @@ export default function CarRouletteGameModal({
                   </Text>
                 </TouchableOpacity>
               ))}
-
-              {/* Clear Button */}
-              <TouchableOpacity
-                style={[styles.utilityBtn, totalCurrentBet === 0 && styles.utilityBtnDisabled]}
-                activeOpacity={0.75}
-                onPress={handleClearBets}
-                disabled={gamePhase !== 'BETTING' || isSpinning || totalCurrentBet === 0}
-              >
-                <Text style={styles.utilityBtnText}>🗑️ <T>Clear</T></Text>
-              </TouchableOpacity>
-
-              {/* Rebet Button */}
-              <TouchableOpacity
-                style={[styles.utilityBtn, !lastBets && styles.utilityBtnDisabled]}
-                activeOpacity={0.75}
-                onPress={handleRebet}
-                disabled={gamePhase !== 'BETTING' || isSpinning || !lastBets}
-              >
-                <Text style={styles.utilityBtnText}>🔁 <T>Rebet</T></Text>
-              </TouchableOpacity>
             </View>
 
             {/* Spin / Start Now Button */}

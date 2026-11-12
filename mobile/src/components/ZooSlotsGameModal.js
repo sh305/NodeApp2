@@ -566,43 +566,20 @@ export default function ZooSlotsGameModal({
                   disabled={isSpinning}
                 >
                   <ShinyCoinIcon size={14} />
-                  <Text style={[styles.chipText, selectedChip === chip && styles.chipTextSelected]}>
+                  <Text style={[styles.chipText, selectedChip === chip && styles.chipBtnSelected && styles.chipTextSelected]}>
                     {chip >= 1000 ? `${chip / 1000}K` : chip}
                   </Text>
                 </TouchableOpacity>
               ))}
-
-              {/* Max Bet Button */}
-              <TouchableOpacity
-                style={styles.utilityBtn}
-                activeOpacity={0.75}
-                onPress={handleMaxBet}
-                disabled={isSpinning}
-              >
-                <Text style={styles.utilityBtnText}>⚡ <T>Max</T></Text>
-              </TouchableOpacity>
             </View>
 
-            {/* Spin & Auto Buttons */}
+            {/* Spin Button */}
             <View style={styles.actionsRow}>
-              {/* Auto Spin Button */}
-              <TouchableOpacity
-                style={[
-                  styles.autoBtn,
-                  autoSpin && styles.autoBtnActive,
-                ]}
-                activeOpacity={0.8}
-                onPress={toggleAutoSpin}
-              >
-                <Text style={[styles.autoBtnText, autoSpin && styles.autoBtnTextActive]}>
-                  {autoSpin ? '⏹️ AUTO ON' : '🔁 AUTO'}
-                </Text>
-              </TouchableOpacity>
-
               {/* Main Emerald Spin Button */}
               <TouchableOpacity
                 style={[
                   styles.spinBtn,
+                  { flex: 1 },
                   isSpinning && styles.spinBtnDisabled,
                 ]}
                 activeOpacity={0.85}

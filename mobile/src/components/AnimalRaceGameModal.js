@@ -585,36 +585,6 @@ export default function AnimalRaceGameModal({
               },
             ]}
           >
-            {/* Quick Action Buttons (Clear, Double, Repeat) */}
-            <View style={styles.quickActionsRow}>
-              <TouchableOpacity
-                style={styles.actionSmallBtn}
-                activeOpacity={0.75}
-                onPress={handleClearBets}
-                disabled={isRacing || totalBet <= 0}
-              >
-                <Text style={styles.actionSmallText}><T>Clear</T></Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionSmallBtn}
-                activeOpacity={0.75}
-                onPress={handleDoubleBets}
-                disabled={isRacing || totalBet <= 0}
-              >
-                <Text style={styles.actionSmallText}>2X <T>Double</T></Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionSmallBtn}
-                activeOpacity={0.75}
-                onPress={handleRepeatBets}
-                disabled={isRacing || !lastBets}
-              >
-                <Text style={styles.actionSmallText}>🔁 <T>Repeat</T></Text>
-              </TouchableOpacity>
-            </View>
-
             {/* Chip Selection Bar */}
             <View style={styles.chipsRow}>
               {CHIP_VALUES.map((chip) => {
@@ -630,7 +600,7 @@ export default function AnimalRaceGameModal({
                       colors={isSelected ? ['#F59E0B', '#D97706'] : ['#334155', '#1E293B']}
                       style={styles.chipGrad}
                     >
-                      <ShinyCoinIcon size={12} />
+                      <ShinyCoinIcon size={14} />
                       <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
                         {chip >= 1000 ? `${chip / 1000}k` : chip}
                       </Text>

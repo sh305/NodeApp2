@@ -637,28 +637,9 @@ export default function SuperSlotsGameModal({
           </View>
 
           {/* ══ SPIN CONTROLS SECTION ══ */}
-          <View style={styles.spinControlsSection}>
-            {/* Auto Spin Toggle Button */}
-            <TouchableOpacity
-              style={[
-                styles.autoSpinBtn,
-                autoSpin && styles.autoSpinBtnActive,
-              ]}
-              activeOpacity={0.8}
-              onPress={() => setAutoSpin((prev) => !prev)}
-            >
-              <Text
-                style={[
-                  styles.autoSpinBtnText,
-                  autoSpin && styles.autoSpinBtnTextActive,
-                ]}
-              >
-                {autoSpin ? t('AUTO ON') : t('AUTO SPIN')}
-              </Text>
-            </TouchableOpacity>
-
+          <View style={[styles.spinControlsSection, { justifyContent: 'center' }]}>
             {/* Main 3D SPIN Button */}
-            <Animated.View style={{ transform: [{ scale: spinBtnScale }] }}>
+            <Animated.View style={{ transform: [{ scale: spinBtnScale }], width: '100%' }}>
               <TouchableOpacity
                 style={styles.mainSpinBtn}
                 activeOpacity={0.85}

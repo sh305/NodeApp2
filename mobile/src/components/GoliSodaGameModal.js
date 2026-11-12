@@ -808,27 +808,11 @@ export default function GoliSodaGameModal({
               </ScrollView>
             </View>
 
-            {/* ══ ACTION BUTTONS: CLEAR, REBET, TOTAL ══ */}
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={styles.clearBtn}
-                activeOpacity={0.75}
-                onPress={handleClearBets}
-              >
-                <Text style={styles.clearBtnText}>🗑️ <T>Clear</T></Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.rebetBtn}
-                activeOpacity={0.75}
-                onPress={handleRebet}
-              >
-                <Text style={styles.rebetBtnText}>🔁 <T>Rebet</T></Text>
-              </TouchableOpacity>
-
+            {/* ══ TOTAL BET DISPLAY ══ */}
+            <View style={[styles.actionRow, { justifyContent: 'center' }]}>
               <View style={styles.totalBetDisplay}>
                 <Text style={styles.totalBetLabel}><T>Total Bet</T>:</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <ShinyCoinIcon size={14} />
                   <Text style={styles.totalBetAmount}>
                     {totalCurrentBet.toLocaleString()}

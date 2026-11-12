@@ -661,25 +661,6 @@ export default function MatkaCrackGameModal({
                   );
                 })}
               </View>
-
-              {/* Action Buttons: Clear & Rebet */}
-              <View style={styles.actionBtnsRow}>
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.clearBtn]}
-                  activeOpacity={0.75}
-                  onPress={handleClearBets}
-                >
-                  <Text style={styles.clearBtnText}>🗑️ <T>Clear</T></Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.rebetBtn]}
-                  activeOpacity={0.75}
-                  onPress={handleRebet}
-                >
-                  <Text style={styles.rebetBtnText}>🔄 <T>Rebet</T></Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </ScrollView>
 
