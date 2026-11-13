@@ -225,6 +225,17 @@ ramCache.set('hi:::Cyber Superbike', 'साइबर सुपरबाइक')
 ramCache.set('hi:::Crystal Phoenix', 'क्रिस्टल फीनिक्स');
 ramCache.set('hi:::Mafia Boss VIP', 'माफिया बॉस वीआईपी');
 ramCache.set('hi:::Yellow Porsche', 'येलो पोर्श');
+ramCache.set('hi:::Crystal Rose Dome', 'क्रिस्टल रोज़ डोम');
+ramCache.set('hi:::Celestial Palace', 'आसमानी महल');
+ramCache.set('hi:::Pink Love Teddy', 'गुलाबी लव टेडी');
+ramCache.set('hi:::Heart Latte Coffee', 'हार्ट लट्टे कॉफ़ी');
+ramCache.set('hi:::Biker Sheep', 'बाइकर शीप');
+ramCache.set('hi:::Supercar Truck', 'सुपरकार ट्रक');
+ramCache.set('hi:::Cherry Blossom Ride', 'चेरी ब्लॉसम राइड');
+ramCache.set('hi:::Cupid Love Jet', 'क्यूपिड लव जेट');
+ramCache.set('hi:::Sweet Dreams Teddy', 'स्वीट ड्रीम्स टेडी');
+ramCache.set('hi:::Halloween Ghost Car', 'हैलोवीन घोस्ट कार');
+ramCache.set('hi:::Heart Jewel Box', 'हार्ट ज्वेल बॉक्स');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -635,6 +646,17 @@ export const LanguageProvider = ({ children }) => {
       'Crystal Phoenix',
       'Mafia Boss VIP',
       'Yellow Porsche',
+      'Crystal Rose Dome',
+      'Celestial Palace',
+      'Pink Love Teddy',
+      'Heart Latte Coffee',
+      'Biker Sheep',
+      'Supercar Truck',
+      'Cherry Blossom Ride',
+      'Cupid Love Jet',
+      'Sweet Dreams Teddy',
+      'Halloween Ghost Car',
+      'Heart Jewel Box',
       'sent',
       'to',
       'Everyone',
@@ -1665,6 +1687,17 @@ export const LanguageProvider = ({ children }) => {
       'Crystal Phoenix',
       'Mafia Boss VIP',
       'Yellow Porsche',
+      'Crystal Rose Dome',
+      'Celestial Palace',
+      'Pink Love Teddy',
+      'Heart Latte Coffee',
+      'Biker Sheep',
+      'Supercar Truck',
+      'Cherry Blossom Ride',
+      'Cupid Love Jet',
+      'Sweet Dreams Teddy',
+      'Halloween Ghost Car',
+      'Heart Jewel Box',
       'sent',
       'to',
       'Everyone',
