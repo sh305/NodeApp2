@@ -65,13 +65,8 @@ import GreedyBabyGameModal from '../components/GreedyBabyGameModal';
 import SuperSlotsGameModal from '../components/SuperSlotsGameModal';
 import AnimalRaceGameModal from '../components/AnimalRaceGameModal';
 import CarRouletteGameModal from '../components/CarRouletteGameModal';
-import ZooSlotsGameModal from '../components/ZooSlotsGameModal';
 import OceanKingGameModal from '../components/OceanKingGameModal';
 import FruitPartyGameModal from '../components/FruitPartyGameModal';
-import DragonTigerGameModal from '../components/DragonTigerGameModal';
-import ColorPredictionGameModal from '../components/ColorPredictionGameModal';
-import BullseyeDartsGameModal from '../components/BullseyeDartsGameModal';
-import MatkaCrackGameModal from '../components/MatkaCrackGameModal';
 import GoliSodaGameModal from '../components/GoliSodaGameModal';
 import CandyBonanzaGameModal from '../components/CandyBonanzaGameModal';
 import PlinkoGameModal from '../components/PlinkoGameModal';
@@ -189,13 +184,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [superSlotsModalVisible, setSuperSlotsModalVisible] = useState(false);
   const [animalRaceModalVisible, setAnimalRaceModalVisible] = useState(false);
   const [carRouletteModalVisible, setCarRouletteModalVisible] = useState(false);
-  const [zooSlotsModalVisible, setZooSlotsModalVisible] = useState(false);
   const [oceanKingModalVisible, setOceanKingModalVisible] = useState(false);
   const [fruitPartyModalVisible, setFruitPartyModalVisible] = useState(false);
-  const [dragonTigerModalVisible, setDragonTigerModalVisible] = useState(false);
-  const [colorPredictionModalVisible, setColorPredictionModalVisible] = useState(false);
-  const [bullseyeDartsModalVisible, setBullseyeDartsModalVisible] = useState(false);
-  const [matkaCrackModalVisible, setMatkaCrackModalVisible] = useState(false);
   const [goliSodaModalVisible, setGoliSodaModalVisible] = useState(false);
   const [candyBonanzaModalVisible, setCandyBonanzaModalVisible] = useState(false);
   const [plinkoModalVisible, setPlinkoModalVisible] = useState(false);
@@ -3059,21 +3049,11 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             setAnimalRaceModalVisible(true);
           } else if (gameId === 'car_roulette') {
             setCarRouletteModalVisible(true);
-          } else if (gameId === 'zoo_slots') {
-            setZooSlotsModalVisible(true);
           } else if (gameId === 'ocean_king') {
             setOceanKingModalVisible(true);
           } else if (gameId === 'fruit_party') {
             setFruitPartyModalVisible(true);
-                    } else if (gameId === 'dragon_tiger') {
-            setDragonTigerModalVisible(true);
-          } else if (gameId === 'color_prediction') {
-            setColorPredictionModalVisible(true);
-          } else if (gameId === 'bullseye_darts') {
-            setBullseyeDartsModalVisible(true);
-          } else if (gameId === 'matka_crack') {
-            setMatkaCrackModalVisible(true);
-                    } else if (gameId === 'goli_soda') {
+          } else if (gameId === 'goli_soda') {
             setGoliSodaModalVisible(true);
           } else if (gameId === 'candy_bonanza') {
             setCandyBonanzaModalVisible(true);
@@ -3151,22 +3131,6 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
       />
 
-      {/* ══ ZOO SLOTS (WILD ANIMAL REELS) GAME MODAL ══ */}
-      <ZooSlotsGameModal
-        visible={zooSlotsModalVisible}
-        onClose={() => setZooSlotsModalVisible(false)}
-        currentUser={currentUser}
-        onCoinBalanceUpdate={(newCoins) => {
-          if (currentUser && newCoins !== undefined) {
-            currentUser.coins = newCoins;
-          }
-        }}
-        onRechargePress={() => {
-          setZooSlotsModalVisible(false);
-          navigation.navigate('Wallet', { initialTab: 'coins' });
-        }}
-      />
-
       {/* ══ OCEAN KING (FISHING FRENZY) GAME MODAL ══ */}
       <OceanKingGameModal
         visible={oceanKingModalVisible}
@@ -3194,66 +3158,6 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         }}
         onRechargePress={() => {
           setFruitPartyModalVisible(false);
-          navigation.navigate('Wallet', { initialTab: 'coins' });
-        }}
-      />
-      {/* ══ BULLSEYE DARTS (1-SHOT TARGET) GAME MODAL ══ */}
-      <BullseyeDartsGameModal
-        visible={bullseyeDartsModalVisible}
-        onClose={() => setBullseyeDartsModalVisible(false)}
-        currentUser={currentUser}
-        onCoinBalanceUpdate={(newCoins) => {
-          if (currentUser && newCoins !== undefined) {
-            currentUser.coins = newCoins;
-          }
-        }}
-        onRechargePress={() => {
-          setBullseyeDartsModalVisible(false);
-          navigation.navigate('Wallet', { initialTab: 'coins' });
-        }}
-      />
-      {/* ══ COLOR PREDICTION (FAST PARITY) GAME MODAL ══ */}
-      <ColorPredictionGameModal
-        visible={colorPredictionModalVisible}
-        onClose={() => setColorPredictionModalVisible(false)}
-        currentUser={currentUser}
-        onCoinBalanceUpdate={(newCoins) => {
-          if (currentUser && newCoins !== undefined) {
-            currentUser.coins = newCoins;
-          }
-        }}
-        onRechargePress={() => {
-          setColorPredictionModalVisible(false);
-          navigation.navigate('Wallet', { initialTab: 'coins' });
-        }}
-      />
-      {/* ══ DRAGON VS TIGER GAME MODAL ══ */}
-      <DragonTigerGameModal
-        visible={dragonTigerModalVisible}
-        onClose={() => setDragonTigerModalVisible(false)}
-        currentUser={currentUser}
-        onCoinBalanceUpdate={(newCoins) => {
-          if (currentUser && newCoins !== undefined) {
-            currentUser.coins = newCoins;
-          }
-        }}
-        onRechargePress={() => {
-          setDragonTigerModalVisible(false);
-          navigation.navigate('Wallet', { initialTab: 'coins' });
-        }}
-      />
-      {/* ══ MATKA CRACK (TREASURE POT SMASH) GAME MODAL ══ */}
-      <MatkaCrackGameModal
-        visible={matkaCrackModalVisible}
-        onClose={() => setMatkaCrackModalVisible(false)}
-        currentUser={currentUser}
-        onCoinBalanceUpdate={(newCoins) => {
-          if (currentUser && newCoins !== undefined) {
-            currentUser.coins = newCoins;
-          }
-        }}
-        onRechargePress={() => {
-          setMatkaCrackModalVisible(false);
           navigation.navigate('Wallet', { initialTab: 'coins' });
         }}
       />

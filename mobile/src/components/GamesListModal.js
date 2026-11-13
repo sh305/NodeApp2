@@ -18,13 +18,8 @@ import { GreedyBabyCharacter, ShinyCoinIcon } from './FoodIcons';
 import { SevenIcon } from './SlotIcons';
 import { LionIcon } from './AnimalIcons';
 import { SteeringWheelIcon } from './CarIcons';
-import { GoldenPawIcon } from './ZooSlotIcons';
 import { GoldenDragonIcon } from './OceanKingIcons';
 import { FruitCocktailIcon } from './FruitPartyIcons';
-import { DragonTigerTileIcon } from './DragonTigerIcons';
-import { ColorPredictionTileIcon } from './ColorPredictionIcons';
-import { BullseyeDartsTileIcon } from './BullseyeDartsIcons';
-import { MatkaCrackTileIcon } from './MatkaCrackIcons';
 import { GoliSodaTileIcon } from './GoliSodaIcons';
 import { CandyBonanzaTileIcon } from './CandyBonanzaIcons';
 import { PlinkoTileIcon } from './PlinkoIcons';
@@ -199,46 +194,6 @@ function CarRouletteTile() {
 }
 
 /**
- * Modern Square Game Tile for Zoo Slots (Wild Animal Jungle Style)
- */
-function ZooSlotsTile() {
-  return (
-    <View style={[styles.tileBox, styles.zooSlotsTileBorder]}>
-      <LinearGradient
-        colors={['#064E3B', '#15803D', '#B45309', '#022C22']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.tileGradient}
-      >
-        {/* Jungle Sparkles */}
-        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
-          <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
-          <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
-          <Circle cx="20" cy="74" r="1.5" fill="#4ADE80" opacity={0.7} />
-          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
-        </Svg>
-
-        {/* Golden Paw Wild Symbol */}
-        <View style={styles.slotCenterSymbol}>
-          <GoldenPawIcon size={46} />
-        </View>
-
-        {/* Bottom Multiplier Ribbon */}
-        <View style={styles.bottomRibbonAmber}>
-          <Text style={styles.bottomRibbonAmberText}>500X 🐾</Text>
-        </View>
-
-        {/* Glass shine reflection overlay */}
-        <LinearGradient
-          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
-          style={styles.glassShine}
-        />
-      </LinearGradient>
-    </View>
-  );
-}
-
-/**
  * Modern Square Game Tile for Ocean King (Deep Sea Fishing Frenzy)
  */
 function OceanKingTile() {
@@ -317,170 +272,6 @@ function FruitPartyTile() {
     </View>
   );
 }
-
-/**
- * Modern Square Game Tile for Dragon vs Tiger (2-Card High-Stakes Showdown)
- */
-function DragonTigerTile() {
-  return (
-    <View style={[styles.tileBox, styles.dragonTigerTileBorder]}>
-      <LinearGradient
-        colors={['#7F1D1D', '#991B1B', '#B45309', '#1E1B4B']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.tileGradient}
-      >
-        {/* Duel Sparkles */}
-        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
-          <Circle cx="16" cy="18" r="1.8" fill="#F87171" opacity={0.85} />
-          <Circle cx="80" cy="20" r="2" fill="#FDE047" opacity={0.9} />
-          <Circle cx="20" cy="74" r="1.5" fill="#F59E0B" opacity={0.7} />
-          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
-        </Svg>
-
-        {/* Dragon vs Tiger Clash Symbol */}
-        <View style={styles.slotCenterSymbol}>
-          <DragonTigerTileIcon size={50} />
-        </View>
-
-        {/* Bottom Multiplier Ribbon */}
-        <View style={styles.bottomRibbonCrimson}>
-          <Text style={styles.bottomRibbonCrimsonText}>9X TIE ⚔️</Text>
-        </View>
-
-        {/* Glass shine reflection overlay */}
-        <LinearGradient
-          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
-          style={styles.glassShine}
-        />
-      </LinearGradient>
-    </View>
-  );
-}
-
-
-/**
- * Modern Square Game Tile for Color Prediction (Color Clash / Fast Parity)
- */
-function ColorPredictionTile() {
-  return (
-    <View style={[styles.tileBox, styles.colorPredictionTileBorder]}>
-      <LinearGradient
-        colors={['#1E1138', '#3B0764', '#7E22CE', '#100520']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.tileGradient}
-      >
-        {/* Mystic Aura Sparkles */}
-        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
-          <Circle cx="16" cy="18" r="1.8" fill="#A855F7" opacity={0.85} />
-          <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
-          <Circle cx="20" cy="74" r="1.5" fill="#34D399" opacity={0.7} />
-          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
-        </Svg>
-
-        {/* Color Prediction Triple-Sphere Symbol */}
-        <View style={styles.slotCenterSymbol}>
-          <ColorPredictionTileIcon size={50} />
-        </View>
-
-        {/* Bottom Multiplier Ribbon */}
-        <View style={styles.bottomRibbonPurple}>
-          <Text style={styles.bottomRibbonPurpleText}>4.5X VIOLET 🔮</Text>
-        </View>
-
-        {/* Glass shine reflection overlay */}
-        <LinearGradient
-          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
-          style={styles.glassShine}
-        />
-      </LinearGradient>
-    </View>
-  );
-}
-
-
-/**
- * Modern Square Game Tile for Bullseye Darts (1-Shot Target Precision)
- */
-function BullseyeDartsTile() {
-  return (
-    <View style={[styles.tileBox, styles.bullseyeDartsTileBorder]}>
-      <LinearGradient
-        colors={['#78350F', '#B45309', '#BE123C', '#1E1B4B']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.tileGradient}
-      >
-        {/* Darts Target Sparkles */}
-        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
-          <Circle cx="16" cy="18" r="1.8" fill="#FDE047" opacity={0.85} />
-          <Circle cx="80" cy="20" r="2" fill="#FEF08A" opacity={0.9} />
-          <Circle cx="20" cy="74" r="1.5" fill="#EF4444" opacity={0.7} />
-          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FDE047" opacity={0.9} />
-        </Svg>
-
-        {/* Bullseye Darts Clash Symbol */}
-        <View style={styles.slotCenterSymbol}>
-          <BullseyeDartsTileIcon size={50} />
-        </View>
-
-        {/* Bottom Multiplier Ribbon */}
-        <View style={styles.bottomRibbonGoldDark}>
-          <Text style={styles.bottomRibbonGoldDarkText}>25X BULLSEYE 🎯</Text>
-        </View>
-
-        {/* Glass shine reflection overlay */}
-        <LinearGradient
-          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
-          style={styles.glassShine}
-        />
-      </LinearGradient>
-    </View>
-  );
-}
-
-
-/**
- * Modern Square Game Tile for Matka Crack (Treasure Pot Smash)
- */
-function MatkaCrackTile() {
-  return (
-    <View style={[styles.tileBox, styles.matkaCrackTileBorder]}>
-      <LinearGradient
-        colors={['#78350F', '#B45309', '#D97706', '#2A1308']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.tileGradient}
-      >
-        {/* Pot Treasure Sparkles */}
-        <Svg width="100%" height="100%" viewBox="0 0 96 96" style={StyleSheet.absoluteFill}>
-          <Circle cx="16" cy="18" r="1.8" fill="#FEF08A" opacity={0.85} />
-          <Circle cx="80" cy="20" r="2" fill="#38BDF8" opacity={0.9} />
-          <Circle cx="20" cy="74" r="1.5" fill="#F59E0B" opacity={0.7} />
-          <Path d="M78 12 L79 15 L82 16 L79 17 L78 20 L77 17 L74 16 L77 15 Z" fill="#FEF08A" opacity={0.9} />
-        </Svg>
-
-        {/* Matka Crack Emblem Symbol */}
-        <View style={styles.slotCenterSymbol}>
-          <MatkaCrackTileIcon size={50} />
-        </View>
-
-        {/* Bottom Multiplier Ribbon */}
-        <View style={styles.bottomRibbonAmberDark}>
-          <Text style={styles.bottomRibbonAmberDarkText}>5X POT 🏺</Text>
-        </View>
-
-        {/* Glass shine reflection overlay */}
-        <LinearGradient
-          colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.03)', 'transparent']}
-          style={styles.glassShine}
-        />
-      </LinearGradient>
-    </View>
-  );
-}
-
 
 /**
  * Modern Square Game Tile for Goli Soda Pop (Marble Fizz 1-Shot)
@@ -709,11 +500,6 @@ const GAMES = [
     TileComponent: CarRouletteTile,
   },
   {
-    id: 'zoo_slots',
-    title: 'Zoo Slots',
-    TileComponent: ZooSlotsTile,
-  },
-  {
     id: 'ocean_king',
     title: 'Ocean King',
     TileComponent: OceanKingTile,
@@ -722,26 +508,6 @@ const GAMES = [
     id: 'fruit_party',
     title: 'Fruit Party',
     TileComponent: FruitPartyTile,
-  },
-  {
-    id: 'dragon_tiger',
-    title: 'Dragon vs Tiger',
-    TileComponent: DragonTigerTile,
-  },
-  {
-    id: 'color_prediction',
-    title: 'Color Prediction',
-    TileComponent: ColorPredictionTile,
-  },
-  {
-    id: 'bullseye_darts',
-    title: 'Bullseye Darts',
-    TileComponent: BullseyeDartsTile,
-  },
-  {
-    id: 'matka_crack',
-    title: 'Matka Crack',
-    TileComponent: MatkaCrackTile,
   },
   {
     id: 'goli_soda',
