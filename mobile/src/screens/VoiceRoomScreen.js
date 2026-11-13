@@ -28,6 +28,7 @@ import api, { BASE_URL } from '../api/client';
 import RoomSeatGrid from '../components/RoomSeatGrid';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import GiftBottomSheet from '../components/GiftBottomSheet';
+import SvgaGiftPlayer from '../components/SvgaGiftPlayer';
 import RoomQuickProfileModal from '../components/RoomQuickProfileModal';
 import KickModal from '../components/KickModal';
 import ReportModal from '../components/ReportModal';
@@ -140,6 +141,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [giftBanner, setGiftBanner] = useState(null);
   const [centerGiftAnim, setCenterGiftAnim] = useState(null);
+  const [activeSvgaAnim, setActiveSvgaAnim] = useState(null);
   const [giftingUserId, setGiftingUserId] = useState(null);
   const [treasureBoxVisible, setTreasureBoxVisible] = useState(false);
   const [roomGoldContributed, setRoomGoldContributed] = useState(0);
@@ -745,13 +747,17 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
     socket.on('gift_received_animation', (giftData) => {
       setGiftBanner(giftData);
-      setCenterGiftAnim(giftData);
+      if (giftData?.animationUrl && giftData.animationUrl.includes('.svga')) {
+        setActiveSvgaAnim(giftData.animationUrl);
+      } else {
+        setCenterGiftAnim(giftData);
+        setTimeout(() => setCenterGiftAnim(null), 3800);
+      }
       if (giftData?.receiverId) {
         setGiftingUserId(String(giftData.receiverId));
         setTimeout(() => setGiftingUserId(null), 4000);
       }
       setTimeout(() => setGiftBanner(null), 4500);
-      setTimeout(() => setCenterGiftAnim(null), 3800);
       fetchRoomDetails();
     });
 
@@ -1632,6 +1638,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
             receiverAvatar: targetReceiver?.avatar || null,
             giftName: gift.name,
             giftIcon: gift.iconUrl,
+            animationUrl: gift.animationUrl || '',
             quantity,
             isCombo: quantity > 1,
             coins: spentCoins,
@@ -2570,6 +2577,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           setQuickProfileModalVisible(true);
         }}
         navigation={navigation}
+      />
+
+      {/* ══ FULL-SCREEN 3D SVGA GIFT ANIMATION PLAYER ══ */}
+      <SvgaGiftPlayer
+        visible={Boolean(activeSvgaAnim)}
+        svgaUrl={activeSvgaAnim}
+        onFinish={() => setActiveSvgaAnim(null)}
       />
 
       {/* Kick Modal */}
