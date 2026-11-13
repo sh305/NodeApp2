@@ -324,6 +324,11 @@ export default function GiftBottomSheet({
                               resizeMode="contain"
                             />
 
+                            {/* Gift Name */}
+                            <Text style={styles.giftNameText} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+
                             {/* Price in Gold Coins */}
                             <View style={styles.giftPriceRow}>
                               <Text style={styles.coinTinyIcon}>🪙</Text>
@@ -720,9 +725,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   giftGraphic: {
-    width: 52,
-    height: 52,
-    marginVertical: 2,
+    width: 44,
+    height: 44,
+    marginVertical: 1,
+  },
+  giftNameText: {
+    color: '#E2E8F0',
+    fontSize: 9.5,
+    fontWeight: '600',
+    textAlign: 'center',
+    maxWidth: '92%',
+    marginTop: 1,
   },
   giftPriceRow: {
     flexDirection: 'row',

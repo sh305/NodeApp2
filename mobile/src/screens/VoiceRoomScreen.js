@@ -139,6 +139,8 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
   const [kickModalVisible, setKickModalVisible] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [giftBanner, setGiftBanner] = useState(null);
+  const [centerGiftAnim, setCenterGiftAnim] = useState(null);
+  const [giftingUserId, setGiftingUserId] = useState(null);
   const [treasureBoxVisible, setTreasureBoxVisible] = useState(false);
   const [roomGoldContributed, setRoomGoldContributed] = useState(0);
   const [roomEmojiModalVisible, setRoomEmojiModalVisible] = useState(false);
@@ -743,7 +745,13 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
 
     socket.on('gift_received_animation', (giftData) => {
       setGiftBanner(giftData);
-      setTimeout(() => setGiftBanner(null), 4000);
+      setCenterGiftAnim(giftData);
+      if (giftData?.receiverId) {
+        setGiftingUserId(String(giftData.receiverId));
+        setTimeout(() => setGiftingUserId(null), 4000);
+      }
+      setTimeout(() => setGiftBanner(null), 4500);
+      setTimeout(() => setCenterGiftAnim(null), 3800);
       fetchRoomDetails();
     });
 
@@ -1597,14 +1605,17 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         quantity,
         isAll,
         recipientIds,
+        receiverIds: recipientIds,
       });
 
       if (res.data?.success) {
         const spentCoins = res.data.totalCost || totalCost || (gift.coinPrice || 10) * quantity;
         setRoomGoldContributed((prev) => prev + spentCoins);
 
-        if (currentUser && res.data.remainingCoins !== undefined) {
-          currentUser.coins = res.data.remainingCoins;
+        const newRemaining =
+          res.data.remainingCoins ?? res.data.data?.remainingCoins ?? res.data.data?.senderCoins;
+        if (currentUser && newRemaining !== undefined) {
+          currentUser.coins = newRemaining;
         }
 
         const receiverDisplayName = isAll
@@ -1615,12 +1626,17 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
           roomId,
           giftData: {
             senderName: currentUser?.name || 'User',
+            senderAvatar: currentUser?.avatar || null,
             receiverName: receiverDisplayName,
+            receiverId: targetReceiver?._id || null,
+            receiverAvatar: targetReceiver?.avatar || null,
             giftName: gift.name,
             giftIcon: gift.iconUrl,
             quantity,
             isCombo: quantity > 1,
             coins: spentCoins,
+            badge: gift.badge || '',
+            category: gift.category || 'hot',
           },
         });
 
@@ -1846,14 +1862,60 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
         {/* Gift Banner (floating combo broadcast) */}
         {giftBanner && (
           <View style={styles.giftBanner}>
-            <Image source={{ uri: giftBanner.giftIcon }} style={styles.bannerIcon} />
-            <Text style={styles.bannerText}>
-              <Text style={styles.bold}>{giftBanner.senderName}</Text> sent{' '}
-              <Text style={styles.highlight}>
-                {giftBanner.giftName} {giftBanner.quantity > 1 ? `${giftBanner.quantity} Combo` : `x${giftBanner.quantity}`}
-              </Text>{' '}
-              to <Text style={styles.bold}>{giftBanner.receiverName}</Text> 🎉
-            </Text>
+            <LinearGradient
+              colors={['#8B5CF6', '#EC4899']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.giftBannerGradient}
+            >
+              <Image source={{ uri: giftBanner.giftIcon }} style={styles.bannerIcon} resizeMode="contain" />
+              <Text style={styles.bannerText}>
+                <Text style={styles.bold}>{giftBanner.senderName}</Text>{' '}
+                <T>sent</T>{' '}
+                <Text style={styles.highlight}>
+                  {giftBanner.giftName} {giftBanner.quantity > 1 ? `${giftBanner.quantity} Combo` : `x${giftBanner.quantity}`}
+                </Text>{' '}
+                <T>to</T> <Text style={styles.bold}>{giftBanner.receiverName}</Text> 🎉
+              </Text>
+            </LinearGradient>
+          </View>
+        )}
+
+        {/* Center Screen Luxury Celebration Overlay */}
+        {centerGiftAnim && (
+          <View style={styles.centerGiftContainer} pointerEvents="none">
+            <LinearGradient
+              colors={['rgba(30, 27, 75, 0.95)', 'rgba(88, 28, 135, 0.95)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.centerGiftCard}
+            >
+              <Image
+                source={{ uri: centerGiftAnim.giftIcon }}
+                style={styles.centerGiftImage}
+                resizeMode="contain"
+              />
+              <View style={styles.centerGiftComboBadge}>
+                <LinearGradient
+                  colors={['#F59E0B', '#EF4444']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.centerGiftComboGradient}
+                >
+                  <Text style={styles.centerGiftComboText}>
+                    {centerGiftAnim.quantity > 1 ? `x${centerGiftAnim.quantity} COMBO!` : `x${centerGiftAnim.quantity || 1}`}
+                  </Text>
+                </LinearGradient>
+              </View>
+              <Text style={styles.centerGiftTitle} numberOfLines={1}>
+                {centerGiftAnim.giftName}
+              </Text>
+              <Text style={styles.centerGiftSubtitle} numberOfLines={1}>
+                <Text style={styles.centerGiftSender}>{centerGiftAnim.senderName}</Text>
+                {' ➔ '}
+                <Text style={styles.centerGiftReceiver}>{centerGiftAnim.receiverName}</Text>
+              </Text>
+            </LinearGradient>
           </View>
         )}
 
@@ -1966,6 +2028,7 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               bossSeat={room?.bossSeat}
               onBossSeatPress={handleBossSeatPress}
               seatLayout={room?.seatLayout}
+              giftingUserId={giftingUserId}
             />
           </ScrollView>
         )}
@@ -2014,6 +2077,38 @@ export default function VoiceRoomScreen({ route, navigation, currentUser }) {
               </View>
             }
             renderItem={({ item }) => {
+              if (item.isGift || item.giftData) {
+                const g = item.giftData || {};
+                const sName = item.user?.name || g.senderName || 'User';
+                const rName = g.receiverName || 'Room';
+                const gName = g.giftName || 'Gift';
+                const qty = g.quantity || 1;
+                return (
+                  <View style={styles.chatGiftCard}>
+                    <LinearGradient
+                      colors={['rgba(236, 72, 153, 0.3)', 'rgba(99, 102, 241, 0.25)']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.chatGiftGradient}
+                    >
+                      {g.giftIcon ? (
+                        <Image source={{ uri: g.giftIcon }} style={styles.chatGiftIcon} resizeMode="contain" />
+                      ) : null}
+                      <View style={styles.chatGiftTextWrap}>
+                        <Text style={styles.chatGiftSender} numberOfLines={1}>
+                          {sName}
+                        </Text>
+                        <Text style={styles.chatGiftAction} numberOfLines={1}>
+                          <T>sent</T> <Text style={styles.chatGiftName}>{gName}</Text>{' '}
+                          <Text style={styles.chatGiftQty}>x{qty}</Text>{' '}
+                          <T>to</T> <Text style={styles.chatGiftReceiver}>{rName}</Text>
+                        </Text>
+                      </View>
+                    </LinearGradient>
+                  </View>
+                );
+              }
+
               if (item.luckyNumber) {
                 const result = item.luckyNumber;
                 return (
@@ -3403,39 +3498,165 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  /* ── Gift Banner ── */
+  /* ── Gift Banner (Top Floating) ── */
   giftBanner: {
     position: 'absolute',
     top: 90,
     left: 16,
     right: 16,
     zIndex: 99,
-    backgroundColor: 'rgba(245, 158, 11, 0.95)',
-    borderRadius: 20,
-    padding: 10,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#EC4899',
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
+    elevation: 12,
+  },
+  giftBannerGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#F59E0B',
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: '#FACC15',
+    borderRadius: 24,
   },
   bannerIcon: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     marginRight: 10,
   },
   bannerText: {
-    color: '#000000',
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 12.5,
     flex: 1,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   bold: {
     fontWeight: '800',
+    color: '#FDE047',
   },
   highlight: {
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+
+  /* ── Center Screen Luxury Celebration Overlay ── */
+  centerGiftContainer: {
+    position: 'absolute',
+    top: '32%',
+    left: '12%',
+    right: '12%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  centerGiftCard: {
+    width: '100%',
+    maxWidth: 280,
+    borderRadius: 24,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.8,
+    borderColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  centerGiftImage: {
+    width: 80,
+    height: 80,
+    marginBottom: 6,
+  },
+  centerGiftComboBadge: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 6,
+    elevation: 4,
+  },
+  centerGiftComboGradient: {
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+  },
+  centerGiftComboText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  centerGiftTitle: {
+    color: '#FDE047',
+    fontSize: 15,
     fontWeight: '800',
-    color: '#7C2D12',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  centerGiftSubtitle: {
+    color: '#E0E7FF',
+    fontSize: 11.5,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  centerGiftSender: {
+    color: '#A7F3D0',
+    fontWeight: '700',
+  },
+  centerGiftReceiver: {
+    color: '#FBCFE8',
+    fontWeight: '700',
+  },
+
+  /* ── Chat Gift Card ── */
+  chatGiftCard: {
+    alignSelf: 'flex-start',
+    maxWidth: '92%',
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(236, 72, 153, 0.45)',
+  },
+  chatGiftGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  chatGiftIcon: {
+    width: 26,
+    height: 26,
+    marginRight: 8,
+  },
+  chatGiftTextWrap: {
+    flexShrink: 1,
+  },
+  chatGiftSender: {
+    color: '#FDE047',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  chatGiftAction: {
+    color: '#E2E8F0',
+    fontSize: 10.5,
+    fontWeight: '500',
+  },
+  chatGiftName: {
+    color: '#F472B6',
+    fontWeight: '700',
+  },
+  chatGiftQty: {
+    color: '#FACC15',
+    fontWeight: '900',
+  },
+  chatGiftReceiver: {
+    color: '#93C5FD',
+    fontWeight: '700',
   },
 
   /* ── 2. Seats Scroll Area ── */

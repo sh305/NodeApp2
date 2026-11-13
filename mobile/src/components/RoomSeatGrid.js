@@ -124,6 +124,7 @@ export default function RoomSeatGrid({
   bossSeat = null,
   onBossSeatPress = null,
   seatLayout = null,
+  giftingUserId = null,
 }) {
   const isCustomActive = Boolean(seatLayout?.isActivated && seatLayout?.layoutId);
   const isSpecial = Boolean(isCustomActive && seatLayout?.type === 'special');
@@ -238,6 +239,18 @@ export default function RoomSeatGrid({
                 active={Boolean(isHostActive && !isHostMuted)}
                 color="rgba(245, 158, 11, 0.65)"
               />
+
+              {Boolean(
+                giftingUserId &&
+                  owner &&
+                  (String(owner._id) === String(giftingUserId) || String(owner.id) === String(giftingUserId))
+              ) && (
+                <View style={styles.giftingHostAura}>
+                  <View style={styles.floatingGiftBadge}>
+                    <Text style={styles.floatingGiftEmoji}>🎁</Text>
+                  </View>
+                </View>
+              )}
 
               <LinearGradient
                 colors={
@@ -376,6 +389,27 @@ export default function RoomSeatGrid({
                         },
                       ]}
                     />
+                  )}
+                  {Boolean(
+                    giftingUserId &&
+                      upperNormalSeat.user &&
+                      (String(upperNormalSeat.user._id) === String(giftingUserId) ||
+                        String(upperNormalSeat.user.id) === String(giftingUserId))
+                  ) && (
+                    <View
+                      style={[
+                        styles.giftingSeatAura,
+                        {
+                          width: avatarSize + 10,
+                          height: avatarSize + 10,
+                          borderRadius: (avatarSize + 10) / 2,
+                        },
+                      ]}
+                    >
+                      <View style={styles.floatingGiftBadge}>
+                        <Text style={styles.floatingGiftEmoji}>🎁</Text>
+                      </View>
+                    </View>
                   )}
                   <AvatarWithFrame
                     avatarUri={upperNormalSeat.user.avatar}
@@ -628,6 +662,27 @@ export default function RoomSeatGrid({
                         },
                       ]}
                     />
+                  )}
+                  {Boolean(
+                    giftingUserId &&
+                      seat.user &&
+                      (String(seat.user._id) === String(giftingUserId) ||
+                        String(seat.user.id) === String(giftingUserId))
+                  ) && (
+                    <View
+                      style={[
+                        styles.giftingSeatAura,
+                        {
+                          width: avatarSize + 10,
+                          height: avatarSize + 10,
+                          borderRadius: (avatarSize + 10) / 2,
+                        },
+                      ]}
+                    >
+                      <View style={styles.floatingGiftBadge}>
+                        <Text style={styles.floatingGiftEmoji}>🎁</Text>
+                      </View>
+                    </View>
                   )}
                   <AvatarWithFrame
                     avatarUri={seat.user.avatar}
@@ -1313,5 +1368,51 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     tintColor: '#FFFFFF',
+  },
+  giftingSeatAura: {
+    position: 'absolute',
+    borderWidth: 2.5,
+    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.28)',
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  giftingHostAura: {
+    position: 'absolute',
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    borderWidth: 2.5,
+    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.28)',
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  floatingGiftBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EC4899',
+    borderRadius: 10,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: '#FDF2F8',
+    elevation: 5,
+  },
+  floatingGiftEmoji: {
+    fontSize: 10,
   },
 });

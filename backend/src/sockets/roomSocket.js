@@ -926,13 +926,48 @@ function initRoomSockets(io) {
     socket.on('broadcast_gift', ({ roomId, giftData }) => {
       io.to(roomId).emit('gift_received_animation', giftData);
 
+      // Also broadcast a rich gift message into the room's live chat
+      const chatGiftMsg = {
+        _id: `gift_msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        system: true,
+        isGift: true,
+        user: {
+          _id: socket.userId || null,
+          name: giftData?.senderName || 'User',
+          avatar: giftData?.senderAvatar || null,
+        },
+        giftData: {
+          giftName: giftData?.giftName,
+          giftIcon: giftData?.giftIcon,
+          quantity: giftData?.quantity || 1,
+          receiverName: giftData?.receiverName,
+          receiverId: giftData?.receiverId,
+          coins: giftData?.coins || 0,
+        },
+        message: `${giftData?.senderName || 'User'} sent ${giftData?.giftName || 'Gift'} x${giftData?.quantity || 1} to ${giftData?.receiverName || 'Room'}!`,
+        createdAt: new Date().toISOString(),
+      };
+      io.to(roomId).emit('new_chat_message', chatGiftMsg);
+
+      // Mega VIP gift alert across all active rooms (10k+ coins)
+      const giftCoins = Number(giftData?.coins || (giftData?.giftPrice ? giftData.giftPrice * (giftData.quantity || 1) : 10)) || 10;
+      if (giftCoins >= 10000) {
+        io.emit('global_gift_marquee', {
+          senderName: giftData?.senderName || 'User',
+          receiverName: giftData?.receiverName || 'Room',
+          giftName: giftData?.giftName || 'Luxury Gift',
+          giftIcon: giftData?.giftIcon || '',
+          quantity: giftData?.quantity || 1,
+          roomId: String(roomId),
+        });
+      }
+
       // Check if room is in active PK battle
       const cleanRoomId = String(roomId);
       const battleId = roomToPkBattle.get(cleanRoomId);
       if (battleId) {
         const battle = activePkBattles.get(battleId);
         if (battle && battle.status === 'active') {
-          const giftCoins = Number(giftData?.coins || (giftData?.giftPrice ? giftData.giftPrice * (giftData.quantity || 1) : 10)) || 10;
           if (battle.room1.roomId === cleanRoomId) {
             battle.room1.score += giftCoins;
           } else if (battle.room2.roomId === cleanRoomId) {
