@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { BASE_URL } from '../api/client';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -16,8 +17,14 @@ export default function SvgaGiftPlayer({
 }) {
   const timeoutRef = useRef(null);
 
+  const targetUrl = svgaUrl
+    ? svgaUrl.startsWith('http')
+      ? svgaUrl
+      : `${BASE_URL}${svgaUrl.startsWith('/') ? '' : '/'}${svgaUrl}`
+    : '';
+
   useEffect(() => {
-    if (visible && svgaUrl) {
+    if (visible && targetUrl) {
       // Safety auto-dismiss after 7.5 seconds in case of network stall
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => {
@@ -29,9 +36,9 @@ export default function SvgaGiftPlayer({
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [visible, svgaUrl]);
+  }, [visible, targetUrl]);
 
-  if (!visible || !svgaUrl) return null;
+  if (!visible || !targetUrl) return null;
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -71,7 +78,7 @@ export default function SvgaGiftPlayer({
           }
         });
 
-        parser.load('${svgaUrl}', function(videoItem) {
+        parser.load('${targetUrl}', function(videoItem) {
           player.setVideoItem(videoItem);
           player.startAnimation();
         }, function(err) {
@@ -138,3 +145,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 });
+

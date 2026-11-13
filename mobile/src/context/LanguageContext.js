@@ -218,6 +218,13 @@ ramCache.set('hi:::If both cards have the exact same rank, Tie pays 9X, and 50% 
 ramCache.set('hi:::DRAGON WINS!', 'ड्रैगन की जीत!');
 ramCache.set('hi:::TIGER WINS!', 'टाइगर की जीत!');
 ramCache.set('hi:::TIE GAME (9X PAYOUT)!', 'टाई गेम (9X पेआउट)!');
+ramCache.set('hi:::Crescent Moon', 'क्रिसेंट मून');
+ramCache.set('hi:::Royal Wedding Gown', 'रॉयल वेडिंग गाउन');
+ramCache.set('hi:::Fairy Magic Dress', 'परी मैजिक ड्रेस');
+ramCache.set('hi:::Cyber Superbike', 'साइबर सुपरबाइक');
+ramCache.set('hi:::Crystal Phoenix', 'क्रिस्टल फीनिक्स');
+ramCache.set('hi:::Mafia Boss VIP', 'माफिया बॉस वीआईपी');
+ramCache.set('hi:::Yellow Porsche', 'येलो पोर्श');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -621,6 +628,13 @@ export const LanguageProvider = ({ children }) => {
       'Pegasus Unicorn',
       'Royal Palace',
       'Emperor Dragon',
+      'Crescent Moon',
+      'Royal Wedding Gown',
+      'Fairy Magic Dress',
+      'Cyber Superbike',
+      'Crystal Phoenix',
+      'Mafia Boss VIP',
+      'Yellow Porsche',
       'sent',
       'to',
       'Everyone',
@@ -1644,6 +1658,13 @@ export const LanguageProvider = ({ children }) => {
       'Pegasus Unicorn',
       'Royal Palace',
       'Emperor Dragon',
+      'Crescent Moon',
+      'Royal Wedding Gown',
+      'Fairy Magic Dress',
+      'Cyber Superbike',
+      'Crystal Phoenix',
+      'Mafia Boss VIP',
+      'Yellow Porsche',
       'sent',
       'to',
       'Everyone',
