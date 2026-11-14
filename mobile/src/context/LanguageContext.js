@@ -247,6 +247,17 @@ ramCache.set('hi:::Love Choco Coffee', 'लव चोको कॉफ़ी');
 ramCache.set('hi:::Heart Waterfall', 'हार्ट वाटरफॉल');
 ramCache.set('hi:::Royal Turkish Coffee', 'रॉयल टर्किश कॉफ़ी');
 ramCache.set('hi:::Diamond Proposal Ring', 'डायमंड प्रपोजल रिंग');
+ramCache.set('hi:::Super Heart Like', 'सुपर हार्ट लाइक');
+ramCache.set('hi:::Deep Sea Pearl', 'डीप सी पर्ल');
+ramCache.set('hi:::Sparkling Rose Bouquet', 'स्पार्कलिंग रोज़ गुलदस्ता');
+ramCache.set('hi:::Choco Rose Romance', 'चोको रोज़ रोमांस');
+ramCache.set('hi:::Cupid Love Arrow', 'क्यूपिड लव एरो');
+ramCache.set('hi:::Firework Festival', 'आतिशबाज़ी उत्सव');
+ramCache.set('hi:::Fairy Tales Angel', 'फेयरी टेल्स एंजेल');
+ramCache.set('hi:::Crystal Neon Violin', 'क्रिस्टल नियॉन वॉयलिन');
+ramCache.set('hi:::Imperial Red Crown', 'इंपीरियल रेड क्राउन');
+ramCache.set('hi:::Enchanted Forest Fairy', 'एनचांटेड फॉरेस्ट फेयरी');
+ramCache.set('hi:::Golden Palace Supercar', 'गोल्डन पैलेस सुपरकार');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -679,6 +690,17 @@ export const LanguageProvider = ({ children }) => {
       'Heart Waterfall',
       'Royal Turkish Coffee',
       'Diamond Proposal Ring',
+      'Super Heart Like',
+      'Deep Sea Pearl',
+      'Sparkling Rose Bouquet',
+      'Choco Rose Romance',
+      'Cupid Love Arrow',
+      'Firework Festival',
+      'Fairy Tales Angel',
+      'Crystal Neon Violin',
+      'Imperial Red Crown',
+      'Enchanted Forest Fairy',
+      'Golden Palace Supercar',
       'sent',
       'to',
       'Everyone',
@@ -1731,6 +1753,17 @@ export const LanguageProvider = ({ children }) => {
       'Heart Waterfall',
       'Royal Turkish Coffee',
       'Diamond Proposal Ring',
+      'Super Heart Like',
+      'Deep Sea Pearl',
+      'Sparkling Rose Bouquet',
+      'Choco Rose Romance',
+      'Cupid Love Arrow',
+      'Firework Festival',
+      'Fairy Tales Angel',
+      'Crystal Neon Violin',
+      'Imperial Red Crown',
+      'Enchanted Forest Fairy',
+      'Golden Palace Supercar',
       'sent',
       'to',
       'Everyone',
