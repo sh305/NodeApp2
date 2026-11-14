@@ -236,6 +236,17 @@ ramCache.set('hi:::Cupid Love Jet', 'क्यूपिड लव जेट');
 ramCache.set('hi:::Sweet Dreams Teddy', 'स्वीट ड्रीम्स टेडी');
 ramCache.set('hi:::Halloween Ghost Car', 'हैलोवीन घोस्ट कार');
 ramCache.set('hi:::Heart Jewel Box', 'हार्ट ज्वेल बॉक्स');
+ramCache.set('hi:::Pink Diamond Ring', 'पिंक डायमंड रिंग');
+ramCache.set('hi:::Angel Wing Heart', 'एंजेल विंग हार्ट');
+ramCache.set('hi:::Rainbow Teddy Cake', 'रेनबो टेडी केक');
+ramCache.set('hi:::Swan Wedding Cake', 'स्वान वेडिंग केक');
+ramCache.set('hi:::Sweet Glazed Donuts', 'स्वीट ग्लेज्ड डोनट्स');
+ramCache.set('hi:::Flying Love Letter', 'फ्लाइंग लव लेटर');
+ramCache.set('hi:::Royal Couple Rings', 'रॉयल कपल रिंग्स');
+ramCache.set('hi:::Love Choco Coffee', 'लव चोको कॉफ़ी');
+ramCache.set('hi:::Heart Waterfall', 'हार्ट वाटरफॉल');
+ramCache.set('hi:::Royal Turkish Coffee', 'रॉयल टर्किश कॉफ़ी');
+ramCache.set('hi:::Diamond Proposal Ring', 'डायमंड प्रपोजल रिंग');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -657,6 +668,17 @@ export const LanguageProvider = ({ children }) => {
       'Sweet Dreams Teddy',
       'Halloween Ghost Car',
       'Heart Jewel Box',
+      'Pink Diamond Ring',
+      'Angel Wing Heart',
+      'Rainbow Teddy Cake',
+      'Swan Wedding Cake',
+      'Sweet Glazed Donuts',
+      'Flying Love Letter',
+      'Royal Couple Rings',
+      'Love Choco Coffee',
+      'Heart Waterfall',
+      'Royal Turkish Coffee',
+      'Diamond Proposal Ring',
       'sent',
       'to',
       'Everyone',
@@ -1698,6 +1720,17 @@ export const LanguageProvider = ({ children }) => {
       'Sweet Dreams Teddy',
       'Halloween Ghost Car',
       'Heart Jewel Box',
+      'Pink Diamond Ring',
+      'Angel Wing Heart',
+      'Rainbow Teddy Cake',
+      'Swan Wedding Cake',
+      'Sweet Glazed Donuts',
+      'Flying Love Letter',
+      'Royal Couple Rings',
+      'Love Choco Coffee',
+      'Heart Waterfall',
+      'Royal Turkish Coffee',
+      'Diamond Proposal Ring',
       'sent',
       'to',
       'Everyone',
