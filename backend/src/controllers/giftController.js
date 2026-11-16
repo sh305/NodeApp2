@@ -10,10 +10,12 @@ const defaultGifts = [
   { name: 'Red Rose', category: 'hot', coinPrice: 10, expReward: 10, badge: '🌹', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Rose/3D/rose_3d.png', animationUrl: 'https://raw.githubusercontent.com/svga/SVGA-Samples/master/rose.svga' },
   { name: 'Love Heart', category: 'hot', coinPrice: 25, expReward: 25, badge: '❤️', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Sparkling%20heart/3D/sparkling_heart_3d.png', animationUrl: 'https://raw.githubusercontent.com/svga/SVGA-Samples/master/heartbeat.svga' },
   { name: 'Teddy Bear', category: 'hot', coinPrice: 99, expReward: 99, badge: '🧸', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Teddy%20bear/3D/teddy_bear_3d.png' },
+  { name: 'Thank You Heart', category: 'hot', coinPrice: 199, expReward: 199, badge: '💖', iconUrl: '/uploads/gifts/thumbnails/thank_you_heart.png', animationUrl: '/uploads/gifts/thank_you_heart.svga' },
   { name: 'Bouquet', category: 'hot', coinPrice: 299, expReward: 299, badge: '💐', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Bouquet/3D/bouquet_3d.png' },
   { name: 'Super Heart Like', category: 'hot', coinPrice: 520, expReward: 520, badge: '👍', iconUrl: '/uploads/gifts/thumbnails/super_heart_like.png', animationUrl: '/uploads/gifts/super_heart_like.svga' },
   { name: 'Sweet Glazed Donuts', category: 'hot', coinPrice: 888, expReward: 888, badge: '🍩', iconUrl: '/uploads/gifts/thumbnails/sweet_glazed_donuts.png', animationUrl: '/uploads/gifts/sweet_glazed_donuts.svga' },
   { name: 'Diamond Ring', category: 'hot', coinPrice: 999, expReward: 999, badge: '💍', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Ring/3D/ring_3d.png' },
+  { name: 'Love Rose Gun', category: 'hot', coinPrice: 1314, expReward: 1314, badge: '🔫', iconUrl: '/uploads/gifts/thumbnails/love_rose_gun.png', animationUrl: '/uploads/gifts/love_rose_gun.svga' },
   { name: 'Fireworks', category: 'hot', coinPrice: 1999, expReward: 1999, badge: '🎆', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Fireworks/3D/fireworks_3d.png', animationUrl: 'https://raw.githubusercontent.com/svga/SVGA-Samples/master/halloween.svga' },
   { name: 'Sports Car', category: 'hot', coinPrice: 4999, expReward: 4999, badge: '🏎️', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Automobile/3D/automobile_3d.png', animationUrl: 'https://raw.githubusercontent.com/svga/SVGA-Samples/master/posche.svga' },
   { name: 'Space Rocket', category: 'hot', coinPrice: 19999, expReward: 19999, badge: '🚀', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Rocket/3D/rocket_3d.png', animationUrl: 'https://raw.githubusercontent.com/svga/SVGA-Samples/master/Rocket.svga' },
@@ -22,6 +24,7 @@ const defaultGifts = [
   { name: 'Lucky Clover', category: 'lucky', coinPrice: 30, expReward: 30, badge: '🍀', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Four%20leaf%20clover/3D/four_leaf_clover_3d.png' },
   { name: 'Crystal Ball', category: 'lucky', coinPrice: 150, expReward: 150, badge: '🔮', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Crystal%20ball/3D/crystal_ball_3d.png' },
   { name: 'Golden Dice', category: 'lucky', coinPrice: 500, expReward: 500, badge: '🎲', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Game%20die/3D/game_die_3d.png' },
+  { name: 'Golden Thunder Bell', category: 'lucky', coinPrice: 888, expReward: 888, badge: '🔔', iconUrl: '/uploads/gifts/thumbnails/golden_thunder_bell.png', animationUrl: '/uploads/gifts/golden_thunder_bell.svga' },
   { name: '777 Jackpot', category: 'lucky', coinPrice: 1200, expReward: 1200, badge: '777', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Slot%20machine/3D/slot_machine_3d.png' },
   { name: 'Sweet Dreams Teddy', category: 'lucky', coinPrice: 3000, expReward: 3000, badge: '🌙', iconUrl: '/uploads/gifts/thumbnails/sweet_dreams_teddy.png', animationUrl: '/uploads/gifts/sweet_dreams_teddy.svga' },
   { name: 'Deep Sea Pearl', category: 'lucky', coinPrice: 3333, expReward: 3333, badge: '🦪', iconUrl: '/uploads/gifts/thumbnails/deep_sea_pearl.png', animationUrl: '/uploads/gifts/deep_sea_pearl.svga' },
@@ -48,9 +51,13 @@ const defaultGifts = [
   { name: 'Pink Diamond Ring', category: 'couple', coinPrice: 9999, expReward: 9999, badge: '💎', iconUrl: '/uploads/gifts/thumbnails/pink_diamond_ring.png', animationUrl: '/uploads/gifts/pink_diamond_ring.svga' },
   { name: 'Heart Jewel Box', category: 'couple', coinPrice: 9999, expReward: 9999, badge: '💖', iconUrl: '/uploads/gifts/thumbnails/heart_jewel_box.png', animationUrl: '/uploads/gifts/heart_jewel_box.svga' },
   { name: 'Firework Festival', category: 'couple', coinPrice: 12000, expReward: 12000, badge: '🎆', iconUrl: '/uploads/gifts/thumbnails/romantic_firework_festival.png', animationUrl: '/uploads/gifts/romantic_firework_festival.svga' },
+  { name: 'Starlight Proposal', category: 'couple', coinPrice: 13140, expReward: 13140, badge: '💍', iconUrl: '/uploads/gifts/thumbnails/starlight_proposal.png', animationUrl: '/uploads/gifts/starlight_proposal.svga' },
+  { name: 'Rainbow Love Balloon', category: 'couple', coinPrice: 15000, expReward: 15000, badge: '🎈', iconUrl: '/uploads/gifts/thumbnails/rainbow_love_balloon.png', animationUrl: '/uploads/gifts/rainbow_love_balloon.svga' },
   { name: 'Diamond Proposal Ring', category: 'couple', coinPrice: 15000, expReward: 15000, badge: '💍', iconUrl: '/uploads/gifts/thumbnails/diamond_proposal_ring.png', animationUrl: '/uploads/gifts/diamond_proposal_ring.svga' },
   { name: 'Royal Couple Rings', category: 'couple', coinPrice: 20000, expReward: 20000, badge: '💍', iconUrl: '/uploads/gifts/thumbnails/royal_couple_rings.png', animationUrl: '/uploads/gifts/royal_couple_rings.svga' },
   { name: 'Cherry Blossom Ride', category: 'couple', coinPrice: 25000, expReward: 25000, badge: '🐎', iconUrl: '/uploads/gifts/thumbnails/cherry_blossom_ride.png', animationUrl: '/uploads/gifts/cherry_blossom_ride.svga' },
+  { name: 'Imperial Lovers Romance', category: 'couple', coinPrice: 25000, expReward: 25000, badge: '🎎', iconUrl: '/uploads/gifts/thumbnails/imperial_lovers_romance.png', animationUrl: '/uploads/gifts/imperial_lovers_romance.svga' },
+  { name: 'Pink Love Supercar', category: 'couple', coinPrice: 28888, expReward: 28888, badge: '🏎️', iconUrl: '/uploads/gifts/thumbnails/pink_love_supercar.png', animationUrl: '/uploads/gifts/pink_love_supercar.svga' },
   { name: 'Swan Wedding Cake', category: 'couple', coinPrice: 35000, expReward: 35000, badge: '🦢', iconUrl: '/uploads/gifts/thumbnails/swan_wedding_cake.png', animationUrl: '/uploads/gifts/swan_wedding_cake.svga' },
   { name: 'Royal Wedding Gown', category: 'couple', coinPrice: 52000, expReward: 52000, badge: '👗', iconUrl: '/uploads/gifts/thumbnails/royal_wedding_gown.png', animationUrl: '/uploads/gifts/royal_wedding_gown.svga' },
   { name: 'Royal Jewel', category: 'couple', coinPrice: 99999, expReward: 99999, badge: '👑', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Gem%20stone/3D/gem_stone_3d.png' },
@@ -62,10 +69,12 @@ const defaultGifts = [
   { name: 'Superbike', category: 'custom', coinPrice: 1888, expReward: 1888, badge: '🏍️', iconUrl: '/uploads/gifts/thumbnails/cyber_superbike.png', animationUrl: '/uploads/gifts/cyber_superbike.svga' },
   { name: 'Biker Sheep', category: 'custom', coinPrice: 2000, expReward: 2000, badge: '🐑', iconUrl: '/uploads/gifts/thumbnails/biker_sheep.png', animationUrl: '/uploads/gifts/biker_sheep.svga' },
   { name: 'Fairy Tales Angel', category: 'custom', coinPrice: 4999, expReward: 4999, badge: '👼', iconUrl: '/uploads/gifts/thumbnails/fairy_tales_angel_boy.png', animationUrl: '/uploads/gifts/fairy_tales_angel_boy.svga' },
+  { name: 'Floral Fantasy Bikini', category: 'custom', coinPrice: 5200, expReward: 5200, badge: '👙', iconUrl: '/uploads/gifts/thumbnails/floral_fantasy_bikini.png', animationUrl: '/uploads/gifts/floral_fantasy_bikini.svga' },
   { name: 'Crystal Neon Violin', category: 'custom', coinPrice: 6666, expReward: 6666, badge: '🎻', iconUrl: '/uploads/gifts/thumbnails/crystal_neon_violin.png', animationUrl: '/uploads/gifts/crystal_neon_violin.svga' },
   { name: 'Rainbow Teddy Cake', category: 'custom', coinPrice: 8888, expReward: 8888, badge: '🎂', iconUrl: '/uploads/gifts/thumbnails/rainbow_teddy_cake.png', animationUrl: '/uploads/gifts/rainbow_teddy_cake.svga' },
   { name: 'Fairy Magic Dress', category: 'custom', coinPrice: 10000, expReward: 10000, badge: '🧚', iconUrl: '/uploads/gifts/thumbnails/fairy_magic_dress.png', animationUrl: '/uploads/gifts/fairy_magic_dress.svga' },
   { name: 'Hypercar', category: 'custom', coinPrice: 18888, expReward: 18888, badge: '🏎️', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Automobile/3D/automobile_3d.png' },
+  { name: 'Cyber Fighter Jet', category: 'custom', coinPrice: 35000, expReward: 35000, badge: '✈️', iconUrl: '/uploads/gifts/thumbnails/cyber_fighter_jet.png', animationUrl: '/uploads/gifts/cyber_fighter_jet.svga' },
   { name: 'Supercar Truck', category: 'custom', coinPrice: 38888, expReward: 38888, badge: '🚚', iconUrl: '/uploads/gifts/thumbnails/birthday_supercar_truck.png', animationUrl: '/uploads/gifts/birthday_supercar_truck.svga' },
   { name: 'Cupid Love Jet', category: 'custom', coinPrice: 88888, expReward: 88888, badge: '✈️', iconUrl: '/uploads/gifts/thumbnails/cupid_love_jet.png', animationUrl: '/uploads/gifts/cupid_love_jet.svga' },
   { name: 'Golden Throne', category: 'custom', coinPrice: 188888, expReward: 188888, badge: '👑', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Crown/3D/crown_3d.png', animationUrl: 'https://raw.githubusercontent.com/svga/SVGA-Samples/master/kingset.svga' },
@@ -74,7 +83,9 @@ const defaultGifts = [
   { name: 'VIP Medal', category: 'vip', coinPrice: 500, expReward: 500, badge: 'VIP', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/1st%20place%20medal/3D/1st_place_medal_3d.png' },
   { name: 'Gold Trophy', category: 'vip', coinPrice: 2000, expReward: 2000, badge: 'VIP', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Trophy/3D/trophy_3d.png' },
   { name: 'Champagne Pop', category: 'vip', coinPrice: 5000, expReward: 5000, badge: 'VIP', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Bottle%20with%20popping%20cork/3D/bottle_with_popping_cork_3d.png' },
+  { name: 'Royal Golden Rose', category: 'vip', coinPrice: 18888, expReward: 18888, badge: '🌹', iconUrl: '/uploads/gifts/thumbnails/royal_golden_rose.png', animationUrl: '/uploads/gifts/royal_golden_rose.svga' },
   { name: 'Crown of Kings', category: 'vip', coinPrice: 20000, expReward: 20000, badge: 'VIP', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Crown/3D/crown_3d.png', animationUrl: 'https://raw.githubusercontent.com/svga/SVGA-Samples/master/kingset.svga' },
+  { name: 'Celestial Tiara Crown', category: 'vip', coinPrice: 20000, expReward: 20000, badge: '👑', iconUrl: '/uploads/gifts/thumbnails/celestial_tiara_crown.png', animationUrl: '/uploads/gifts/celestial_tiara_crown.svga' },
   { name: 'Imperial Red Crown', category: 'vip', coinPrice: 25000, expReward: 25000, badge: '👑', iconUrl: '/uploads/gifts/thumbnails/imperial_red_crown.png', animationUrl: '/uploads/gifts/imperial_red_crown.svga' },
   { name: 'Mafia Boss VIP', category: 'vip', coinPrice: 50000, expReward: 50000, badge: '🤵', iconUrl: '/uploads/gifts/thumbnails/mafia_boss_suit.png', animationUrl: '/uploads/gifts/mafia_boss_suit.svga' },
   { name: 'Enchanted Forest Fairy', category: 'vip', coinPrice: 50000, expReward: 50000, badge: '🧚‍♀️', iconUrl: '/uploads/gifts/thumbnails/enchanted_forest_fairy.png', animationUrl: '/uploads/gifts/enchanted_forest_fairy.svga' },
@@ -92,8 +103,8 @@ exports.getGifts = async (req, res) => {
     let gifts = await Gift.find({ isActive: true }).sort({ coinPrice: 1 });
 
     const needsRefresh =
-      gifts.length < 68 ||
-      !gifts.some((g) => g.name === 'Imperial Red Crown') ||
+      gifts.length < 79 ||
+      !gifts.some((g) => g.name === 'Celestial Tiara Crown') ||
       gifts.some(
         (g) =>
           !g.iconUrl ||

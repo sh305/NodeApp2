@@ -258,6 +258,17 @@ ramCache.set('hi:::Crystal Neon Violin', 'क्रिस्टल नियॉ�
 ramCache.set('hi:::Imperial Red Crown', 'इंपीरियल रेड क्राउन');
 ramCache.set('hi:::Enchanted Forest Fairy', 'एनचांटेड फॉरेस्ट फेयरी');
 ramCache.set('hi:::Golden Palace Supercar', 'गोल्डन पैलेस सुपरकार');
+ramCache.set('hi:::Thank You Heart', 'थैंक यू हार्ट');
+ramCache.set('hi:::Love Rose Gun', 'लव रोज़ गन');
+ramCache.set('hi:::Golden Thunder Bell', 'गोल्डन थंडर बेल');
+ramCache.set('hi:::Starlight Proposal', 'स्टारलाइट प्रपोजल');
+ramCache.set('hi:::Rainbow Love Balloon', 'रेनबो लव बैलून');
+ramCache.set('hi:::Imperial Lovers Romance', 'शाही प्रेम रोमांस');
+ramCache.set('hi:::Pink Love Supercar', 'पिंक लव सुपरकार');
+ramCache.set('hi:::Floral Fantasy Bikini', 'फ्लोरल फैंटेसी बिकिनी');
+ramCache.set('hi:::Cyber Fighter Jet', 'साइबर फाइटर जेट');
+ramCache.set('hi:::Royal Golden Rose', 'रॉयल गोल्डन रोज़');
+ramCache.set('hi:::Celestial Tiara Crown', 'आसमानी टियारा क्राउन');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -701,6 +712,17 @@ export const LanguageProvider = ({ children }) => {
       'Imperial Red Crown',
       'Enchanted Forest Fairy',
       'Golden Palace Supercar',
+      'Thank You Heart',
+      'Love Rose Gun',
+      'Golden Thunder Bell',
+      'Starlight Proposal',
+      'Rainbow Love Balloon',
+      'Imperial Lovers Romance',
+      'Pink Love Supercar',
+      'Floral Fantasy Bikini',
+      'Cyber Fighter Jet',
+      'Royal Golden Rose',
+      'Celestial Tiara Crown',
       'sent',
       'to',
       'Everyone',
@@ -1764,6 +1786,17 @@ export const LanguageProvider = ({ children }) => {
       'Imperial Red Crown',
       'Enchanted Forest Fairy',
       'Golden Palace Supercar',
+      'Thank You Heart',
+      'Love Rose Gun',
+      'Golden Thunder Bell',
+      'Starlight Proposal',
+      'Rainbow Love Balloon',
+      'Imperial Lovers Romance',
+      'Pink Love Supercar',
+      'Floral Fantasy Bikini',
+      'Cyber Fighter Jet',
+      'Royal Golden Rose',
+      'Celestial Tiara Crown',
       'sent',
       'to',
       'Everyone',
