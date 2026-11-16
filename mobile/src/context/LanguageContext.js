@@ -269,6 +269,18 @@ ramCache.set('hi:::Floral Fantasy Bikini', 'फ्लोरल फैंटे�
 ramCache.set('hi:::Cyber Fighter Jet', 'साइबर फाइटर जेट');
 ramCache.set('hi:::Royal Golden Rose', 'रॉयल गोल्डन रोज़');
 ramCache.set('hi:::Celestial Tiara Crown', 'आसमानी टियारा क्राउन');
+ramCache.set('hi:::Celestial Pegasus Castle', 'आसमानी पेगासस महल');
+ramCache.set('hi:::Ocean Love Letter', 'समुद्री प्रेम पत्र');
+ramCache.set('hi:::Crystal Rose Box', 'क्रिस्टल रोज़ बॉक्स');
+ramCache.set('hi:::Shadow Tarantula', 'शैडो टैरेंटुला');
+ramCache.set('hi:::Wedding Swing Birdcage', 'वेडिंग स्विंग बर्डकेज');
+ramCache.set('hi:::Dubai Burj Rolls Royce', 'दुबई बुर्ज रोल्स रॉयस');
+ramCache.set('hi:::Cyber Neon Hypercar', 'साइबर नियॉन हाइपरकार');
+ramCache.set('hi:::Sweetheart First Kiss', 'स्वीटहार्ट फर्स्ट किस');
+ramCache.set('hi:::Cathedral Wedding Bloom', 'कैथेड्रल वेडिंग ब्लूम');
+ramCache.set('hi:::Moonlit Bridge Romance', 'मूनलिट ब्रिज रोमांस');
+ramCache.set('hi:::Galaxy Wedding Embrace', 'गैलेक्सी वेडिंग एम्ब्रेस');
+ramCache.set('hi:::Crystal Magic Perfume', 'क्रिस्टल मैजिक परफ्यूम');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -723,6 +735,18 @@ export const LanguageProvider = ({ children }) => {
       'Cyber Fighter Jet',
       'Royal Golden Rose',
       'Celestial Tiara Crown',
+      'Celestial Pegasus Castle',
+      'Ocean Love Letter',
+      'Crystal Rose Box',
+      'Shadow Tarantula',
+      'Wedding Swing Birdcage',
+      'Dubai Burj Rolls Royce',
+      'Cyber Neon Hypercar',
+      'Sweetheart First Kiss',
+      'Cathedral Wedding Bloom',
+      'Moonlit Bridge Romance',
+      'Galaxy Wedding Embrace',
+      'Crystal Magic Perfume',
       'sent',
       'to',
       'Everyone',
@@ -1797,6 +1821,18 @@ export const LanguageProvider = ({ children }) => {
       'Cyber Fighter Jet',
       'Royal Golden Rose',
       'Celestial Tiara Crown',
+      'Celestial Pegasus Castle',
+      'Ocean Love Letter',
+      'Crystal Rose Box',
+      'Shadow Tarantula',
+      'Wedding Swing Birdcage',
+      'Dubai Burj Rolls Royce',
+      'Cyber Neon Hypercar',
+      'Sweetheart First Kiss',
+      'Cathedral Wedding Bloom',
+      'Moonlit Bridge Romance',
+      'Galaxy Wedding Embrace',
+      'Crystal Magic Perfume',
       'sent',
       'to',
       'Everyone',
