@@ -42,6 +42,9 @@ Thumbs.db
 *.apk
 *.zip
 FunMaza*
-backend/uploads/
+backend/uploads/raw_gifts/
+backend/uploads/temp*
+backend/uploads/inspect*
+
 
 
