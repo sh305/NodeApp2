@@ -304,6 +304,21 @@ ramCache.set('hi:::Golden Royal Rolls Royce', 'गोल्डन रॉयल �
 ramCache.set('hi:::Golden Money Gun', 'गोल्डन मनी गन');
 ramCache.set('hi:::Cheers Party Beer Mugs', 'चीयर्स पार्टी बीयर मग्स');
 ramCache.set('hi:::Stardust Rose Bouquet', 'स्टारडस्ट गुलाब का गुलदस्ता');
+ramCache.set('hi:::Neon Hi Greeting', 'नियॉन हाय ग्रीटिंग');
+ramCache.set('hi:::Celebration Birthday Cake', 'सेलिब्रेशन बर्थडे केक');
+ramCache.set('hi:::Lucky Four Clover', 'लकी फोर क्लोवर');
+ramCache.set('hi:::Sparkle Face Mask', 'स्पार्कल फेस मास्क');
+ramCache.set('hi:::Cupid Love Slingshot', 'क्यूपिड लव स्लिंगशॉट');
+ramCache.set('hi:::Luminous Pearl Shell', 'ल्यूमिनस पर्ल शेल');
+ramCache.set('hi:::Sparkling Crimson Rose', 'स्पार्कलिंग क्रिमसन रोज़');
+ramCache.set('hi:::Finger Heart Love', 'फिंगर हार्ट लव');
+ramCache.set('hi:::Teddy Rose Surprise', 'टेडी रोज़ सरप्राइज़');
+ramCache.set('hi:::Amethyst Royal Ring', 'एमेथिस्ट रॉयल रिंग');
+ramCache.set('hi:::Romantic Balloon Kiss', 'रोमांटिक बलून किस');
+ramCache.set('hi:::Crystal Luxury Perfume', 'क्रिस्टल लक्ज़री परफ्यूम');
+ramCache.set('hi:::Crystal Ice Slippers', 'क्रिस्टल आइस स्लिपर्स');
+ramCache.set('hi:::Cinderella Glass Slipper', 'सिंड्रेला ग्लास स्लिपर');
+ramCache.set('hi:::Celestial Crystal Violin', 'सेलेस्टियल क्रिस्टल वायलिन');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -793,6 +808,21 @@ export const LanguageProvider = ({ children }) => {
       'Golden Money Gun',
       'Cheers Party Beer Mugs',
       'Stardust Rose Bouquet',
+      'Neon Hi Greeting',
+      'Celebration Birthday Cake',
+      'Lucky Four Clover',
+      'Sparkle Face Mask',
+      'Cupid Love Slingshot',
+      'Luminous Pearl Shell',
+      'Sparkling Crimson Rose',
+      'Finger Heart Love',
+      'Teddy Rose Surprise',
+      'Amethyst Royal Ring',
+      'Romantic Balloon Kiss',
+      'Crystal Luxury Perfume',
+      'Crystal Ice Slippers',
+      'Cinderella Glass Slipper',
+      'Celestial Crystal Violin',
       'sent',
       'to',
       'Everyone',
@@ -1902,6 +1932,21 @@ export const LanguageProvider = ({ children }) => {
       'Golden Money Gun',
       'Cheers Party Beer Mugs',
       'Stardust Rose Bouquet',
+      'Neon Hi Greeting',
+      'Celebration Birthday Cake',
+      'Lucky Four Clover',
+      'Sparkle Face Mask',
+      'Cupid Love Slingshot',
+      'Luminous Pearl Shell',
+      'Sparkling Crimson Rose',
+      'Finger Heart Love',
+      'Teddy Rose Surprise',
+      'Amethyst Royal Ring',
+      'Romantic Balloon Kiss',
+      'Crystal Luxury Perfume',
+      'Crystal Ice Slippers',
+      'Cinderella Glass Slipper',
+      'Celestial Crystal Violin',
       'sent',
       'to',
       'Everyone',
