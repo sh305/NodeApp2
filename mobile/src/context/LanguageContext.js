@@ -281,6 +281,17 @@ ramCache.set('hi:::Cathedral Wedding Bloom', 'कैथेड्रल वेड
 ramCache.set('hi:::Moonlit Bridge Romance', 'मूनलिट ब्रिज रोमांस');
 ramCache.set('hi:::Galaxy Wedding Embrace', 'गैलेक्सी वेडिंग एम्ब्रेस');
 ramCache.set('hi:::Crystal Magic Perfume', 'क्रिस्टल मैजिक परफ्यूम');
+ramCache.set('hi:::Sweet Candy Ice Cream', 'स्वीट कैंडी आइसक्रीम');
+ramCache.set('hi:::Flying Kiss Heart', 'फ्लाइंग किस हार्ट');
+ramCache.set('hi:::Golden Magic Corn', 'सुनहरा जादुई भुट्टा');
+ramCache.set('hi:::Carousel Merry Go Round', 'रोमांचक झूला मेरी गो राउंड');
+ramCache.set('hi:::Strawberry Couple Donuts', 'स्ट्रॉबेरी कपल डोनट्स');
+ramCache.set('hi:::Winged Crystal Heart', 'पंखों वाला क्रिस्टल हार्ट');
+ramCache.set('hi:::Golden Cupid Angel', 'गोल्डन कामदेव देवदूत');
+ramCache.set('hi:::Sweet Love Meet', 'स्वीट लव मीट');
+ramCache.set('hi:::Neon Party Glowsticks', 'नियॉन पार्टी ग्लोस्टिक्स');
+ramCache.set('hi:::Magic Flying Carpet', 'जादुई उड़ने वाला कालीन');
+ramCache.set('hi:::Live Carnival Stage', 'लाइव कार्निवल स्टेज');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -747,6 +758,17 @@ export const LanguageProvider = ({ children }) => {
       'Moonlit Bridge Romance',
       'Galaxy Wedding Embrace',
       'Crystal Magic Perfume',
+      'Sweet Candy Ice Cream',
+      'Flying Kiss Heart',
+      'Golden Magic Corn',
+      'Carousel Merry Go Round',
+      'Strawberry Couple Donuts',
+      'Winged Crystal Heart',
+      'Golden Cupid Angel',
+      'Sweet Love Meet',
+      'Neon Party Glowsticks',
+      'Magic Flying Carpet',
+      'Live Carnival Stage',
       'sent',
       'to',
       'Everyone',
@@ -1833,6 +1855,17 @@ export const LanguageProvider = ({ children }) => {
       'Moonlit Bridge Romance',
       'Galaxy Wedding Embrace',
       'Crystal Magic Perfume',
+      'Sweet Candy Ice Cream',
+      'Flying Kiss Heart',
+      'Golden Magic Corn',
+      'Carousel Merry Go Round',
+      'Strawberry Couple Donuts',
+      'Winged Crystal Heart',
+      'Golden Cupid Angel',
+      'Sweet Love Meet',
+      'Neon Party Glowsticks',
+      'Magic Flying Carpet',
+      'Live Carnival Stage',
       'sent',
       'to',
       'Everyone',
