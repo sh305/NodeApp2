@@ -1,9 +1,10 @@
-node_modules
-.expo
-.expo-export
-dist
-web-build
+node_modules/
+.expo/
+.expo-export/
+dist/
+web-build/
 *.log
 *.apk
 *.zip
 FunMaza*
+../backend/

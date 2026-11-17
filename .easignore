@@ -1,0 +1,16 @@
+backend/
+backend/uploads/
+*.mp4
+Snapchat_Demo_Video.mp4
+node_modules/
+mobile/node_modules/
+backend/node_modules/
+.expo/
+mobile/.expo/
+dist/
+mobile/dist/
+web-build/
+*.log
+*.apk
+*.zip
+FunMaza*
