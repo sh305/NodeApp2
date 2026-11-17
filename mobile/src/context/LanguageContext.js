@@ -292,6 +292,18 @@ ramCache.set('hi:::Sweet Love Meet', 'स्वीट लव मीट');
 ramCache.set('hi:::Neon Party Glowsticks', 'नियॉन पार्टी ग्लोस्टिक्स');
 ramCache.set('hi:::Magic Flying Carpet', 'जादुई उड़ने वाला कालीन');
 ramCache.set('hi:::Live Carnival Stage', 'लाइव कार्निवल स्टेज');
+ramCache.set('hi:::Sweet Swirl Lollipop', 'मीठी लॉलीपॉप');
+ramCache.set('hi:::Choco Berry Popsicle', 'चोको बेरी पॉप्सिकल');
+ramCache.set('hi:::Golden Arrow Love You', 'गोल्डन एरो लव यू');
+ramCache.set('hi:::Nimbus Magic Cloud', 'निम्बस जादुई बादल');
+ramCache.set('hi:::Lucky Wishing Bottle', 'लकी विशिंग बॉटल');
+ramCache.set('hi:::Rainbow Star Parfait', 'रेनबो स्टार परफेट');
+ramCache.set('hi:::Blooming Rose Garden', 'खिलता हुआ गुलाब उद्यान');
+ramCache.set('hi:::Sweet Boba Couple Tea', 'स्वीट बोबा कपल टी');
+ramCache.set('hi:::Golden Royal Rolls Royce', 'गोल्डन रॉयल रोल्स रॉयस');
+ramCache.set('hi:::Golden Money Gun', 'गोल्डन मनी गन');
+ramCache.set('hi:::Cheers Party Beer Mugs', 'चीयर्स पार्टी बीयर मग्स');
+ramCache.set('hi:::Stardust Rose Bouquet', 'स्टारडस्ट गुलाब का गुलदस्ता');
 ramCache.set('hi:::Insufficient coins balance. Please recharge first.', 'सिक्कों का बैलेंस अपर्याप्त है। कृपया पहले रिचार्ज करें।');
 ramCache.set('hi:::Bets cleared!', 'दांव हटा दिए गए!');
 ramCache.set('hi:::Insufficient coins for Rebet', 'दोबारा दांव लगाने के लिए सिक्के कम हैं');
@@ -769,6 +781,18 @@ export const LanguageProvider = ({ children }) => {
       'Neon Party Glowsticks',
       'Magic Flying Carpet',
       'Live Carnival Stage',
+      'Sweet Swirl Lollipop',
+      'Choco Berry Popsicle',
+      'Golden Arrow Love You',
+      'Nimbus Magic Cloud',
+      'Lucky Wishing Bottle',
+      'Rainbow Star Parfait',
+      'Blooming Rose Garden',
+      'Sweet Boba Couple Tea',
+      'Golden Royal Rolls Royce',
+      'Golden Money Gun',
+      'Cheers Party Beer Mugs',
+      'Stardust Rose Bouquet',
       'sent',
       'to',
       'Everyone',
@@ -1866,6 +1890,18 @@ export const LanguageProvider = ({ children }) => {
       'Neon Party Glowsticks',
       'Magic Flying Carpet',
       'Live Carnival Stage',
+      'Sweet Swirl Lollipop',
+      'Choco Berry Popsicle',
+      'Golden Arrow Love You',
+      'Nimbus Magic Cloud',
+      'Lucky Wishing Bottle',
+      'Rainbow Star Parfait',
+      'Blooming Rose Garden',
+      'Sweet Boba Couple Tea',
+      'Golden Royal Rolls Royce',
+      'Golden Money Gun',
+      'Cheers Party Beer Mugs',
+      'Stardust Rose Bouquet',
       'sent',
       'to',
       'Everyone',
