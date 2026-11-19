@@ -14,9 +14,16 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import api from '../api/client';
+import api, { BASE_URL } from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from './Toast';
+
+const resolveMediaUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const clean = url.startsWith('/') ? url : `/${url}`;
+  return `${BASE_URL || 'https://nodeapp2-yl8c.onrender.com'}${clean}`;
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -90,9 +97,14 @@ export default function GiftBottomSheet({
       setLoadingGifts(true);
       const res = await api.get('/gifts');
       if (res.data?.success && Array.isArray(res.data.gifts)) {
-        setGifts(res.data.gifts);
-        if (!selectedGift && res.data.gifts.length > 0) {
-          setSelectedGift(res.data.gifts[0]);
+        const sanitized = res.data.gifts.map((g) => ({
+          ...g,
+          iconUrl: resolveMediaUrl(g.iconUrl),
+          animationUrl: resolveMediaUrl(g.animationUrl),
+        }));
+        setGifts(sanitized);
+        if (!selectedGift && sanitized.length > 0) {
+          setSelectedGift(sanitized[0]);
         }
       }
     } catch (e) {

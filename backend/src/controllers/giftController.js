@@ -146,6 +146,24 @@ const defaultGifts = [
   { name: 'Emperor Dragon', category: 'vip', coinPrice: 500000, expReward: 500000, badge: 'VIP', iconUrl: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Dragon/3D/dragon_3d.png' },
 ];
 
+const resolveUrl = (url, baseUrl) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  return `${baseUrl}${cleanUrl}`;
+};
+
+function getBaseUrl(req) {
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/+$/, '');
+  const forwardedHost = req ? req.get('x-forwarded-host') : null;
+  const host = forwardedHost || (req ? req.get('host') : null) || 'nodeapp2-yl8c.onrender.com';
+  const proto = (req && req.get('x-forwarded-proto')) || (req && req.secure ? 'https' : 'http');
+  if (host.includes('onrender.com')) {
+    return `https://${host}`;
+  }
+  return `${proto}://${host}`;
+}
+
 // @desc    Get All Gifts List (Auto-seeds/upgrades to 3D gifts with SVGA if missing or outdated)
 // @route   GET /api/gifts
 exports.getGifts = async (req, res) => {
@@ -161,7 +179,6 @@ exports.getGifts = async (req, res) => {
           g.iconUrl.includes('unsplash') ||
           g.iconUrl.includes('flaticon') ||
           g.iconUrl.includes('undefined') ||
-          g.iconUrl.includes('undefined') ||
           (g.name === 'Red Rose' && !g.animationUrl)
       );
 
@@ -171,7 +188,19 @@ exports.getGifts = async (req, res) => {
       gifts = await Gift.find({ isActive: true }).sort({ coinPrice: 1 });
     }
 
-    return res.status(200).json({ success: true, gifts });
+    const baseUrl = getBaseUrl(req);
+    const formattedGifts = gifts.map((g) => {
+      const giftObj = g.toObject ? g.toObject() : { ...g };
+      if (giftObj.iconUrl) {
+        giftObj.iconUrl = resolveUrl(giftObj.iconUrl, baseUrl);
+      }
+      if (giftObj.animationUrl) {
+        giftObj.animationUrl = resolveUrl(giftObj.animationUrl, baseUrl);
+      }
+      return giftObj;
+    });
+
+    return res.status(200).json({ success: true, gifts: formattedGifts });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -257,13 +286,22 @@ exports.sendGift = async (req, res) => {
       roomExpEarned: totalExp,
     });
 
+    const baseUrl = getBaseUrl(req);
+    const formattedGift = gift.toObject ? gift.toObject() : { ...gift };
+    if (formattedGift.iconUrl) {
+      formattedGift.iconUrl = resolveUrl(formattedGift.iconUrl, baseUrl);
+    }
+    if (formattedGift.animationUrl) {
+      formattedGift.animationUrl = resolveUrl(formattedGift.animationUrl, baseUrl);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Gift sent successfully!',
       totalCost,
       remainingCoins: sender.coins,
       data: {
-        gift,
+        gift: formattedGift,
         quantity: parsedQty,
         isAll,
         recipientsCount,

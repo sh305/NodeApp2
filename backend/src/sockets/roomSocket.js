@@ -924,6 +924,17 @@ function initRoomSockets(io) {
 
     // Broadcast Gift Animation to Room & Sync PK Battle Score
     socket.on('broadcast_gift', ({ roomId, giftData }) => {
+      if (giftData) {
+        const defaultBase = 'https://nodeapp2-yl8c.onrender.com';
+        if (giftData.giftIcon && !giftData.giftIcon.startsWith('http')) {
+          const clean = giftData.giftIcon.startsWith('/') ? giftData.giftIcon : `/${giftData.giftIcon}`;
+          giftData.giftIcon = `${defaultBase}${clean}`;
+        }
+        if (giftData.animationUrl && !giftData.animationUrl.startsWith('http')) {
+          const clean = giftData.animationUrl.startsWith('/') ? giftData.animationUrl : `/${giftData.animationUrl}`;
+          giftData.animationUrl = `${defaultBase}${clean}`;
+        }
+      }
       io.to(roomId).emit('gift_received_animation', giftData);
 
       // Also broadcast a rich gift message into the room's live chat
