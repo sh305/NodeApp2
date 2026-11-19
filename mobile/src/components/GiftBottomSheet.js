@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -57,6 +57,7 @@ export default function GiftBottomSheet({
   const [recipientPopoverVisible, setRecipientPopoverVisible] = useState(false);
   const [comboPopoverVisible, setComboPopoverVisible] = useState(false);
   const [activePage, setActivePage] = useState(0);
+  const giftScrollRef = useRef(null);
 
   // Sync recipient when targetUser changes
   useEffect(() => {
@@ -114,27 +115,29 @@ export default function GiftBottomSheet({
     }
   };
 
-  // Filter gifts by active tab (fallback to all if empty)
+  // Filter gifts by active tab (clean, exact category filter)
   const filteredGifts = useMemo(() => {
     const tabKey = activeTab.toLowerCase();
-    const list = gifts.filter((g) => (g.category || 'hot').toLowerCase() === tabKey);
-    return list.length > 0 ? list : gifts.slice(0, 8);
+    return gifts.filter((g) => (g.category || 'hot').toLowerCase() === tabKey);
   }, [gifts, activeTab]);
 
-  // Auto-select first gift when tab changes
+  // Reset scroll position and auto-select first gift when tab changes
   useEffect(() => {
+    setActivePage(0);
+    giftScrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
     if (filteredGifts.length > 0) {
       setSelectedGift(filteredGifts[0]);
     }
-  }, [activeTab, filteredGifts]);
+  }, [activeTab]);
 
   // Group gifts into pages of 8 (2 rows x 4 columns)
   const giftPages = useMemo(() => {
+    if (!filteredGifts || filteredGifts.length === 0) return [];
     const pages = [];
     for (let i = 0; i < filteredGifts.length; i += 8) {
       pages.push(filteredGifts.slice(i, i + 8));
     }
-    return pages.length > 0 ? pages : [[]];
+    return pages;
   }, [filteredGifts]);
 
   // Calculate recipients
@@ -279,8 +282,11 @@ export default function GiftBottomSheet({
                   style={styles.tabBtn}
                   activeOpacity={0.75}
                   onPress={() => {
-                    setActiveTab(tab);
-                    setActivePage(0);
+                    if (activeTab !== tab) {
+                      setActiveTab(tab);
+                      setActivePage(0);
+                      giftScrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
+                    }
                   }}
                 >
                   <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
@@ -297,9 +303,15 @@ export default function GiftBottomSheet({
             <View style={styles.giftsLoadingContainer}>
               <ActivityIndicator color="#00E5FF" size="large" />
             </View>
+          ) : giftPages.length === 0 ? (
+            <View style={styles.giftsLoadingContainer}>
+              <Text style={styles.emptyGiftsText}>{t('No gifts available in this category')}</Text>
+            </View>
           ) : (
             <View style={styles.giftGridContainer}>
               <ScrollView
+                ref={giftScrollRef}
+                key={`scroll_${activeTab}`}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
@@ -311,13 +323,13 @@ export default function GiftBottomSheet({
                 scrollEventThrottle={16}
               >
                 {giftPages.map((pageGifts, pageIdx) => (
-                  <View key={`page_${pageIdx}`} style={styles.giftPageWrap}>
+                  <View key={`${activeTab}_page_${pageIdx}`} style={styles.giftPageWrap}>
                     <View style={styles.giftGrid8}>
                       {pageGifts.map((item) => {
                         const isSelected = selectedGift?._id === item._id;
                         return (
                           <TouchableOpacity
-                            key={item._id}
+                            key={`${item._id || item.name}`}
                             activeOpacity={0.8}
                             style={[styles.giftBox, isSelected && styles.giftBoxSelected]}
                             onPress={() => setSelectedGift(item)}
@@ -686,6 +698,11 @@ const styles = StyleSheet.create({
     height: 220,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  emptyGiftsText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '500',
   },
   giftGridContainer: {
     minHeight: 235,
